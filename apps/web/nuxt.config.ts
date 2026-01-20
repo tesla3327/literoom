@@ -1,0 +1,35 @@
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
+
+export default defineNuxtConfig({
+  compatibilityDate: '2025-01-20',
+
+  future: {
+    compatibilityVersion: 4,
+  },
+
+  modules: [
+    '@nuxt/ui',
+    '@nuxt/eslint',
+    '@nuxt/test-utils/module',
+  ],
+
+  devtools: { enabled: true },
+
+  css: ['~/assets/css/main.css'],
+
+  vite: {
+    plugins: [wasm(), topLevelAwait()],
+  },
+
+  eslint: {
+    config: {
+      stylistic: true,
+    },
+  },
+
+  typescript: {
+    strict: true,
+    typeCheck: true,
+  },
+})

@@ -1,0 +1,26 @@
+{
+  "name": "literoom",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @literoom/web dev",
+    "build": "pnpm --filter @literoom/web build",
+    "preview": "pnpm --filter @literoom/web preview",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm test:unit && pnpm test:e2e",
+    "test:unit": "pnpm --filter @literoom/web test:unit",
+    "test:e2e": "pnpm --filter @literoom/web test:e2e",
+    "wasm:build": "cd crates/literoom-wasm && wasm-pack build --target web --out-dir ../../packages/wasm",
+    "wasm:build:dev": "cd crates/literoom-wasm && wasm-pack build --target web --dev --out-dir ../../packages/wasm"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
