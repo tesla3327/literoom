@@ -1,0 +1,16 @@
+[package]
+name = "literoom-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core image processing library for Literoom"
+
+[dependencies]
+serde = { workspace = true }
+image = { workspace = true }
+rawloader = { workspace = true }
+kamadak-exif = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
