@@ -212,3 +212,62 @@ All 6 phases completed:
 **Status**: Research synthesis complete. Ready to create implementation plan.
 
 ---
+
+## 95: 2026-01-21 17:00 EST: Export Workflow - Implementation Plan Created
+
+**Objective**: Create a detailed implementation plan for the Export workflow feature.
+
+**Background**: Research was completed in iteration #94. This is the last major v1 requirement - users need to export edited photos as JPEGs with configurable quality, optional resizing, and customizable filename templates.
+
+**Plan Created**: `docs/plans/2026-01-21-export-workflow-plan.md`
+
+**6-Phase Implementation**:
+
+1. **Phase 1: JPEG Encoding in WASM** (5 files)
+   - Create `crates/literoom-core/src/encode/mod.rs`
+   - Create `crates/literoom-core/src/encode/jpeg.rs`
+   - Create `crates/literoom-wasm/src/encode.rs`
+   - Modify `crates/literoom-core/src/lib.rs`
+   - Modify `crates/literoom-wasm/src/lib.rs`
+   - Use existing `image` crate for encoding
+
+2. **Phase 2: Worker Integration** (5 files)
+   - Add `encode-jpeg` message type to worker-messages.ts
+   - Add handler in decode-worker.ts
+   - Add `encodeJpeg()` method to DecodeService
+   - Update types and exports
+
+3. **Phase 3: Filename Template Parser** (3 files)
+   - Create `packages/core/src/export/filename-template.ts`
+   - Implement `renderTemplate()` and `validateTemplate()`
+   - Tokens: `{orig}`, `{seq:N}`, `{date}`
+   - Add comprehensive unit tests
+
+4. **Phase 4: Export Service** (3 files)
+   - Create `packages/core/src/export/export-service.ts`
+   - Create `packages/core/src/export/types.ts`
+   - Handle batch processing with progress callbacks
+   - Collision detection with auto-increment
+
+5. **Phase 5: UI Components** (3 files)
+   - Create `apps/web/app/stores/export.ts`
+   - Create `apps/web/app/composables/useExport.ts`
+   - Create `apps/web/app/components/export/ExportModal.vue`
+   - UModal with scope selection, quality slider, resize options
+
+6. **Phase 6: Integration** (2 files)
+   - Add Export button to FilterBar
+   - Add Cmd/Ctrl+E keyboard shortcut
+   - Add ExportModal to index.vue
+
+**Key Decisions**:
+- JPEG quality default: 90 (Lightroom standard)
+- Export scope default: Picks only
+- Resize presets: Original, 2048px, 3840px, 5120px
+- Collision handling: Auto-increment suffix
+
+**Total Files**: ~21 files across 6 phases
+
+**Status**: Plan created. Ready for implementation.
+
+---
