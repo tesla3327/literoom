@@ -200,9 +200,15 @@ async function loadImagePixels(
  * Composable for managing histogram display in the edit view.
  *
  * @param assetId - Reactive ref to the current asset ID
+ * @param adjustedPixelsRef - Optional ref to adjusted pixel data from preview
+ * @param adjustedDimensionsRef - Optional ref to adjusted pixel dimensions
  * @returns Histogram state and controls
  */
-export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayReturn {
+export function useHistogramDisplay(
+  assetId: Ref<string>,
+  adjustedPixelsRef?: Ref<Uint8Array | null | undefined>,
+  adjustedDimensionsRef?: Ref<{ width: number; height: number } | null | undefined>,
+): UseHistogramDisplayReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
   const { $decodeService } = useNuxtApp()
@@ -434,6 +440,80 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
   }
 
   /**
+   * Compute histogram directly from provided pixel data.
+   * Used when adjusted pixels are passed from the preview pipeline.
+   *
+   * @param pixels - RGB pixel data (3 bytes per pixel)
+   * @param width - Image width
+   * @param height - Image height
+   */
+  async function computeHistogramFromPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+  ): Promise<void> {
+    // Don't re-compute if already computing
+    if (isComputing.value) return
+
+    // Capture current generation to detect stale computations
+    const currentGen = computeGeneration.value
+
+    isComputing.value = true
+    error.value = null
+
+    try {
+      // Compute histogram via WASM worker
+      const result = await $decodeService.computeHistogram(pixels, width, height)
+
+      // Check if generation changed (stale computation)
+      if (computeGeneration.value !== currentGen) {
+        console.log('[useHistogramDisplay] Discarding stale adjusted-pixels histogram result')
+        return
+      }
+
+      histogram.value = result
+
+      // Render to canvas
+      renderHistogram()
+    }
+    catch (e) {
+      // Only update error state if still on same generation
+      if (computeGeneration.value === currentGen) {
+        error.value = 'Failed to compute histogram from adjusted pixels'
+        console.error('[useHistogramDisplay] Adjusted pixels computation error:', e)
+      }
+    }
+    finally {
+      isComputing.value = false
+    }
+  }
+
+  /**
+   * Debounced histogram computation for adjusted pixels.
+   * Uses longer delay (500ms) to prioritize preview updates.
+   * Stores the pending pixels to avoid closure issues with typed parameters.
+   */
+  let pendingAdjustedPixels: { pixels: Uint8Array; width: number; height: number } | null = null
+
+  const debouncedComputeFromPixels = debounce(() => {
+    if (pendingAdjustedPixels) {
+      computeHistogramFromPixels(
+        pendingAdjustedPixels.pixels,
+        pendingAdjustedPixels.width,
+        pendingAdjustedPixels.height,
+      )
+    }
+  }, HISTOGRAM_DEBOUNCE_MS)
+
+  /**
+   * Schedule debounced histogram computation from adjusted pixels.
+   */
+  function scheduleComputeFromPixels(pixels: Uint8Array, width: number, height: number) {
+    pendingAdjustedPixels = { pixels, width, height }
+    debouncedComputeFromPixels()
+  }
+
+  /**
    * Debounced histogram computation for use during slider drag.
    * Uses longer delay (500ms) to prioritize preview updates.
    */
@@ -542,14 +622,32 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
   )
 
   /**
+   * Watch for adjusted pixels from the preview pipeline.
+   * When adjusted pixels are provided, compute histogram from them for accurate results.
+   */
+  if (adjustedPixelsRef && adjustedDimensionsRef) {
+    watch(
+      [adjustedPixelsRef, adjustedDimensionsRef],
+      ([pixels, dims]) => {
+        if (pixels && dims) {
+          // Use debounced computation to avoid jank during rapid updates
+          scheduleComputeFromPixels(pixels, dims.width, dims.height)
+        }
+      },
+      { immediate: true },
+    )
+  }
+
+  /**
    * Watch for adjustment changes and trigger debounced histogram computation.
-   * Note: For a more accurate histogram, we should compute from adjusted pixels,
-   * but for now we compute from source pixels (faster, good enough for MVP).
+   * This is a fallback for when adjusted pixels are not provided.
+   * When adjusted pixels ARE provided, the above watcher handles updates.
    */
   watch(
     () => editStore.adjustments,
     () => {
-      if (sourceCache.value) {
+      // Only use source-based computation if adjusted pixels are not being provided
+      if (!adjustedPixelsRef && sourceCache.value) {
         debouncedCompute()
       }
     },
@@ -584,6 +682,7 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
   onUnmounted(() => {
     debouncedCompute.cancel()
+    debouncedComputeFromPixels.cancel()
   })
 
   return {

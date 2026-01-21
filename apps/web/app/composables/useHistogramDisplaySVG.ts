@@ -241,7 +241,11 @@ async function loadImagePixels(
 // Composable
 // ============================================================================
 
-export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDisplaySVGReturn {
+export function useHistogramDisplaySVG(
+  assetId: Ref<string>,
+  adjustedPixelsRef?: Ref<Uint8Array | null | undefined>,
+  adjustedDimensionsRef?: Ref<{ width: number; height: number } | null | undefined>,
+): UseHistogramDisplaySVGReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
   const { $decodeService } = useNuxtApp()
@@ -377,6 +381,67 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     }
   }
 
+  /**
+   * Compute histogram directly from provided pixel data.
+   * Used when adjusted pixels are passed from the preview pipeline.
+   */
+  async function computeHistogramFromPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+  ): Promise<void> {
+    if (isComputing.value) return
+
+    const currentGen = computeGeneration.value
+
+    isComputing.value = true
+    error.value = null
+
+    try {
+      const result = await $decodeService.computeHistogram(pixels, width, height)
+
+      if (computeGeneration.value !== currentGen) {
+        console.log('[useHistogramDisplaySVG] Discarding stale adjusted-pixels histogram result')
+        return
+      }
+
+      histogram.value = result
+    }
+    catch (e) {
+      if (computeGeneration.value === currentGen) {
+        error.value = 'Failed to compute histogram from adjusted pixels'
+        console.error('[useHistogramDisplaySVG] Adjusted pixels computation error:', e)
+      }
+    }
+    finally {
+      isComputing.value = false
+    }
+  }
+
+  /**
+   * Debounced histogram computation for adjusted pixels.
+   * Stores the pending pixels to avoid closure issues with typed parameters.
+   */
+  let pendingAdjustedPixels: { pixels: Uint8Array; width: number; height: number } | null = null
+
+  const debouncedComputeFromPixels = debounce(() => {
+    if (pendingAdjustedPixels) {
+      computeHistogramFromPixels(
+        pendingAdjustedPixels.pixels,
+        pendingAdjustedPixels.width,
+        pendingAdjustedPixels.height,
+      )
+    }
+  }, HISTOGRAM_DEBOUNCE_MS)
+
+  /**
+   * Schedule debounced histogram computation from adjusted pixels.
+   */
+  function scheduleComputeFromPixels(pixels: Uint8Array, width: number, height: number) {
+    pendingAdjustedPixels = { pixels, width, height }
+    debouncedComputeFromPixels()
+  }
+
   const debouncedCompute = debounce(() => {
     computeHistogram()
   }, HISTOGRAM_DEBOUNCE_MS)
@@ -451,10 +516,28 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     },
   )
 
+  /**
+   * Watch for adjusted pixels from the preview pipeline.
+   */
+  if (adjustedPixelsRef && adjustedDimensionsRef) {
+    watch(
+      [adjustedPixelsRef, adjustedDimensionsRef],
+      ([pixels, dims]) => {
+        if (pixels && dims) {
+          scheduleComputeFromPixels(pixels, dims.width, dims.height)
+        }
+      },
+      { immediate: true },
+    )
+  }
+
+  /**
+   * Watch for adjustment changes (fallback when adjusted pixels not provided).
+   */
   watch(
     () => editStore.adjustments,
     () => {
-      if (sourceCache.value) {
+      if (!adjustedPixelsRef && sourceCache.value) {
         debouncedCompute()
       }
     },
@@ -467,6 +550,7 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
 
   onUnmounted(() => {
     debouncedCompute.cancel()
+    debouncedComputeFromPixels.cancel()
   })
 
   return {

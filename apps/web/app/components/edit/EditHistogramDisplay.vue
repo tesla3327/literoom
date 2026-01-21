@@ -8,14 +8,23 @@
 
 const props = defineProps<{
   assetId: string
+  adjustedPixels?: Uint8Array | null
+  adjustedDimensions?: { width: number; height: number } | null
 }>()
+
+const adjustedPixelsRef = toRef(props, 'adjustedPixels')
+const adjustedDimensionsRef = toRef(props, 'adjustedDimensions')
 
 const {
   canvasRef,
   histogram,
   isComputing,
   error,
-} = useHistogramDisplay(toRef(props, 'assetId'))
+} = useHistogramDisplay(
+  toRef(props, 'assetId'),
+  adjustedPixelsRef,
+  adjustedDimensionsRef,
+)
 
 // Use shared UI store for clipping overlay state
 const editUIStore = useEditUIStore()

@@ -9,7 +9,12 @@ import { SVG_WIDTH, SVG_HEIGHT } from '~/composables/useHistogramDisplaySVG'
 
 const props = defineProps<{
   assetId: string
+  adjustedPixels?: Uint8Array | null
+  adjustedDimensions?: { width: number; height: number } | null
 }>()
+
+const adjustedPixelsRef = toRef(props, 'adjustedPixels')
+const adjustedDimensionsRef = toRef(props, 'adjustedDimensions')
 
 const {
   histogram,
@@ -18,7 +23,11 @@ const {
   redPath,
   greenPath,
   bluePath,
-} = useHistogramDisplaySVG(toRef(props, 'assetId'))
+} = useHistogramDisplaySVG(
+  toRef(props, 'assetId'),
+  adjustedPixelsRef,
+  adjustedDimensionsRef,
+)
 
 // Use shared UI store for clipping overlay state
 const editUIStore = useEditUIStore()

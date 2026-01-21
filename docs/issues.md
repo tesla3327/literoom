@@ -6,6 +6,8 @@
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview)
 
 ### Solved Issues
+- [Histogram doesn't update when edits are made (High)](#histogram-doesnt-update-when-edits-are-made---solved)
+- [Edit sliders don't match Lightroom behavior (Medium)](#edit-sliders-dont-match-lightroom-behavior---solved)
 - [Direct URL navigation to edit view (Critical)](#direct-url-navigation-to-edit-view---solved)
 - [Clipping overlay not rendered on preview (High)](#clipping-overlay-not-rendered-on-preview---solved)
 - [Filmstrip navigation causes stuck loading state (Critical)](#filmstrip-navigation-causes-stuck-loading-state---solved)
@@ -66,6 +68,51 @@ The crop region and rotation controls are only visible in a small thumbnail in t
 ---
 
 ## Solved Issues
+
+### Histogram doesn't update when edits are made - SOLVED
+
+**Severity**: High | **Fixed**: 2026-01-21
+
+The histogram now updates in real-time when adjustments are made to the image.
+
+**Root Cause**: The histogram was computing from source (thumbnail) pixels, not from adjusted pixels. This was an intentional MVP design decision documented in the code.
+
+**Fix Applied**:
+1. Modified `useEditPreview.ts` to export `adjustedPixels` and `adjustedDimensions` shallowRefs
+2. Modified `useHistogramDisplay.ts` and `useHistogramDisplaySVG.ts` to accept optional adjusted pixels refs
+3. Added watchers that trigger histogram recomputation when adjusted pixels change
+4. Updated histogram components to accept and pass adjusted pixels props
+5. Wired up `EditPreviewCanvas` to expose adjusted pixels, and edit page to pass them to histogram
+
+**Files Modified** (7 files):
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useHistogramDisplay.ts`
+- `apps/web/app/composables/useHistogramDisplaySVG.ts`
+- `apps/web/app/components/edit/EditHistogramDisplay.vue`
+- `apps/web/app/components/edit/EditHistogramDisplaySVG.vue`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+- `apps/web/app/pages/edit/[id].vue`
+
+---
+
+### Edit sliders don't match Lightroom behavior - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-21
+
+The edit sliders now have Lightroom-style reset interactions and organized panel groups.
+
+**Fix Applied**:
+1. **Reset Interactions**: Double-click or Alt+click on slider label resets to default (0)
+2. **Panel Organization**: Basic panel now organized into Lightroom-style groups:
+   - **White Balance**: Temperature, Tint
+   - **Tone**: Exposure, Contrast, Highlights, Shadows, Whites, Blacks
+   - **Presence**: Vibrance, Saturation
+
+**Files Modified**:
+- `apps/web/app/components/edit/EditAdjustmentSlider.vue` - Added Alt+click reset handler
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Reorganized into grouped layout
+
+---
 
 ### Direct URL navigation to edit view - SOLVED
 

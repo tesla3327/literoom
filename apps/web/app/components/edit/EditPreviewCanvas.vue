@@ -37,7 +37,18 @@ const {
   error,
   clippingMap,
   previewDimensions,
+  adjustedPixels,
+  adjustedDimensions,
 } = useEditPreview(toRef(props, 'assetId'))
+
+/**
+ * Expose adjusted pixels for histogram computation.
+ * This allows the parent component to pass these to the histogram.
+ */
+defineExpose({
+  adjustedPixels,
+  adjustedDimensions,
+})
 
 // ============================================================================
 // Template Refs

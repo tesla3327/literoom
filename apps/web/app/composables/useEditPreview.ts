@@ -57,6 +57,10 @@ export interface UseEditPreviewReturn {
   clippingMap: Ref<ClippingMap | null>
   /** Dimensions of the current preview image */
   previewDimensions: Ref<{ width: number; height: number } | null>
+  /** Adjusted pixel data (RGB, 3 bytes per pixel) for histogram computation */
+  adjustedPixels: Ref<Uint8Array | null>
+  /** Dimensions of the adjusted pixels */
+  adjustedDimensions: Ref<{ width: number; height: number } | null>
 }
 
 // ============================================================================
@@ -274,6 +278,12 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /** Dimensions of the current preview image */
   const previewDimensions = ref<{ width: number; height: number } | null>(null)
 
+  /** Adjusted pixel data (RGB, 3 bytes per pixel) for histogram computation */
+  const adjustedPixels = shallowRef<Uint8Array | null>(null)
+
+  /** Dimensions of the adjusted pixels */
+  const adjustedDimensions = shallowRef<{ width: number; height: number } | null>(null)
+
   /** Cached source pixels to avoid re-loading on every adjustment */
   const sourceCache = ref<{
     assetId: string
@@ -419,6 +429,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         // Still compute clipping from source pixels
         clippingMap.value = detectClippedPixels(pixels, width, height)
         previewDimensions.value = { width, height }
+
+        // Store source pixels as adjusted pixels (no modifications needed)
+        adjustedPixels.value = pixels
+        adjustedDimensions.value = { width, height }
       }
       else {
         // Apply transforms and adjustments via WASM
@@ -486,6 +500,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         // ===== STEP 5: Detect clipping for overlay =====
         clippingMap.value = detectClippedPixels(currentPixels, currentWidth, currentHeight)
         previewDimensions.value = { width: currentWidth, height: currentHeight }
+
+        // ===== STEP 6: Store adjusted pixels for histogram =====
+        adjustedPixels.value = currentPixels
+        adjustedDimensions.value = { width: currentWidth, height: currentHeight }
 
         // Convert result to blob URL
         resultUrl = await pixelsToUrl(currentPixels, currentWidth, currentHeight)
@@ -685,5 +703,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     error,
     clippingMap,
     previewDimensions,
+    adjustedPixels,
+    adjustedDimensions,
   }
 }

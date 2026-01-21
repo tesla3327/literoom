@@ -28,6 +28,21 @@ const selectionStore = useSelectionStore()
 const editStore = useEditStore()
 
 // ============================================================================
+// Preview Component Ref
+// ============================================================================
+
+/**
+ * Reference to the preview canvas component.
+ * Used to access adjusted pixels for histogram computation.
+ * The exposed refs from the component.
+ */
+const previewCanvasRef = ref<InstanceType<typeof EditPreviewCanvas> | null>(null)
+
+// Reactive computed refs that extract adjusted pixels from the preview component
+const adjustedPixels = computed(() => previewCanvasRef.value?.adjustedPixels ?? null)
+const adjustedDimensions = computed(() => previewCanvasRef.value?.adjustedDimensions ?? null)
+
+// ============================================================================
 // Histogram Mode Toggle
 // ============================================================================
 
@@ -212,8 +227,18 @@ onUnmounted(() => {
           </div>
 
           <!-- Histogram Display -->
-          <EditHistogramDisplay v-if="useCanvasHistogram" :asset-id="assetId" />
-          <EditHistogramDisplaySVG v-else :asset-id="assetId" />
+          <EditHistogramDisplay
+            v-if="useCanvasHistogram"
+            :asset-id="assetId"
+            :adjusted-pixels="adjustedPixels"
+            :adjusted-dimensions="adjustedDimensions"
+          />
+          <EditHistogramDisplaySVG
+            v-else
+            :asset-id="assetId"
+            :adjusted-pixels="adjustedPixels"
+            :adjusted-dimensions="adjustedDimensions"
+          />
 
           <!-- Quick info -->
           <div class="space-y-2 text-sm">
@@ -231,7 +256,7 @@ onUnmounted(() => {
 
       <!-- Center: preview canvas -->
       <main class="flex-1 relative min-w-0">
-        <EditPreviewCanvas :asset-id="assetId" />
+        <EditPreviewCanvas ref="previewCanvasRef" :asset-id="assetId" />
       </main>
 
       <!-- Right panel: edit controls -->
