@@ -4,8 +4,11 @@
 //! including RAW decoding, edit pipeline, histogram computation, and more.
 
 pub mod adjustments;
+pub mod curve;
 pub mod decode;
 pub mod histogram;
+
+pub use curve::{apply_tone_curve, evaluate_curve, ToneCurveLut};
 
 /// Basic adjustments for image editing
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
