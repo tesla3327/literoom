@@ -60,6 +60,13 @@ export interface IDecodeService {
     width: number,
     height: number
   ): Promise<HistogramData>
+  /** Apply tone curve to image pixel data */
+  applyToneCurve(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    points: Array<{ x: number; y: number }>
+  ): Promise<DecodedImage>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -188,6 +195,13 @@ export class DecodeService implements IDecodeService {
           maxValue: response.maxValue,
           hasHighlightClipping: response.hasHighlightClipping,
           hasShadowClipping: response.hasShadowClipping
+        })
+        break
+      case 'tone-curve-result':
+        pending.resolve({
+          width: response.width,
+          height: response.height,
+          pixels: response.pixels
         })
         break
     }
@@ -321,6 +335,26 @@ export class DecodeService implements IDecodeService {
       pixels,
       width,
       height
+    })
+  }
+
+  /**
+   * Apply tone curve to image pixel data.
+   * Returns a new image with the tone curve applied.
+   */
+  async applyToneCurve(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    points: Array<{ x: number; y: number }>
+  ): Promise<DecodedImage> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'apply-tone-curve',
+      pixels,
+      width,
+      height,
+      points
     })
   }
 

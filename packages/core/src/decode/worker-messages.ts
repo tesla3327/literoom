@@ -18,6 +18,7 @@ export type DecodeRequest =
   | DetectFileTypeRequest
   | ApplyAdjustmentsRequest
   | ComputeHistogramRequest
+  | ApplyToneCurveRequest
 
 /**
  * Decode a JPEG file to raw RGB pixels.
@@ -101,12 +102,29 @@ export interface ComputeHistogramRequest {
 }
 
 /**
+ * Apply tone curve to image pixels.
+ */
+export interface ApplyToneCurveRequest {
+  id: string
+  type: 'apply-tone-curve'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+  /** Tone curve control points */
+  points: Array<{ x: number; y: number }>
+}
+
+/**
  * Response message sent from decode worker to main thread.
  */
 export type DecodeResponse =
   | DecodeSuccessResponse
   | FileTypeResponse
   | HistogramResponse
+  | ToneCurveResponse
   | DecodeErrorResponse
 
 /**
@@ -160,4 +178,18 @@ export interface HistogramResponse {
   hasHighlightClipping: boolean
   /** True if any channel has pixels at 0 */
   hasShadowClipping: boolean
+}
+
+/**
+ * Tone curve application response.
+ */
+export interface ToneCurveResponse {
+  id: string
+  type: 'tone-curve-result'
+  /** Processed RGB pixel data */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
 }

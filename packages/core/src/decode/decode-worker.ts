@@ -19,9 +19,11 @@ import init, {
   resize_to_fit,
   is_raw_file,
   apply_adjustments,
+  apply_tone_curve,
   compute_histogram,
   BasicAdjustments,
-  JsDecodedImage
+  JsDecodedImage,
+  JsToneCurveLut
 } from 'literoom-wasm'
 
 import type {
@@ -29,7 +31,8 @@ import type {
   DecodeResponse,
   DecodeSuccessResponse,
   DecodeErrorResponse,
-  HistogramResponse
+  HistogramResponse,
+  ToneCurveResponse
 } from './worker-messages'
 import type { ErrorCode } from './types'
 
@@ -282,6 +285,43 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
           blue.buffer,
           luminance.buffer
         ])
+        break
+      }
+
+      case 'apply-tone-curve': {
+        const { pixels, width, height, points } = request
+
+        // Create LUT from curve points
+        const lut = new JsToneCurveLut(points)
+
+        // Create image wrapper
+        const inputImage = new JsDecodedImage(width, height, pixels)
+
+        // Apply tone curve
+        const outputImage = apply_tone_curve(inputImage, lut)
+
+        // Extract result
+        const outputPixels = outputImage.pixels()
+        const outputWidth = outputImage.width
+        const outputHeight = outputImage.height
+
+        // Free WASM memory
+        lut.free()
+        inputImage.free()
+
+        const response: ToneCurveResponse = {
+          id,
+          type: 'tone-curve-result',
+          pixels: outputPixels,
+          width: outputWidth,
+          height: outputHeight
+        }
+
+        // Transfer pixel buffer to avoid copying
+        self.postMessage(response, [outputPixels.buffer])
+
+        // Free output image WASM memory
+        outputImage.free()
         break
       }
 

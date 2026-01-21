@@ -151,3 +151,31 @@ export function filterToNumber(filter: FilterType | undefined): number {
       return 2
   }
 }
+
+/**
+ * A control point on the tone curve.
+ */
+export interface CurvePoint {
+  /** Input value (0-1): 0 = shadows, 1 = highlights */
+  x: number
+  /** Output value (0-1): 0 = black, 1 = white */
+  y: number
+}
+
+/**
+ * Tone curve with control points.
+ */
+export interface ToneCurve {
+  /** Control points, sorted by x coordinate */
+  points: CurvePoint[]
+}
+
+/**
+ * Default tone curve (linear, no adjustment).
+ */
+export const DEFAULT_TONE_CURVE: Readonly<ToneCurve> = Object.freeze({
+  points: [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+  ],
+})

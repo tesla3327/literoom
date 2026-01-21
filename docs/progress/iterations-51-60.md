@@ -1,5 +1,44 @@
 # Iterations 51-60
 
+## 57: 2026-01-21 12:01 EST: Phase 11.3 & 11.4 Complete - TypeScript Types and Worker Integration
+
+**Objective**: Add TypeScript types, worker message definitions, and service methods for tone curve (Phases 11.3-11.4 of the Tone Curve plan).
+
+**Work Completed**:
+
+**Phase 11.3 - TypeScript Types**:
+- Added `CurvePoint` interface to `packages/core/src/decode/types.ts`
+- Added `ToneCurve` interface with points array
+- Added `DEFAULT_TONE_CURVE` constant (linear 0,0 to 1,1)
+- Added `ApplyToneCurveRequest` message type to worker-messages.ts
+- Added `ToneCurveResponse` message type
+- Updated `DecodeRequest` and `DecodeResponse` unions
+- Exported new types from index.ts
+
+**Phase 11.4 - Worker Handler and Service Method**:
+- Added `apply_tone_curve` and `JsToneCurveLut` imports to decode-worker.ts
+- Implemented `apply-tone-curve` case in worker switch statement
+- Added `applyToneCurve()` method to `IDecodeService` interface
+- Implemented method in `DecodeService` class
+- Implemented mock method in `MockDecodeService` (with LUT-based curve application)
+- Added `tone-curve-result` handling in `handleResponse()`
+
+**Files Modified**:
+- `packages/core/src/decode/types.ts` - Added curve types and defaults
+- `packages/core/src/decode/worker-messages.ts` - Added request/response types
+- `packages/core/src/decode/index.ts` - Added exports
+- `packages/core/src/decode/decode-worker.ts` - Added imports and handler
+- `packages/core/src/decode/decode-service.ts` - Added interface and implementation
+- `packages/core/src/decode/mock-decode-service.ts` - Added mock implementation
+
+**Test Results**:
+- All 226 packages/core tests pass
+- TypeScript compiles without errors
+
+**Next Step**: Phase 11.5 - Edit Store Extensions (add toneCurve to Adjustments)
+
+---
+
 ## 56: 2026-01-21 12:00 EST: Fixed Preview Update Issue in Demo Mode
 
 **Objective**: Fix critical issue where preview doesn't update when adjustments change.

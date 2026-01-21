@@ -404,6 +404,53 @@ export class MockDecodeService implements IDecodeService {
     }
   }
 
+  async applyToneCurve(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    points: Array<{ x: number; y: number }>
+  ): Promise<DecodedImage> {
+    await this.simulateOperation()
+
+    // Check if curve is linear (identity)
+    const isLinear =
+      points.length === 2 &&
+      Math.abs(points[0].x) < 0.001 &&
+      Math.abs(points[0].y) < 0.001 &&
+      Math.abs(points[1].x - 1) < 0.001 &&
+      Math.abs(points[1].y - 1) < 0.001
+
+    if (isLinear) {
+      // Return unchanged pixels for identity curve
+      return { width, height, pixels: new Uint8Array(pixels) }
+    }
+
+    // Build simple LUT via linear interpolation for mock
+    const lut = new Uint8Array(256)
+    for (let i = 0; i < 256; i++) {
+      const x = i / 255
+      // Find segment
+      let segIndex = 0
+      while (segIndex < points.length - 1 && points[segIndex + 1].x < x) {
+        segIndex++
+      }
+      const p0 = points[segIndex]
+      const p1 = points[segIndex + 1] || points[segIndex]
+      // Linear interpolation
+      const t = p1.x === p0.x ? 0 : (x - p0.x) / (p1.x - p0.x)
+      const y = p0.y + t * (p1.y - p0.y)
+      lut[i] = Math.max(0, Math.min(255, Math.round(y * 255)))
+    }
+
+    // Apply LUT to pixels
+    const outputPixels = new Uint8Array(pixels.length)
+    for (let i = 0; i < pixels.length; i++) {
+      outputPixels[i] = lut[pixels[i]]
+    }
+
+    return { width, height, pixels: outputPixels }
+  }
+
   destroy(): void {
     this._state = { status: 'error', error: 'Service destroyed' }
   }

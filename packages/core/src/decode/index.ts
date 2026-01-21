@@ -15,6 +15,9 @@ export {
   type ErrorCode,
   type DecodeServiceState,
   type HistogramData,
+  type CurvePoint,
+  type ToneCurve,
+  DEFAULT_TONE_CURVE,
   DecodeError,
   filterToNumber
 } from './types'
@@ -29,10 +32,12 @@ export {
   type DetectFileTypeRequest,
   type ApplyAdjustmentsRequest,
   type ComputeHistogramRequest,
+  type ApplyToneCurveRequest,
   type DecodeResponse,
   type DecodeSuccessResponse,
   type FileTypeResponse,
   type HistogramResponse,
+  type ToneCurveResponse,
   type DecodeErrorResponse
 } from './worker-messages'
 
