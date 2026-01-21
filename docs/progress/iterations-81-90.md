@@ -1,5 +1,80 @@
 # Iterations 81-90
 
+## 86: 2026-01-21 16:13 EST: Preview Generation - Implementation Plan Created
+
+**Objective**: Create an implementation plan for the preview generation feature.
+
+**Background**: Research was completed in iteration #85. The critical issue is that the edit view uses 512px thumbnails instead of proper 2560px previews. Research found that 90% of the infrastructure already exists.
+
+**Plan Created**: `docs/plans/2026-01-21-preview-generation-plan.md`
+
+**8-Phase Implementation**:
+1. **Phase 1**: Extend Asset interface with preview1xUrl/Status fields
+2. **Phase 2**: Create PreviewCache class (20-item memory LRU + OPFS)
+3. **Phase 3**: Extend ThumbnailService with requestPreview() method
+4. **Phase 4**: Update catalog store with preview update actions
+5. **Phase 5**: Update CatalogService with requestPreview() method
+6. **Phase 6**: Wire preview callbacks in catalog plugin
+7. **Phase 7**: Update useEditPreview to use preview1x, request on mount
+8. **Phase 8**: Update MockCatalogService for demo mode support
+
+**Files to Modify** (8 files):
+- `packages/core/src/catalog/types.ts`
+- `packages/core/src/catalog/thumbnail-cache.ts`
+- `packages/core/src/catalog/thumbnail-service.ts`
+- `packages/core/src/catalog/catalog-service.ts`
+- `packages/core/src/catalog/mock-catalog-service.ts`
+- `apps/web/app/stores/catalog.ts`
+- `apps/web/app/plugins/catalog.client.ts`
+- `apps/web/app/composables/useEditPreview.ts`
+
+**Status**: Plan created. Ready for implementation.
+
+---
+
+## 85: 2026-01-21 16:12 EST: Preview Generation - Research Complete
+
+**Objective**: Fix the critical issue where edit view uses thumbnail instead of full-resolution preview.
+
+**Background**: Per `docs/issues.md`, this is a Critical severity issue. The edit view displays small thumbnail images (used for the grid) instead of proper full-resolution previews. This makes editing unusable - users can't make accurate editing decisions on pixelated images.
+
+**Expected** (per spec section 2.3):
+- **Preview 1x**: 2560px long edge for loupe/edit view
+- **Preview 2x**: 5120px long edge for high-detail work
+- Previews should be generated progressively (1x first, then 2x)
+
+**Research Completed**:
+
+Launched 4 parallel research agents to investigate:
+1. Thumbnail service architecture (queue, cache, processing)
+2. Decode service architecture (worker, WASM, operations)
+3. useEditPreview composable (current thumbnail usage)
+4. OPFS caching strategy (LRU, persistence)
+
+**Key Finding**: The infrastructure is **90% ready** for preview generation:
+- ✅ `DecodeService.generatePreview()` already exists with maxEdge and filter options
+- ✅ Database schema already tracks preview1xReady/preview2xReady
+- ✅ OPFS caching extensible to separate previews/ directory
+- ✅ Priority queue can be reused
+- ✅ Worker pool supports parallel generation
+- ✅ useEditPreview pipeline works with any pixel dimensions
+- ✅ useEditPreview.ts already has TODO comment for preview1x
+
+**What Needs Implementation** (6 files):
+1. `packages/core/src/catalog/types.ts` - Add preview1xUrl/preview1xStatus to Asset
+2. `packages/core/src/catalog/thumbnail-cache.ts` - Add PreviewCache class
+3. `packages/core/src/catalog/thumbnail-service.ts` - Add requestPreview() method
+4. `apps/web/app/stores/catalog.ts` - Add updatePreview action
+5. `apps/web/app/plugins/catalog.client.ts` - Wire preview callbacks
+6. `apps/web/app/composables/useEditPreview.ts` - Use preview1xUrl, request on mount
+
+**Files Created**:
+- `docs/research/2026-01-21-preview-generation-synthesis.md`
+
+**Status**: Research complete. Ready to create implementation plan.
+
+---
+
 ## 84: 2026-01-21 15:40 EST: Histogram Update Fix - Implementation Complete
 
 **Objective**: Implement the histogram update fix so histogram updates when edits are made.
