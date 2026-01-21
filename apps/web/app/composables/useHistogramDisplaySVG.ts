@@ -24,6 +24,10 @@ export interface UseHistogramDisplaySVGReturn {
   showShadowClipping: Ref<boolean>
   /** Toggle both clipping overlays (J key behavior) */
   toggleClippingOverlays: () => void
+  /** Toggle shadow clipping overlay only */
+  toggleShadowClipping: () => void
+  /** Toggle highlight clipping overlay only */
+  toggleHighlightClipping: () => void
   /** SVG path data for red channel */
   redPath: ComputedRef<string>
   /** SVG path data for green channel */
@@ -271,6 +275,9 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     height: number
   } | null>(null)
 
+  /** Generation counter to detect stale computations during rapid navigation */
+  const computeGeneration = ref(0)
+
   // ============================================================================
   // Computed SVG Paths
   // ============================================================================
@@ -334,23 +341,35 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     if (!sourceCache.value) return
     if (isComputing.value) return
 
+    // Capture current generation to detect stale computations
+    const currentGen = computeGeneration.value
+
     isComputing.value = true
     error.value = null
 
     try {
       const { pixels, width, height, assetId: cachedId } = sourceCache.value
 
-      if (cachedId !== assetId.value) return
+      if (cachedId !== assetId.value || computeGeneration.value !== currentGen) {
+        console.log('[useHistogramDisplaySVG] Stale computation detected, discarding')
+        return
+      }
 
       const result = await $decodeService.computeHistogram(pixels, width, height)
 
-      if (cachedId !== assetId.value) return
+      if (cachedId !== assetId.value || computeGeneration.value !== currentGen) {
+        console.log('[useHistogramDisplaySVG] Discarding stale histogram result')
+        return
+      }
 
       histogram.value = result
     }
     catch (e) {
-      error.value = 'Failed to compute histogram'
-      console.error('Histogram computation error:', e)
+      // Only update error state if still on same generation
+      if (computeGeneration.value === currentGen) {
+        error.value = 'Failed to compute histogram'
+        console.error('[useHistogramDisplaySVG] Computation error:', e)
+      }
     }
     finally {
       isComputing.value = false
@@ -376,6 +395,14 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     }
   }
 
+  function toggleShadowClipping(): void {
+    showShadowClipping.value = !showShadowClipping.value
+  }
+
+  function toggleHighlightClipping(): void {
+    showHighlightClipping.value = !showHighlightClipping.value
+  }
+
   // ============================================================================
   // Watchers
   // ============================================================================
@@ -388,16 +415,39 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
   watch(
     assetId,
     async (id) => {
+      // Increment generation to invalidate pending operations
+      computeGeneration.value++
+      const currentGen = computeGeneration.value
+
       debouncedCompute.cancel()
       error.value = null
       sourceCache.value = null
       histogram.value = null
 
+      if (!id) return
+
       if (import.meta.client && catalog) {
         catalog.requestThumbnail(id, 0)
       }
 
-      await loadSource(id)
+      const asset = catalogStore.assets.get(id)
+      if (!asset?.thumbnailUrl) return
+
+      try {
+        await loadSource(id)
+
+        if (computeGeneration.value !== currentGen) {
+          console.log('[useHistogramDisplaySVG] Asset watcher: generation changed, discarding')
+          return
+        }
+      }
+      catch (err) {
+        if (computeGeneration.value === currentGen) {
+          error.value = err instanceof Error ? err.message : 'Failed to load histogram'
+          isComputing.value = false
+          console.error('[useHistogramDisplaySVG] Asset load error:', err)
+        }
+      }
     },
     { immediate: true },
   )
@@ -405,8 +455,20 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
   watch(
     sourceUrl,
     async (url) => {
-      if (url && !sourceCache.value) {
+      if (!url || sourceCache.value) return
+
+      const currentGen = computeGeneration.value
+
+      try {
         await loadSource(assetId.value)
+
+        if (computeGeneration.value !== currentGen) return
+      }
+      catch (err) {
+        if (computeGeneration.value === currentGen) {
+          error.value = err instanceof Error ? err.message : 'Failed to load histogram source'
+          isComputing.value = false
+        }
       }
     },
   )
@@ -436,6 +498,8 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     showHighlightClipping,
     showShadowClipping,
     toggleClippingOverlays,
+    toggleShadowClipping,
+    toggleHighlightClipping,
     redPath,
     greenPath,
     bluePath,

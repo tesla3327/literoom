@@ -201,6 +201,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     height: number
   } | null>(null)
 
+  /** Generation counter to detect stale renders during rapid navigation */
+  const renderGeneration = ref(0)
+
   // ============================================================================
   // Computed
   // ============================================================================
@@ -267,6 +270,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       return
     }
 
+    // Capture current generation to detect stale renders
+    const currentGen = renderGeneration.value
+
     error.value = null
     isRendering.value = true
     renderQuality.value = quality
@@ -275,7 +281,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       const { pixels, width, height, assetId: cachedId } = sourceCache.value
 
       // Check if asset changed while we were waiting
-      if (cachedId !== assetId.value) {
+      if (cachedId !== assetId.value || renderGeneration.value !== currentGen) {
+        console.log('[useEditPreview] Stale render detected (asset or generation changed), discarding')
         return
       }
 
@@ -376,9 +383,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         }
       }
 
-      // Check again if asset changed
-      if (cachedId !== assetId.value) {
-        // Asset changed, discard result
+      // Check again if asset or generation changed (stale render protection)
+      if (cachedId !== assetId.value || renderGeneration.value !== currentGen) {
+        // Asset or generation changed, discard result
+        console.log('[useEditPreview] Discarding stale render result')
         if (resultUrl.startsWith('blob:')) {
           URL.revokeObjectURL(resultUrl)
         }
@@ -388,8 +396,11 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       previewUrl.value = resultUrl
     }
     catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to render preview'
-      console.error('Preview render error:', e)
+      // Only update error state if still on same generation
+      if (renderGeneration.value === currentGen) {
+        error.value = e instanceof Error ? e.message : 'Failed to render preview'
+        console.error('[useEditPreview] Render error:', e)
+      }
     }
     finally {
       isRendering.value = false
@@ -439,13 +450,26 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /**
    * Watch for asset changes and immediately load new source.
+   * Uses generation counter to prevent stale updates during rapid navigation.
    */
   watch(
     assetId,
     async (id) => {
+      // Increment generation to invalidate pending operations
+      renderGeneration.value++
+      const currentGen = renderGeneration.value
+
+      // Cancel any pending debounced renders
       debouncedRender.cancel()
+
+      // Reset state
       error.value = null
       sourceCache.value = null
+
+      if (!id) {
+        previewUrl.value = null
+        return
+      }
 
       // Request thumbnail generation (priority 0 = highest for edit view)
       // This ensures the thumbnail is generated even if we navigate directly to edit view
@@ -458,12 +482,33 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       const asset = catalogStore.assets.get(id)
       previewUrl.value = asset?.thumbnailUrl ?? null
 
-      // Load source pixels in background
-      await loadSource(id)
+      // Early return if no thumbnail URL yet - the sourceUrl watcher will pick up when it's ready
+      if (!asset?.thumbnailUrl) {
+        return
+      }
 
-      // Render with current adjustments if any
-      if (sourceCache.value && editStore.isDirty) {
-        renderPreview('full')
+      try {
+        // Load source pixels in background
+        await loadSource(id)
+
+        // Check generation before proceeding (stale protection)
+        if (renderGeneration.value !== currentGen) {
+          console.log('[useEditPreview] Asset watcher: generation changed, discarding')
+          return
+        }
+
+        // Render with current adjustments if any
+        if (sourceCache.value && editStore.isDirty) {
+          await renderPreview('full')
+        }
+      }
+      catch (err) {
+        // Only update error if still on same generation
+        if (renderGeneration.value === currentGen) {
+          error.value = err instanceof Error ? err.message : 'Failed to load preview'
+          isRendering.value = false
+          console.error('[useEditPreview] Asset load error:', err)
+        }
       }
     },
     { immediate: true },
@@ -476,11 +521,28 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   watch(
     sourceUrl,
     async (url) => {
-      if (url && !sourceCache.value) {
+      if (!url || sourceCache.value) return
+
+      const currentGen = renderGeneration.value
+
+      try {
         await loadSource(assetId.value)
+
+        // Check generation before proceeding
+        if (renderGeneration.value !== currentGen) {
+          return
+        }
+
         // Render with current adjustments after loading
         if (sourceCache.value) {
-          renderPreview('full')
+          await renderPreview('full')
+        }
+      }
+      catch (err) {
+        if (renderGeneration.value === currentGen) {
+          error.value = err instanceof Error ? err.message : 'Failed to load source'
+          isRendering.value = false
+          console.error('[useEditPreview] Source load error:', err)
         }
       }
     },

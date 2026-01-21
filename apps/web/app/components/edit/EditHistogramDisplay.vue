@@ -1,17 +1,17 @@
 <script setup lang="ts">
 /**
- * SVG-based Histogram Display Component
+ * Histogram Display Component
  *
- * Uses bezier curves for smooth rendering instead of canvas.
- * Browser handles anti-aliasing natively.
+ * Shows RGB histogram with clipping indicators.
+ * Updates in real-time as adjustments change.
  */
-import { SVG_WIDTH, SVG_HEIGHT } from '~/composables/useHistogramDisplaySVG'
 
 const props = defineProps<{
   assetId: string
 }>()
 
 const {
+  canvasRef,
   histogram,
   isComputing,
   error,
@@ -20,16 +20,14 @@ const {
   toggleClippingOverlays,
   toggleShadowClipping,
   toggleHighlightClipping,
-  redPath,
-  greenPath,
-  bluePath,
-} = useHistogramDisplaySVG(toRef(props, 'assetId'))
+} = useHistogramDisplay(toRef(props, 'assetId'))
 
 // ============================================================================
 // Keyboard Shortcut (J key)
 // ============================================================================
 
 function handleKeydown(e: KeyboardEvent) {
+  // Ignore when typing in inputs
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
     return
   }
@@ -50,11 +48,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-3" data-testid="histogram-display-svg">
+  <div class="space-y-3" data-testid="histogram-display">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <h3 class="text-sm font-medium text-gray-400">
-        Histogram <span class="text-xs text-gray-600">(SVG)</span>
+        Histogram
       </h3>
       <span
         v-if="isComputing"
@@ -65,71 +63,18 @@ onUnmounted(() => {
       </span>
     </div>
 
-    <!-- SVG container -->
+    <!-- Canvas container -->
     <div
       class="relative aspect-[4/3] bg-gray-900 rounded overflow-hidden"
-      data-testid="histogram-svg-container"
+      data-testid="histogram-canvas-container"
     >
-      <svg
-        :viewBox="`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`"
+      <canvas
+        ref="canvasRef"
+        width="256"
+        height="192"
         class="w-full h-full"
-        preserveAspectRatio="none"
-        data-testid="histogram-svg"
-      >
-        <!-- Background -->
-        <rect
-          x="0"
-          y="0"
-          :width="SVG_WIDTH"
-          :height="SVG_HEIGHT"
-          fill="#1a1a1a"
-        />
-
-        <!-- Histogram curves - order matters for layering -->
-        <!-- Blue (back) -->
-        <path
-          v-if="bluePath"
-          :d="bluePath"
-          fill="rgba(0, 100, 255, 0.4)"
-          stroke="rgb(0, 0, 255)"
-          stroke-width="1"
-          stroke-opacity="0.6"
-        />
-
-        <!-- Green (middle) -->
-        <path
-          v-if="greenPath"
-          :d="greenPath"
-          fill="rgba(0, 200, 0, 0.4)"
-          stroke="rgb(0, 255, 0)"
-          stroke-width="1"
-          stroke-opacity="0.6"
-        />
-
-        <!-- Red (front) -->
-        <path
-          v-if="redPath"
-          :d="redPath"
-          fill="rgba(255, 50, 50, 0.4)"
-          stroke="rgb(255, 0, 0)"
-          stroke-width="1"
-          stroke-opacity="0.6"
-        />
-
-        <!-- Shadow clipping indicator (top-left triangle) -->
-        <polygon
-          v-if="histogram?.hasShadowClipping"
-          points="0,0 8,0 0,8"
-          fill="#3b82f6"
-        />
-
-        <!-- Highlight clipping indicator (top-right triangle) -->
-        <polygon
-          v-if="histogram?.hasHighlightClipping"
-          :points="`${SVG_WIDTH},0 ${SVG_WIDTH - 8},0 ${SVG_WIDTH},8`"
-          fill="#ef4444"
-        />
-      </svg>
+        data-testid="histogram-canvas"
+      />
 
       <!-- Error overlay -->
       <div

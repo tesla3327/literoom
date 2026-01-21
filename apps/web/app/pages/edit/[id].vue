@@ -119,7 +119,12 @@ function handleKeydown(e: KeyboardEvent) {
  */
 watch(assetId, async (id) => {
   if (id) {
-    await editStore.loadForAsset(id)
+    try {
+      await editStore.loadForAsset(id)
+    }
+    catch (err) {
+      console.error('[EditPage] Failed to load edit state for asset:', err)
+    }
   }
 }, { immediate: true })
 

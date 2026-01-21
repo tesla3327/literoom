@@ -29,6 +29,10 @@ export interface UseHistogramDisplayReturn {
   showShadowClipping: Ref<boolean>
   /** Toggle both clipping overlays (J key behavior) */
   toggleClippingOverlays: () => void
+  /** Toggle shadow clipping overlay only */
+  toggleShadowClipping: () => void
+  /** Toggle highlight clipping overlay only */
+  toggleHighlightClipping: () => void
 }
 
 // ============================================================================
@@ -110,8 +114,19 @@ function smoothHistogram(data: Uint32Array, kernel: number[]): number[] {
   return result
 }
 
-/** Gaussian kernel for histogram smoothing (created after function definition) */
-const SMOOTHING_KERNEL = createGaussianKernel(SMOOTHING_KERNEL_SIZE)
+/**
+ * Lazy-initialized Gaussian kernel for histogram smoothing.
+ * Using lazy initialization to avoid HMR issues where createGaussianKernel
+ * may not be defined when module-level constant is evaluated.
+ */
+let _smoothingKernel: number[] | null = null
+
+function getSmoothingKernel(): number[] {
+  if (!_smoothingKernel) {
+    _smoothingKernel = createGaussianKernel(SMOOTHING_KERNEL_SIZE)
+  }
+  return _smoothingKernel
+}
 
 // ============================================================================
 // Debounce Utility
@@ -233,6 +248,9 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
     height: number
   } | null>(null)
 
+  /** Generation counter to detect stale computations during rapid navigation */
+  const computeGeneration = ref(0)
+
   // ============================================================================
   // Histogram Rendering
   // ============================================================================
@@ -259,10 +277,11 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
     if (max === 0) return
 
-    // Smooth the histogram data for each channel
-    const smoothedRed = smoothHistogram(hist.red, SMOOTHING_KERNEL)
-    const smoothedGreen = smoothHistogram(hist.green, SMOOTHING_KERNEL)
-    const smoothedBlue = smoothHistogram(hist.blue, SMOOTHING_KERNEL)
+    // Smooth the histogram data for each channel (using lazy-loaded kernel)
+    const kernel = getSmoothingKernel()
+    const smoothedRed = smoothHistogram(hist.red, kernel)
+    const smoothedGreen = smoothHistogram(hist.green, kernel)
+    const smoothedBlue = smoothHistogram(hist.blue, kernel)
 
     // Draw each channel as a filled path with proper colors
     // Order: Blue first (back), then Green, then Red (front) - matches Lightroom
@@ -379,6 +398,7 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
   /**
    * Compute histogram from current source pixels.
+   * Uses generation counter to prevent stale updates during rapid navigation.
    */
   async function computeHistogram(): Promise<void> {
     if (!sourceCache.value) return
@@ -386,22 +406,27 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
     // Don't re-compute if already computing
     if (isComputing.value) return
 
+    // Capture current generation to detect stale computations
+    const currentGen = computeGeneration.value
+
     isComputing.value = true
     error.value = null
 
     try {
       const { pixels, width, height, assetId: cachedId } = sourceCache.value
 
-      // Check if asset changed while we were waiting
-      if (cachedId !== assetId.value) {
+      // Check if asset or generation changed
+      if (cachedId !== assetId.value || computeGeneration.value !== currentGen) {
+        console.log('[useHistogramDisplay] Stale computation detected, discarding')
         return
       }
 
       // Compute histogram via WASM worker
       const result = await $decodeService.computeHistogram(pixels, width, height)
 
-      // Check again if asset changed
-      if (cachedId !== assetId.value) {
+      // Check again if asset or generation changed
+      if (cachedId !== assetId.value || computeGeneration.value !== currentGen) {
+        console.log('[useHistogramDisplay] Discarding stale histogram result')
         return
       }
 
@@ -411,8 +436,11 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
       renderHistogram()
     }
     catch (e) {
-      error.value = 'Failed to compute histogram'
-      console.error('Histogram computation error:', e)
+      // Only update error state if still on same generation
+      if (computeGeneration.value === currentGen) {
+        error.value = 'Failed to compute histogram'
+        console.error('[useHistogramDisplay] Computation error:', e)
+      }
     }
     finally {
       isComputing.value = false
@@ -446,6 +474,22 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
     }
   }
 
+  /**
+   * Toggle shadow clipping overlay only.
+   * Used by UI buttons instead of direct ref mutation.
+   */
+  function toggleShadowClipping(): void {
+    showShadowClipping.value = !showShadowClipping.value
+  }
+
+  /**
+   * Toggle highlight clipping overlay only.
+   * Used by UI buttons instead of direct ref mutation.
+   */
+  function toggleHighlightClipping(): void {
+    showHighlightClipping.value = !showHighlightClipping.value
+  }
+
   // ============================================================================
   // Watchers
   // ============================================================================
@@ -460,14 +504,26 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
   /**
    * Watch for asset changes and load new source.
+   * Uses generation counter to prevent stale updates during rapid navigation.
    */
   watch(
     assetId,
     async (id) => {
+      // Increment generation to invalidate pending operations
+      computeGeneration.value++
+      const currentGen = computeGeneration.value
+
+      // Cancel any pending debounced computations
       debouncedCompute.cancel()
+
+      // Reset state
       error.value = null
       sourceCache.value = null
       histogram.value = null
+
+      if (!id) {
+        return
+      }
 
       // Request thumbnail generation (priority 0 = highest for edit view)
       // This ensures the thumbnail is generated even if we navigate directly to edit view
@@ -476,8 +532,31 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
         catalog.requestThumbnail(id, 0)
       }
 
-      // Load source pixels and compute histogram
-      await loadSource(id)
+      // Check if asset has thumbnail URL
+      const asset = catalogStore.assets.get(id)
+      if (!asset?.thumbnailUrl) {
+        // Early return - the sourceUrl watcher will pick up when thumbnail is ready
+        return
+      }
+
+      try {
+        // Load source pixels and compute histogram
+        await loadSource(id)
+
+        // Check generation before proceeding
+        if (computeGeneration.value !== currentGen) {
+          console.log('[useHistogramDisplay] Asset watcher: generation changed, discarding')
+          return
+        }
+      }
+      catch (err) {
+        // Only update error if still on same generation
+        if (computeGeneration.value === currentGen) {
+          error.value = err instanceof Error ? err.message : 'Failed to load histogram'
+          isComputing.value = false
+          console.error('[useHistogramDisplay] Asset load error:', err)
+        }
+      }
     },
     { immediate: true },
   )
@@ -489,8 +568,24 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
   watch(
     sourceUrl,
     async (url) => {
-      if (url && !sourceCache.value) {
+      if (!url || sourceCache.value) return
+
+      const currentGen = computeGeneration.value
+
+      try {
         await loadSource(assetId.value)
+
+        // Check generation before proceeding
+        if (computeGeneration.value !== currentGen) {
+          return
+        }
+      }
+      catch (err) {
+        if (computeGeneration.value === currentGen) {
+          error.value = err instanceof Error ? err.message : 'Failed to load histogram source'
+          isComputing.value = false
+          console.error('[useHistogramDisplay] Source load error:', err)
+        }
       }
     },
   )
@@ -548,5 +643,7 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
     showHighlightClipping,
     showShadowClipping,
     toggleClippingOverlays,
+    toggleShadowClipping,
+    toggleHighlightClipping,
   }
 }
