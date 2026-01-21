@@ -8,6 +8,7 @@
 //! - `adjustments` - Basic photo adjustments (exposure, contrast, etc.)
 //! - `types` - WASM-compatible wrapper types for image data
 //! - `decode` - Image decoding bindings (JPEG, RAW thumbnail extraction, resize)
+//! - `encode` - Image encoding bindings (JPEG export)
 //!
 //! # Usage
 //!
@@ -28,6 +29,7 @@ use wasm_bindgen::prelude::*;
 mod adjustments;
 mod curve;
 mod decode;
+mod encode;
 mod histogram;
 mod transform;
 mod types;
@@ -39,6 +41,7 @@ pub use decode::{
     decode_jpeg, decode_raw_thumbnail, extract_raw_thumbnail_bytes, generate_thumbnail,
     is_raw_file, resize, resize_to_fit,
 };
+pub use encode::{encode_jpeg, encode_jpeg_from_image};
 pub use histogram::{compute_histogram, JsHistogram};
 pub use transform::{apply_crop, apply_rotation};
 pub use types::JsDecodedImage;

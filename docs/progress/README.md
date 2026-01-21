@@ -256,6 +256,7 @@ literoom/
 | [93](./iterations-91-100.md:121) | 2026-01-21 | Export Workflow - Research Plan Created |
 | [94](./iterations-91-100.md:162) | 2026-01-21 | Export Workflow - Research Synthesis Complete |
 | [95](./iterations-91-100.md:215) | 2026-01-21 | Export Workflow - Implementation Plan Created |
+| [96](./iterations-91-100.md:275) | 2026-01-21 | Export Workflow - Phase 1 (JPEG Encoding in WASM) |
 
 ---
 
