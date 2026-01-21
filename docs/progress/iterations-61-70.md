@@ -1,5 +1,53 @@
 # Iterations 61-70
 
+## 66: 2026-01-21 13:36 EST: Phase 12.3 Complete - Rust Transform Module
+
+**Objective**: Implement the Rust transform module for image rotation and cropping.
+
+**Work Completed**:
+
+**1. Created `crates/literoom-core/src/transform/mod.rs`:**
+- Module definition with exports for `apply_crop`, `apply_rotation`, `compute_rotated_bounds`, and `InterpolationFilter`
+- Documentation of transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+
+**2. Created `crates/literoom-core/src/transform/rotation.rs`:**
+- `InterpolationFilter` enum with `Bilinear` (fast/preview) and `Lanczos3` (quality/export) variants
+- `compute_rotated_bounds()` function to calculate expanded canvas dimensions for rotated images
+- `apply_rotation()` function with inverse mapping and pixel sampling
+- `sample_bilinear()` for 4-neighbor interpolation (fast)
+- `sample_lanczos3()` for 6x6 neighborhood interpolation (high quality)
+- `lanczos_weight()` kernel function
+- Fast paths for 0°, 90°, 180°, 270°, 360° rotations
+- 14 unit tests covering bounds calculation, interpolation, edge cases
+
+**3. Created `crates/literoom-core/src/transform/crop.rs`:**
+- `apply_crop()` function using normalized coordinates (0.0-1.0)
+- Input clamping for out-of-bounds coordinates
+- Fast path for full crop (returns clone)
+- Minimum 1x1 pixel output dimension
+- 11 unit tests for crop functionality
+
+**4. Updated `crates/literoom-core/src/lib.rs`:**
+- Added `pub mod transform;`
+- Re-exported: `apply_crop`, `apply_rotation`, `compute_rotated_bounds`, `InterpolationFilter`
+
+**Files Created/Modified**:
+- `crates/literoom-core/src/transform/mod.rs` - NEW
+- `crates/literoom-core/src/transform/rotation.rs` - NEW
+- `crates/literoom-core/src/transform/crop.rs` - NEW
+- `crates/literoom-core/src/lib.rs` - Updated
+
+**Verification**:
+- All 132 literoom-core tests pass
+- Clippy passes with no warnings
+- rustfmt check passes
+
+**Status**: Complete
+
+**Next Step**: Phase 12.4 - WASM Bindings for transform operations
+
+---
+
 ## 65: 2026-01-21 13:31 EST: Phase 12.1 Complete - TypeScript Types and Utilities
 
 **Objective**: Implement the TypeScript types and utility functions for crop/transform state.

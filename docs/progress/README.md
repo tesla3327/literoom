@@ -3,7 +3,7 @@
 ## Current Status
 
 **Last Updated**: 2026-01-21 13:36 EST
-**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.1 Complete - Types & Store)
+**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.3 In Progress - Rust Transform Module)
 
 ## Project Structure
 
@@ -195,9 +195,10 @@ literoom/
 |---|------|-------|
 | [61](./iterations-61-70.md:94) | 2026-01-21 | Phase 11.8 Complete - Preview Integration |
 | [62](./iterations-61-70.md:39) | 2026-01-21 | Fix Direct URL Navigation to Edit View |
-| [63](./iterations-61-70.md:3) | 2026-01-21 | Phase 12 - Crop/Rotate/Straighten Research Complete |
-| [64](./iterations-61-70.md:3) | 2026-01-21 | Phase 12 - Implementation Plan Created |
+| [63](./iterations-61-70.md:128) | 2026-01-21 | Phase 12 - Crop/Rotate/Straighten Research Complete |
+| [64](./iterations-61-70.md:58) | 2026-01-21 | Phase 12 - Implementation Plan Created |
 | [65](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.1 Complete - TypeScript Types and Utilities |
+| [66](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.3 Complete - Rust Transform Module |
 
 ---
 
@@ -205,7 +206,7 @@ literoom/
 
 | Package | Tests | Status |
 |---------|-------|--------|
-| literoom-core | 107 | Passing |
+| literoom-core | 132 | Passing |
 | literoom-wasm | 30 | Passing |
 | packages/core | 257 | Passing |
 | apps/web (unit) | 1 | Passing |
