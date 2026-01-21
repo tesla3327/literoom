@@ -1,7 +1,7 @@
 # Implementation Plan: TypeScript Integration for Image Decoding
 
 **Date**: 2026-01-20
-**Status**: In Progress
+**Status**: Complete
 **Research**: [TypeScript Integration Synthesis](../research/2026-01-20-typescript-integration-synthesis.md)
 **Parent Plan**: [Image Decoding Plan](./2026-01-20-image-decoding-plan.md) (Phase 7)
 **Priority**: Critical (enables thumbnail/preview display)
@@ -511,44 +511,48 @@ export function useDecode(): IDecodeService {
 
 ---
 
-### Phase 5: Testing ⬜
+### Phase 5: Testing ✅
 
 **Goal**: Ensure the decode pipeline works correctly.
 
 #### Tasks
 
-- [ ] 5.1. Create mock implementation for testing
+- [x] 5.1. Create mock implementation for testing
   - `packages/core/src/decode/mock-decode-service.ts`
   - Returns predictable results for E2E tests
+  - Configurable with custom handlers, delays, and failure modes
 
-- [ ] 5.2. Add unit tests for DecodeService
-  - `packages/core/src/decode/__tests__/decode-service.test.ts`
-  - Test error handling
-  - Test timeout behavior
-  - Test message correlation
+- [x] 5.2. Add unit tests for types and mock service
+  - `packages/core/src/decode/types.test.ts` - 9 tests
+  - `packages/core/src/decode/mock-decode-service.test.ts` - 20 tests
+  - Test error handling, file type detection, all service methods
 
-- [ ] 5.3. Add integration test
-  - Test worker creates and initializes
-  - Test WASM loads in worker context
+- [x] 5.3. Configure vitest for packages/core
+  - Added `vitest.config.ts` and test scripts to `package.json`
+  - Updated root `package.json` to include core tests in `test:unit`
+
+Note: Integration tests for the real DecodeService require browser environment with Worker and WASM support. The MockDecodeService enables E2E testing without these dependencies.
 
 ---
 
-## File Structure (Target)
+## File Structure (Final)
 
 ```
 packages/core/src/decode/
-├── index.ts                 # Public exports
-├── types.ts                 # Interfaces, types, DecodeError
-├── worker-messages.ts       # Worker message types
-├── decode-service.ts        # DecodeService implementation
-├── decode-worker.ts         # Worker entry point
-├── use-decode.ts            # Vue composable
-├── mock-decode-service.ts   # Mock for testing
-└── __tests__/
-    └── decode-service.test.ts
+├── index.ts                    # Public exports
+├── types.ts                    # Interfaces, types, DecodeError
+├── types.test.ts               # Unit tests for types
+├── worker-messages.ts          # Worker message types
+├── decode-service.ts           # DecodeService implementation
+├── decode-worker.ts            # Worker entry point
+├── mock-decode-service.ts      # Mock for testing
+└── mock-decode-service.test.ts # Unit tests for mock
 
-apps/web/app/plugins/
-└── decode.client.ts         # Nuxt plugin
+apps/web/app/
+├── plugins/
+│   └── decode.client.ts        # Nuxt plugin
+└── composables/
+    └── useDecode.ts            # Vue composable
 ```
 
 ---

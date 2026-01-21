@@ -10,7 +10,7 @@
     "lint:fix": "pnpm -r lint:fix",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm test:unit && pnpm test:e2e",
-    "test:unit": "pnpm --filter @literoom/web test:unit",
+    "test:unit": "pnpm --filter @literoom/core test && pnpm --filter @literoom/web test:unit",
     "test:e2e": "pnpm --filter @literoom/web test:e2e",
     "wasm:build": "cd crates/literoom-wasm && wasm-pack build --target web --out-dir ../../packages/wasm",
     "wasm:build:dev": "cd crates/literoom-wasm && wasm-pack build --target web --dev --out-dir ../../packages/wasm"

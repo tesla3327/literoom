@@ -34,3 +34,10 @@ export {
 
 // Service
 export { DecodeService, type IDecodeService } from './decode-service'
+
+// Mock service for testing
+export {
+  MockDecodeService,
+  createTestImage,
+  type MockDecodeServiceOptions
+} from './mock-decode-service'

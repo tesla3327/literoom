@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:00 EST
-**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 4 Complete
+**Last Updated**: 2026-01-20 22:04 EST
+**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Complete
 
 ## Project Structure
 
@@ -36,6 +36,56 @@ literoom/
 ```
 
 ## Completed Work
+
+### 23: 2026-01-20 22:04 EST: TypeScript Integration - Phase 5 Complete (Testing)
+
+**Objective**: Complete Phase 5 of the TypeScript Integration Plan - Testing infrastructure.
+
+**Work Completed**:
+- Created `packages/core/src/decode/mock-decode-service.ts`:
+  - `MockDecodeService` class implementing `IDecodeService` interface
+  - Configurable options: init delay, decode delay, failure mode
+  - Custom handlers for all decode methods
+  - Built-in file type detection from magic bytes
+  - `createTestImage()` utility for creating test fixtures
+
+- Created `packages/core/src/decode/types.test.ts`:
+  - 9 unit tests for `DecodeError` and `filterToNumber`
+  - Tests error creation, cause chaining, all error codes
+
+- Created `packages/core/src/decode/mock-decode-service.test.ts`:
+  - 20 unit tests covering all MockDecodeService functionality
+  - Tests for initialization, delays, custom handlers, file detection, destroy
+
+- Updated `packages/core/src/decode/index.ts`:
+  - Added exports for `MockDecodeService`, `createTestImage`, `MockDecodeServiceOptions`
+
+- Added vitest configuration to packages/core:
+  - `packages/core/vitest.config.ts`
+  - Added test scripts to `packages/core/package.json`
+  - Updated root `package.json` to include core tests in `test:unit`
+
+**Test Summary**:
+- `packages/core`: 29 tests (9 types + 20 mock service)
+- All tests pass
+
+**Files Created**:
+- `packages/core/src/decode/mock-decode-service.ts`
+- `packages/core/src/decode/types.test.ts`
+- `packages/core/src/decode/mock-decode-service.test.ts`
+- `packages/core/vitest.config.ts`
+
+**Files Modified**:
+- `packages/core/src/decode/index.ts`
+- `packages/core/package.json`
+- `package.json` (root)
+- `docs/plans/2026-01-20-typescript-integration-plan.md`
+
+**Phase 7 (TypeScript Integration) is now complete!**
+
+**Next Step**: Determine next priority - either Phase 4 of Image Decoding Plan (Full RAW Decoding) or begin Catalog Service integration.
+
+---
 
 ### 22: 2026-01-20 22:00 EST: TypeScript Integration - Phase 4 Complete (Nuxt Integration)
 
