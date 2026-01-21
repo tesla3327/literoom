@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 15:17 EST
-**Current Phase**: Image Decoding - Phase 6 (WASM Bindings) - Phase 4 Complete (Build Configuration)
+**Last Updated**: 2026-01-20 21:39 EST
+**Current Phase**: Image Decoding - Phase 6 (WASM Bindings) - Complete
 
 ## Project Structure
 
@@ -34,6 +34,33 @@ literoom/
 ```
 
 ## Completed Work
+
+### 16: 2026-01-20 21:39 EST: WASM Bindings - Phase 5 & 6 Complete (Testing & CI)
+
+**Objective**: Complete WASM bindings testing phase and CI integration.
+
+**Work Completed**:
+- Verified Phase 5 (Testing) was already complete from prior work:
+  - Unit tests for types: 5 tests in `types.rs`
+  - Platform-agnostic tests in `decode.rs`: 6 tests
+  - WASM-specific tests via `wasm_bindgen_test`: 12 tests
+  - All 65 tests pass (50 core + 15 wasm)
+  - Clippy passes with no warnings
+  - Formatting passes
+- Updated CI workflow (`.github/workflows/ci.yml`):
+  - WASM build now outputs to `packages/wasm/` to match project structure
+  - Added verification step to ensure output files exist
+- Updated WASM Bindings Plan to mark all phases complete
+- Updated all verification checklist items in the plan
+
+**Test Summary**:
+- `literoom-core`: 50 tests (JPEG, RAW thumbnail, resize, types)
+- `literoom-wasm`: 15 tests (adjustments, decode, types)
+- All tests pass
+
+**Next Step**: Phase 7 of Image Decoding Plan - TypeScript Integration (DecodeService, Web Worker wrapper).
+
+---
 
 ### 15: 2026-01-20 15:17 EST: WASM Bindings - Phase 4 Complete (Build Configuration)
 
