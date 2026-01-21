@@ -2,51 +2,55 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:25 EST
+**Last Updated**: 2026-01-21 07:09 EST
 
-### Catalog Service Implementation - Phase 2 Complete ✅
+### Phase 7.1: Mock Services - Complete ✅
 
-Implemented the Scan Service for folder scanning with async generator pattern.
+Implemented mock services for demo mode and E2E testing without real file system access.
 
 **Files Created**:
-- `packages/core/src/catalog/scan-service.ts` - ScanService class:
-  - Async generator pattern for progressive UI updates
-  - Batched yielding (50 files per batch) for responsive performance
-  - AbortController support for cancellation
-  - Recursive subdirectory traversal (configurable)
-  - Extension-based file filtering (ARW, JPG, JPEG)
-  - Error handling with typed CatalogError codes
+- `packages/core/src/catalog/demo-assets.ts` - Demo asset factory:
+  - `createDemoAsset()` and `createDemoAssets()` factories
+  - Configurable pick/reject/raw rates for distribution control
+  - Deterministic generation based on index for reproducible tests
+  - `getDemoFlagCounts()` and `filterDemoAssetsByFlag()` helpers
+  - 24 unit tests
 
-- `packages/core/src/catalog/scan-service.test.ts` - Comprehensive unit tests:
-  - JPEG/ARW file detection
-  - Unsupported file type filtering
-  - File metadata extraction
-  - Recursive subdirectory scanning
-  - Non-recursive mode
-  - Deeply nested directories
-  - Empty directories
-  - Batch yielding verification
-  - AbortController cancellation
-  - Inaccessible file handling
-  - Permission error handling
-  - Edge cases (no extension, multiple dots)
+- `packages/core/src/catalog/mock-catalog-service.ts` - MockCatalogService:
+  - Full ICatalogService implementation for testing
+  - Configurable scan delay, batch size, thumbnail delay
+  - Mock folder selection and scanning with batched callbacks
+  - Flag management with async callbacks
+  - Simulated thumbnail generation with data URL SVGs
+  - Test-specific methods: `setAssets()`, `clearAssets()`, `resetToDemo()`, `completeAllThumbnails()`
+  - 46 unit tests
+
+- `packages/core/src/filesystem/mock.ts` - MockFileSystemProvider:
+  - Full FileSystemProvider implementation for testing
+  - Configurable demo file count, raw rate, subdirectories
+  - Mock permission states and handle persistence
+  - `createMockFileHandle()` and `createMockDirectoryHandle()` helpers
+  - Valid JPEG placeholder data for file reads
+  - 43 unit tests
 
 **Files Modified**:
-- `packages/core/src/catalog/index.ts` - Added ScanService exports
+- `packages/core/src/catalog/index.ts` - Added MockCatalogService, demo-assets exports
+- `packages/core/src/filesystem/index.ts` - Added MockFileSystemProvider exports
 
 **Verification**:
-- ✅ All unit tests pass (45/45)
-- ✅ Types integrate with existing IScanService interface
-- ⚠️ TypeScript has pre-existing FileSystem API type issues (not introduced by this change)
+- ✅ All unit tests pass (200 tests total)
+- ✅ TypeScript typecheck passes
+- ✅ Exports work correctly from package entry points
 
 ---
 
 ## Next Steps
 
-Continue with **Catalog Service Phase 3: Thumbnail Service**:
-- Implement `packages/core/src/catalog/thumbnail-queue.ts` - Priority queue
-- Implement `packages/core/src/catalog/thumbnail-cache.ts` - LRU + OPFS caching
-- Implement `packages/core/src/catalog/thumbnail-service.ts` - Main service
+Continue with **Phase 7.2: Nuxt Plugin Integration**:
+- Add `runtimeConfig.public.demoMode` to nuxt.config.ts
+- Create `apps/web/app/plugins/catalog.client.ts` - CatalogService plugin
+- Create `apps/web/app/composables/useCatalog.ts` - CatalogService composable
+- Update index.vue to use the new composables
 
 ---
 

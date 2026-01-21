@@ -63,6 +63,20 @@ export {
   type ThumbnailServiceOptions,
 } from './thumbnail-service'
 export { CatalogService, createCatalogService } from './catalog-service'
+export {
+  MockCatalogService,
+  createMockCatalogService,
+  type MockCatalogServiceOptions,
+} from './mock-catalog-service'
+
+// Demo assets
+export {
+  createDemoAsset,
+  createDemoAssets,
+  getDemoFlagCounts,
+  filterDemoAssetsByFlag,
+  type DemoAssetOptions,
+} from './demo-assets'
 
 // Database
 export type { AssetRecord, FolderRecord, EditRecord, CacheMetadataRecord } from './db'

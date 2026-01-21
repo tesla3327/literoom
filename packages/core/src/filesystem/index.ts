@@ -7,6 +7,14 @@
 
 export * from './types'
 export { BrowserFileSystemProvider, isFileSystemAccessSupported } from './browser'
+export {
+  MockFileSystemProvider,
+  createMockFileHandle,
+  createMockDirectoryHandle,
+  type MockFileSystemProviderOptions,
+  type MockDirectoryHandle,
+  type MockFileHandle,
+} from './mock'
 
 import type { FileSystemProvider } from './types'
 import { FileSystemError } from './types'
