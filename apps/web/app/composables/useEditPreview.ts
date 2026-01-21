@@ -166,7 +166,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
   const { $decodeService } = useNuxtApp()
-  const { requestThumbnail } = useCatalog()
+
+  // Only get catalog methods on client-side (catalog service is client-only)
+  const catalog = import.meta.client ? useCatalog() : null
 
   // ============================================================================
   // State
@@ -390,7 +392,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
       // Request thumbnail generation (priority 0 = highest for edit view)
       // This ensures the thumbnail is generated even if we navigate directly to edit view
-      requestThumbnail(id, 0)
+      // Only run on client (catalog service is client-only)
+      if (import.meta.client && catalog) {
+        catalog.requestThumbnail(id, 0)
+      }
 
       // Show thumbnail immediately while loading pixels
       const asset = catalogStore.assets.get(id)

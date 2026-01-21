@@ -3,13 +3,26 @@
  *
  * Creates the CatalogService instance (real or mock based on demo mode)
  * and wires callbacks to Pinia stores for reactive updates.
+ *
+ * IMPORTANT: This plugin is async and provides a `$catalogReady` promise
+ * that components/middleware can await to ensure services are initialized.
  */
 import type { ICatalogService } from '@literoom/core/catalog'
 import type { IDecodeService } from '@literoom/core/decode'
 
-export default defineNuxtPlugin(async () => {
+export default defineNuxtPlugin(async (nuxtApp) => {
   const config = useRuntimeConfig()
   const isDemoMode = config.public.demoMode
+
+  // Create a promise that resolves when services are ready
+  // This is exposed as $catalogReady for middleware/components to await
+  let resolveReady: () => void
+  const catalogReady = new Promise<void>((resolve) => {
+    resolveReady = resolve
+  })
+
+  // Immediately provide the ready promise so it's available during SSR/early hydration
+  nuxtApp.provide('catalogReady', catalogReady)
 
   // Get stores for callback wiring
   const catalogStore = useCatalogStore()
@@ -56,6 +69,9 @@ export default defineNuxtPlugin(async () => {
       decodeService.destroy()
     })
   }
+
+  // Mark services as ready
+  resolveReady!()
 
   return {
     provide: {

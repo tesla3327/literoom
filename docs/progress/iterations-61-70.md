@@ -1,5 +1,60 @@
 # Iterations 61-70
 
+## 62: 2026-01-21 12:38 EST: Fix Direct URL Navigation to Edit View - Complete
+
+**Objective**: Fix the critical issue where navigating directly to `/edit/demo-asset-1` causes a 500 Server Error due to `$catalogService` being undefined.
+
+**Root Cause Analysis**:
+- The catalog plugin (`catalog.client.ts`) is async and may not finish initializing before route handlers execute
+- Composables (`useHistogramDisplay`, `useEditPreview`) call `useCatalog().requestThumbnail()` with `{ immediate: true }` watchers
+- During SSR, the catalog service doesn't exist, causing the crash when the page tries to access it
+
+**Solution Implemented**:
+
+1. **Updated `apps/web/app/plugins/catalog.client.ts`**:
+   - Added `$catalogReady` promise that resolves when services are initialized
+   - This allows middleware to wait for service availability
+
+2. **Created `apps/web/app/middleware/ensure-catalog.ts`**:
+   - Client-only middleware that awaits `$catalogReady`
+   - Falls back to redirecting to home if service unavailable
+
+3. **Updated `apps/web/app/pages/edit/[id].vue`**:
+   - Applied `ensure-catalog` middleware
+   - Added `ssr: false` to disable server-side rendering (edit page requires client-only services)
+
+4. **Updated `apps/web/app/composables/useCatalog.ts`**:
+   - Changed to get `catalogService` as possibly undefined
+   - Added `requireCatalogService()` helper with clear error message
+   - All methods now use the safe helper
+
+5. **Updated `apps/web/app/composables/useHistogramDisplay.ts`**:
+   - Made `useCatalog()` call conditional on `import.meta.client`
+   - Protected `requestThumbnail()` call with client-side check
+
+6. **Updated `apps/web/app/composables/useEditPreview.ts`**:
+   - Same SSR-safe changes as histogram display
+
+**Files Modified**:
+- `apps/web/app/plugins/catalog.client.ts` - Added $catalogReady promise
+- `apps/web/app/middleware/ensure-catalog.ts` - NEW: Middleware to wait for catalog
+- `apps/web/app/pages/edit/[id].vue` - Applied middleware and disabled SSR
+- `apps/web/app/composables/useCatalog.ts` - Added defensive null-checking
+- `apps/web/app/composables/useHistogramDisplay.ts` - Made SSR-safe
+- `apps/web/app/composables/useEditPreview.ts` - Made SSR-safe
+
+**Verification**:
+- Build passes
+- All 237 packages/core tests pass
+- Browser testing confirmed:
+  - Direct URL navigation no longer crashes (shows loading state)
+  - Normal catalog → edit flow still works correctly
+  - Preview, histogram, and controls all function properly
+
+**Status**: Complete
+
+---
+
 ## 61: 2026-01-21 12:20 EST: Phase 11.8 Complete - Preview Integration
 
 **Objective**: Wire tone curve into the preview rendering pipeline so that curve adjustments visually affect the preview.

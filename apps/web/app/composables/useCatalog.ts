@@ -3,17 +3,32 @@
  *
  * Provides access to the CatalogService and common catalog operations.
  * Works with both real and mock services (demo mode).
+ *
+ * IMPORTANT: The catalog plugin is async and may not be ready immediately.
+ * Pages that use this composable should apply the 'ensure-catalog' middleware
+ * to guarantee $catalogService is available.
  */
 import type { ICatalogService, FlagStatus } from '@literoom/core/catalog'
-import type { DirectoryHandle } from '@literoom/core/filesystem'
 
 export function useCatalog() {
   const nuxtApp = useNuxtApp()
   const config = useRuntimeConfig()
 
   // Access services from plugin
-  const catalogService = nuxtApp.$catalogService as ICatalogService
+  // Note: May be undefined if plugin hasn't finished initializing
+  // Use 'ensure-catalog' middleware on pages to guarantee availability
+  const catalogService = nuxtApp.$catalogService as ICatalogService | undefined
   const isDemoMode = config.public.demoMode
+
+  // Helper to safely access the service with a clear error message
+  function requireCatalogService(): ICatalogService {
+    if (!catalogService) {
+      throw new Error(
+        'Catalog service not initialized. Ensure this page uses the "ensure-catalog" middleware.',
+      )
+    }
+    return catalogService
+  }
 
   // Access stores
   const catalogStore = useCatalogStore()
@@ -22,46 +37,36 @@ export function useCatalog() {
   /**
    * Select a folder and begin scanning.
    * In demo mode, loads the demo catalog automatically.
+   * In real mode, uses CatalogService which handles folder picker and persistence.
    */
   async function selectFolder(): Promise<void> {
-    if (isDemoMode) {
-      // Demo mode: trigger auto-scan with mock service
-      catalogStore.clear()
-      selectionStore.clear()
-      catalogStore.setFolderPath('Demo Photos')
-      catalogStore.setScanning(true)
-
-      try {
-        await catalogService.selectFolder()
-        await catalogService.scanFolder()
-      }
-      finally {
-        catalogStore.setScanning(false)
-      }
-      return
-    }
-
-    // Real mode: use BrowserFileSystemProvider
-    const { BrowserFileSystemProvider } = await import('@literoom/core/filesystem')
-    const fsProvider = new BrowserFileSystemProvider()
-
-    // Show folder picker
-    const handle = await fsProvider.selectDirectory()
-
-    // Save handle for session restoration
-    await fsProvider.saveHandle('main-folder', handle)
+    const service = requireCatalogService()
 
     // Clear previous state
     catalogStore.clear()
     selectionStore.clear()
 
-    // Set folder path
-    catalogStore.setFolderPath(handle.name)
+    if (isDemoMode) {
+      catalogStore.setFolderPath('Demo Photos')
+    }
+
     catalogStore.setScanning(true)
 
     try {
+      // selectFolder() shows the folder picker (real mode) or initializes mock data (demo mode)
+      // It also sets _currentFolder internally and persists the handle
+      await service.selectFolder()
+
+      // Get the folder name for UI display (real mode)
+      if (!isDemoMode) {
+        const folder = service.getCurrentFolder()
+        if (folder) {
+          catalogStore.setFolderPath(folder.name)
+        }
+      }
+
       // Scan the folder (callbacks wire to stores via plugin)
-      await catalogService.scanFolder()
+      await service.scanFolder()
     }
     finally {
       catalogStore.setScanning(false)
@@ -73,36 +78,25 @@ export function useCatalog() {
    * Returns true if restoration was successful.
    */
   async function restoreSession(): Promise<boolean> {
+    const service = requireCatalogService()
+
     if (isDemoMode) {
       // Demo mode: auto-load demo catalog
       await selectFolder()
       return true
     }
 
-    // Real mode: try to load from database
-    const { BrowserFileSystemProvider } = await import('@literoom/core/filesystem')
-    const fsProvider = new BrowserFileSystemProvider()
-
+    // Real mode: try to load from CatalogService's database
     try {
-      const savedHandle = await fsProvider.loadHandle('main-folder')
-      if (!savedHandle) return false
-
-      // Check permission
-      const permissionState = await fsProvider.queryPermission(savedHandle, 'read')
-      if (permissionState !== 'granted') {
-        // Return false - caller should show permission recovery UI
+      const restored = await service.loadFromDatabase()
+      if (!restored) {
         return false
       }
 
-      // Set folder path and scan
-      catalogStore.setFolderPath(savedHandle.name)
-      catalogStore.setScanning(true)
-
-      try {
-        await catalogService.scanFolder()
-      }
-      finally {
-        catalogStore.setScanning(false)
+      // Get folder name for UI display
+      const folder = service.getCurrentFolder()
+      if (folder) {
+        catalogStore.setFolderPath(folder.name)
       }
 
       return true
@@ -117,14 +111,15 @@ export function useCatalog() {
    * Applies to current asset if no multi-selection.
    */
   async function setFlag(flag: FlagStatus): Promise<void> {
+    const service = requireCatalogService()
     const selectedIds = selectionStore.selectedIds
     const currentId = selectionStore.currentId
 
     if (selectedIds.size > 0) {
-      await catalogService.setFlagBatch([...selectedIds], flag)
+      await service.setFlagBatch([...selectedIds], flag)
     }
     else if (currentId) {
-      await catalogService.setFlag(currentId, flag)
+      await service.setFlag(currentId, flag)
     }
   }
 
@@ -153,22 +148,24 @@ export function useCatalog() {
    * Request thumbnail generation for an asset.
    */
   function requestThumbnail(assetId: string, priority: number): void {
-    catalogService.requestThumbnail(assetId, priority)
+    const service = requireCatalogService()
+    service.requestThumbnail(assetId, priority)
   }
 
   /**
    * Update thumbnail priority for viewport-aware loading.
    */
   function updateThumbnailPriority(assetId: string, priority: number): void {
-    catalogService.updateThumbnailPriority(assetId, priority)
+    const service = requireCatalogService()
+    service.updateThumbnailPriority(assetId, priority)
   }
 
   return {
-    // Services
+    // Services (may be undefined until plugin initializes)
     catalogService,
     isDemoMode,
 
-    // Operations
+    // Operations (will throw if service not ready)
     selectFolder,
     restoreSession,
     setFlag,

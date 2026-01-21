@@ -9,6 +9,13 @@
  * - Bottom: filmstrip navigation
  */
 
+// Apply middleware to ensure catalog service is ready before page loads
+// Also disable SSR since this page requires client-only services (catalog, decode)
+definePageMeta({
+  middleware: ['ensure-catalog'],
+  ssr: false,
+})
+
 // ============================================================================
 // Stores and Composables
 // ============================================================================

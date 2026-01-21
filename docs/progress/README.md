@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 12:20 EST
+**Last Updated**: 2026-01-21 12:38 EST
 **Current Phase**: Phase 11 - Tone Curve (Complete)
 
 ## Project Structure
@@ -193,7 +193,8 @@ literoom/
 
 | # | Date | Title |
 |---|------|-------|
-| [61](./iterations-61-70.md:3) | 2026-01-21 | Phase 11.8 Complete - Preview Integration |
+| [61](./iterations-61-70.md:56) | 2026-01-21 | Phase 11.8 Complete - Preview Integration |
+| [62](./iterations-61-70.md:3) | 2026-01-21 | Fix Direct URL Navigation to Edit View |
 
 ---
 
