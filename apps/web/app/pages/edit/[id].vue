@@ -86,8 +86,14 @@ function navigateNext() {
  * Handle keyboard navigation.
  */
 function handleKeydown(e: KeyboardEvent) {
-  // Ignore when typing in inputs
+  // Ignore when typing in inputs or interacting with sliders
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    return
+  }
+
+  // Ignore arrow keys when focused on slider elements (role="slider")
+  const target = e.target as HTMLElement
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && target.getAttribute?.('role') === 'slider') {
     return
   }
 

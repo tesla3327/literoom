@@ -3,12 +3,14 @@
 ## Table of Contents
 
 ### Open Issues
+- [Filmstrip navigation causes stuck loading state (Critical)](#filmstrip-navigation-causes-stuck-loading-state)
 - [Direct URL navigation to edit view (Critical - Partial)](#direct-url-navigation-to-edit-view)
 - [Clipping overlay not rendered on preview (High)](#clipping-overlay-not-rendered-on-preview)
-- [E/Enter/D keys don't navigate to edit view (Medium)](#eenterd-keys-dont-navigate-to-edit-view)
-- [Arrow keys captured by image navigation (Medium)](#arrow-keys-captured-by-image-navigation)
+- [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview)
 
 ### Solved Issues
+- [E/Enter/D keys don't navigate to edit view (Medium)](#eenterd-keys-dont-navigate-to-edit-view---solved)
+- [Arrow keys captured by image navigation (Medium)](#arrow-keys-captured-by-image-navigation---solved)
 - [Histogram does not render correctly (Critical)](#histogram-does-not-render-correctly---solved)
 - [Edit view preview not loading (Critical)](#edit-view-preview-not-loading---solved)
 - [Folder selection shows "No supported images found" (Critical)](#folder-selection-shows-no-supported-images-found---solved)
@@ -22,6 +24,63 @@
 ---
 
 ## Open Issues
+
+### Filmstrip navigation causes stuck loading state
+
+**Severity**: Critical | **Status**: Open | **Discovered**: 2026-01-21
+
+Rapidly clicking between thumbnails in the edit view filmstrip can cause both the preview and histogram to get stuck in a "Loading..." state. In severe cases, the entire edit view becomes broken with empty filmstrip and "0 / 0" position indicator.
+
+**Expected**: Clicking filmstrip thumbnails should smoothly transition between photos, with preview and histogram updating for each new asset.
+
+**Observed**:
+- After rapid navigation between filmstrip thumbnails, preview shows "Loading preview..." indefinitely
+- Histogram shows "Loading..." indefinitely
+- In severe cases:
+  - Header shows "0 / 0" instead of asset position
+  - Filmstrip becomes completely empty
+  - No filename, format, or size displayed
+- The only recovery is navigating back to catalog (G key) and re-entering edit view
+
+**Console Errors Found**:
+```
+[Vue warn] Set operation on key "value" failed: target is readonly. RefImpl
+[Vue warn]: Unhandled error during execution of watcher callback
+[Vue warn]: Unhandled error during execution of component update
+```
+
+Note: Some transient Vite HMR errors also appeared (`createGaussianKernel is not defined`, `SMOOTHING_KERNEL is not defined`) but these are hot-reload artifacts, not actual code issues.
+
+**Root Causes**:
+
+1. **Readonly ref mutation attempt**: The code attempts to set a value on a readonly ref created by `toRef(props, 'assetId')`. When Vue prints `Set operation on key "value" failed: target is readonly. RefImpl`, it indicates that somewhere a composable is trying to write to a readonly ref derived from props.
+
+2. **Race condition in async operations**: When navigating rapidly, multiple async thumbnail loading and histogram computation operations run simultaneously. When operations complete out of order, they may update state for the wrong asset or corrupt shared state.
+
+3. **Watcher callback errors**: The `[Vue warn]: Unhandled error during execution of watcher callback` indicates that watchers in composables are throwing uncaught exceptions during rapid navigation.
+
+4. **shallowRef reactivity issues**: The catalog store uses `shallowRef` for the assets Map, which may not properly trigger computed property updates in composables when individual asset properties change.
+
+**Files Involved**:
+- `apps/web/app/composables/useEditPreview.ts` - Preview loading logic with `toRef` usage
+- `apps/web/app/composables/useHistogramDisplay.ts` - Histogram computation with missing constants
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Uses `toRef(props, 'assetId')`
+- `apps/web/app/components/edit/EditHistogramDisplay.vue` - Uses `toRef(props, 'assetId')`
+- `apps/web/app/stores/catalog.ts` - Uses `shallowRef` for assets Map
+
+**Recommended Fix**:
+1. Fix the missing `SMOOTHING_KERNEL` and `createGaussianKernel` references in histogram code
+2. Add proper cancellation tokens for async operations when asset changes
+3. Consider using `computed` instead of `toRef` for prop-derived values
+4. Add debouncing to filmstrip click handlers to prevent rapid navigation
+5. Ensure watchers properly cancel pending operations before starting new ones
+
+**Screenshots**:
+- `docs/screenshots/verify-filmstrip-nav-07-histogram-stuck-loading.png`
+- `docs/screenshots/verify-filmstrip-nav-08-both-stuck-loading.png`
+- `docs/screenshots/verify-filmstrip-nav-09-broken-state.png`
+
+---
 
 ### Direct URL navigation to edit view
 
@@ -95,73 +154,43 @@ The J key and Shadows/Highlights buttons toggle clipping state correctly (button
 
 ---
 
-### E/Enter/D keys don't navigate to edit view
+### Crop/transform controls not overlayed on preview
 
-**Severity**: Medium | **Status**: Open
+**Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
 
-Pressing E, Enter, or D keys with a photo selected in the catalog grid does not navigate to the edit view. Only double-click works.
+The crop region and rotation controls are only visible in a small thumbnail in the right panel. Users cannot see crop guides or interact with the crop region directly on the main preview canvas.
 
-**Expected**: After selecting a photo in the catalog grid, pressing E, Enter, or D should navigate to `/edit/[asset-id]` to open the edit view for that photo.
+**Expected**: When using crop/transform tools, the main preview canvas should display:
+- Crop region overlay with draggable corner handles
+- Rule-of-thirds grid lines within the crop region
+- Semi-transparent darkening outside the crop area
+- Interactive dragging to resize and move the crop region
+- Visual feedback for rotation angle (rotation guides)
 
-**Observed**: Pressing E, Enter, or D keys does nothing visible. The URL remains at `/` and no navigation occurs.
+**Observed**:
+- Crop region is only shown in a small thumbnail in the Crop & Transform panel
+- No crop overlay appears on the main preview canvas
+- The instructions say "Drag corners to resize | Drag inside to move" but this only works on the small panel thumbnail
+- Users cannot precisely position crops on the full-size preview
 
-**What Works**:
-- ✅ G key returns to grid view from edit view
-- ✅ Double-click on thumbnail navigates to edit view
-- ✅ Thumbnail selection works (click selects, shows checkmark)
-- ✅ Arrow key navigation in grid works
-- ✅ P/X/U flag shortcuts work
+**Impact**: This makes it difficult to make precise crop decisions, especially for large images where the panel thumbnail is too small to see details. Professional photo editing applications (Lightroom, Capture One, etc.) always overlay crop controls directly on the main preview.
 
-**Root Cause**: The `onViewChange` callback in `CatalogGrid.vue` (line 248-256) only changes the view mode state but doesn't actually navigate to the edit page:
+**Implementation Needed**:
+1. Add a crop overlay component to `EditPreviewCanvas.vue`
+2. Render the crop region as a resizable overlay on the main canvas
+3. Add corner handles that can be dragged to resize
+4. Add center drag to reposition the crop region
+5. Show rule-of-thirds grid when crop is active
+6. Darken the area outside the crop region
+7. Connect mouse events to update the crop state in the edit store
 
-```typescript
-onViewChange: (mode) => {
-  if (mode === 'edit') {
-    catalogUIStore.setViewMode('loupe')
-    // Future: navigate to edit page  <-- INCOMPLETE
-  }
-  else {
-    catalogUIStore.setViewMode('grid')
-  }
-},
-```
+**Files Involved**:
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Needs crop overlay
+- `apps/web/app/components/edit/EditCropEditor.vue` - Current panel-only implementation
+- `apps/web/app/stores/edit.ts` - Crop state management
 
-**Fix Required**: Add navigation to the edit page when mode is 'edit':
-
-```typescript
-onViewChange: (mode) => {
-  if (mode === 'edit') {
-    catalogUIStore.setViewMode('loupe')
-    const currentId = selectionStore.currentId
-    if (currentId) {
-      navigateTo(`/edit/${currentId}`)
-    }
-  }
-  else {
-    catalogUIStore.setViewMode('grid')
-  }
-},
-```
-
-**Location**: `apps/web/app/components/catalog/CatalogGrid.vue:248-256`
-
----
-
-### Arrow keys captured by image navigation
-
-**Severity**: Medium | **Status**: Open
-
-When a slider element has focus, pressing ArrowRight/ArrowLeft navigates to different images instead of adjusting the slider value.
-
-**Expected**: When a slider has keyboard focus, arrow keys should increment/decrement the slider value.
-
-**Observed**: Arrow keys trigger `navigateNext()`/`navigatePrev()` in the page's keyboard handler, causing image navigation instead of slider adjustment.
-
-**Root Cause**: The `handleKeydown()` function in `apps/web/app/pages/edit/[id].vue:75-96` checks for `HTMLInputElement` and `HTMLTextAreaElement` targets, but not for elements with `role="slider"`.
-
-**Fix**: Add a check for `e.target.role === 'slider'` or check if `e.target.matches('[role="slider"]')` and skip navigation when the target is a slider.
-
-**Location**: `apps/web/app/pages/edit/[id].vue:75-96`
+**Screenshots**:
+- `docs/screenshots/verify-transform-07-crop.png` - Shows crop only in panel thumbnail
 
 ---
 
@@ -267,3 +296,31 @@ App was using Nuxt UI v3 instead of v4. Upgraded to Nuxt UI 4.
 **Fixed**: 2026-01-21
 
 Shows loading/glimmer state instead of actual images. Fixed by adding `requestThumbnail` calls in `CatalogThumbnail.vue` when component mounts. Also improved thumbnail visuals with gradient patterns.
+
+---
+
+### E/Enter/D keys don't navigate to edit view - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-21
+
+Pressing E, Enter, or D keys with a photo selected in the catalog grid now navigates to the edit view.
+
+**Root Cause**: The `onViewChange` callback in `CatalogGrid.vue` only changed the view mode state but didn't actually navigate to the edit page.
+
+**Fix Applied**: Added `navigateTo(`/edit/${currentId}`)` call in the `onViewChange` callback when mode is 'edit'.
+
+**File Modified**: `apps/web/app/components/catalog/CatalogGrid.vue`
+
+---
+
+### Arrow keys captured by image navigation - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-21
+
+When a slider element has focus, arrow keys now properly adjust the slider value instead of navigating between images.
+
+**Root Cause**: The `handleKeydown()` function in the edit page checked for input/textarea elements but not for slider elements (role="slider").
+
+**Fix Applied**: Added a check for `target.getAttribute('role') === 'slider'` to skip navigation when focused on slider elements.
+
+**File Modified**: `apps/web/app/pages/edit/[id].vue`

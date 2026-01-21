@@ -65,7 +65,7 @@ const sortedAssetIds = computed(() => catalogUIStore.sortedAssetIds)
  * Number of rows needed to display all items.
  */
 const rowCount = computed(() =>
-  Math.ceil(sortedAssetIds.value.length / columnsCount.value)
+  Math.ceil(sortedAssetIds.value.length / columnsCount.value),
 )
 
 /**
@@ -176,7 +176,7 @@ function handleThumbnailClick(event: MouseEvent, rowIndex: number, colIndex: num
   selectionStore.handleClick(
     assetId,
     { shiftKey: event.shiftKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey },
-    sortedAssetIds.value
+    sortedAssetIds.value,
   )
 }
 
@@ -215,7 +215,7 @@ function scrollToCurrentItem(id: string, index: number) {
   // After scroll, find and focus the element
   nextTick(() => {
     const element = scrollContainerRef.value?.querySelector(
-      `[data-asset-id="${id}"]`
+      `[data-asset-id="${id}"]`,
     ) as HTMLElement | null
     scrollIntoViewIfNeeded(element)
     element?.focus()
@@ -248,8 +248,12 @@ const { handleKeydown } = useGridKeyboard({
   onViewChange: (mode) => {
     if (mode === 'edit') {
       catalogUIStore.setViewMode('loupe')
-      // Future: navigate to edit page
-    } else {
+      const currentId = selectionStore.currentId
+      if (currentId) {
+        navigateTo(`/edit/${currentId}`)
+      }
+    }
+    else {
       catalogUIStore.setViewMode('grid')
     }
   },
@@ -319,10 +323,21 @@ function handleContainerFocus() {
     </div>
 
     <!-- Empty state (shown when no items) -->
-    <div v-if="sortedAssetIds.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
-      <UIcon name="i-heroicons-photo" class="w-16 h-16 mb-4 text-gray-600" />
-      <p class="text-lg font-medium">No photos to display</p>
-      <p v-if="catalogUIStore.filterMode !== 'all'" class="text-sm mt-2 text-gray-600">
+    <div
+      v-if="sortedAssetIds.length === 0"
+      class="absolute inset-0 flex flex-col items-center justify-center text-gray-500"
+    >
+      <UIcon
+        name="i-heroicons-photo"
+        class="w-16 h-16 mb-4 text-gray-600"
+      />
+      <p class="text-lg font-medium">
+        No photos to display
+      </p>
+      <p
+        v-if="catalogUIStore.filterMode !== 'all'"
+        class="text-sm mt-2 text-gray-600"
+      >
         Try changing the filter or selecting a different folder
       </p>
     </div>

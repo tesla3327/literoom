@@ -1,5 +1,30 @@
 # Iterations 71-80
 
+## 74: 2026-01-21 14:36 EST: Keyboard Navigation Fixes
+
+**Objective**: Fix two medium-severity keyboard navigation issues.
+
+**Fixes Applied**:
+
+1. **E/Enter/D keys don't navigate to edit view**
+   - Root cause: `onViewChange` callback only set view mode but didn't navigate
+   - Fix: Added `navigateTo(`/edit/${currentId}`)` call when mode is 'edit'
+   - File: `apps/web/app/components/catalog/CatalogGrid.vue:248-259`
+
+2. **Arrow keys captured by image navigation**
+   - Root cause: Keyboard handler didn't check for slider elements
+   - Fix: Added check for `target.getAttribute('role') === 'slider'` to skip navigation
+   - File: `apps/web/app/pages/edit/[id].vue:88-96`
+
+**Verification**:
+- Nuxt prepare succeeds (types generated)
+- All 257 packages/core tests pass
+- All 1 web unit test passes
+
+**Status**: Complete
+
+---
+
 ## 73: 2026-01-21 14:32 EST: Filmstrip Navigation Bug Fix - Implementation Complete
 
 **Objective**: Fix the critical bug where rapidly clicking filmstrip thumbnails causes stuck loading states.
