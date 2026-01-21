@@ -10,6 +10,7 @@
  */
 import type { Ref } from 'vue'
 import type { Adjustments } from '@literoom/core/catalog'
+import { hasModifiedAdjustments } from '@literoom/core/catalog'
 
 // ============================================================================
 // Types
@@ -279,10 +280,11 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         blacks: editStore.adjustments.blacks,
         vibrance: editStore.adjustments.vibrance,
         saturation: editStore.adjustments.saturation,
+        toneCurve: editStore.adjustments.toneCurve,
       }
 
       // Check if any adjustments are non-default
-      const hasAdjustments = Object.values(adjustments).some(v => v !== 0)
+      const hasAdjustments = hasModifiedAdjustments(adjustments)
 
       let resultUrl: string
 

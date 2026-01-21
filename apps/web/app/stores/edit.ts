@@ -4,6 +4,7 @@
  * Manages edit state for photo editing:
  * - Current asset being edited
  * - Adjustment values (temperature, exposure, etc.)
+ * - Tone curve control points
  * - Dirty flag tracking
  * - Load/reset/save operations
  *
@@ -15,7 +16,10 @@ import {
   EDIT_SCHEMA_VERSION,
   createDefaultEditState,
   hasModifiedAdjustments,
+  isModifiedToneCurve,
 } from '@literoom/core/catalog'
+import type { CurvePoint, ToneCurve } from '@literoom/core/decode'
+import { DEFAULT_TONE_CURVE } from '@literoom/core/decode'
 
 export const useEditStore = defineStore('edit', () => {
   // ============================================================================
@@ -57,6 +61,11 @@ export const useEditStore = defineStore('edit', () => {
   const hasModifications = computed(() => hasModifiedAdjustments(adjustments.value))
 
   /**
+   * Whether the tone curve has been modified from the default linear curve.
+   */
+  const hasCurveModifications = computed(() => isModifiedToneCurve(adjustments.value.toneCurve))
+
+  /**
    * Get the full edit state object.
    */
   const editState = computed<EditState>(() => ({
@@ -88,9 +97,14 @@ export const useEditStore = defineStore('edit', () => {
   }
 
   /**
-   * Update a single adjustment value.
+   * Numeric adjustment keys (excludes toneCurve).
    */
-  function setAdjustment<K extends keyof Adjustments>(key: K, value: number): void {
+  type NumericAdjustmentKey = Exclude<keyof Adjustments, 'toneCurve'>
+
+  /**
+   * Update a single numeric adjustment value.
+   */
+  function setAdjustment(key: NumericAdjustmentKey, value: number): void {
     adjustments.value[key] = value
     isDirty.value = true
     error.value = null
@@ -132,10 +146,12 @@ export const useEditStore = defineStore('edit', () => {
       // const state = editState.value
       // await saveEditState(currentAssetId.value, state)
       isDirty.value = false
-    } catch (e) {
+    }
+    catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to save edits'
       throw e
-    } finally {
+    }
+    finally {
       isSaving.value = false
     }
   }
@@ -151,6 +167,65 @@ export const useEditStore = defineStore('edit', () => {
     error.value = null
   }
 
+  // ============================================================================
+  // Tone Curve Actions
+  // ============================================================================
+
+  /**
+   * Set the complete tone curve.
+   */
+  function setToneCurve(curve: ToneCurve): void {
+    adjustments.value = {
+      ...adjustments.value,
+      toneCurve: { points: [...curve.points] },
+    }
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Add a control point to the curve.
+   * Points are automatically sorted by x coordinate.
+   */
+  function addCurvePoint(point: CurvePoint): void {
+    const newPoints = [...adjustments.value.toneCurve.points, point].sort(
+      (a, b) => a.x - b.x,
+    )
+    setToneCurve({ points: newPoints })
+  }
+
+  /**
+   * Update a control point by index.
+   * Points are automatically re-sorted by x coordinate.
+   */
+  function updateCurvePoint(index: number, point: CurvePoint): void {
+    const newPoints = [...adjustments.value.toneCurve.points]
+    newPoints[index] = point
+    newPoints.sort((a, b) => a.x - b.x)
+    setToneCurve({ points: newPoints })
+  }
+
+  /**
+   * Delete a control point by index.
+   * Cannot delete anchor points (first and last).
+   * Cannot reduce below 2 points.
+   */
+  function deleteCurvePoint(index: number): void {
+    const points = adjustments.value.toneCurve.points
+    if (index === 0 || index === points.length - 1) return
+    if (points.length <= 2) return
+
+    const newPoints = points.filter((_, i) => i !== index)
+    setToneCurve({ points: newPoints })
+  }
+
+  /**
+   * Reset only the tone curve to the default linear curve.
+   */
+  function resetToneCurve(): void {
+    setToneCurve({ points: [...DEFAULT_TONE_CURVE.points] })
+  }
+
   return {
     // State
     currentAssetId,
@@ -161,6 +236,7 @@ export const useEditStore = defineStore('edit', () => {
 
     // Computed
     hasModifications,
+    hasCurveModifications,
     editState,
 
     // Actions
@@ -170,5 +246,12 @@ export const useEditStore = defineStore('edit', () => {
     reset,
     save,
     clear,
+
+    // Tone Curve Actions
+    setToneCurve,
+    addCurvePoint,
+    updateCurvePoint,
+    deleteCurvePoint,
+    resetToneCurve,
   }
 })

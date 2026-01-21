@@ -1,5 +1,52 @@
 # Iterations 51-60
 
+## 58: 2026-01-21 12:10 EST: Phase 11.5 Complete - Edit Store Extensions
+
+**Objective**: Add tone curve state management to the edit store (Phase 11.5 of the Tone Curve plan).
+
+**Work Completed**:
+
+**Catalog Types Updated** (`packages/core/src/catalog/types.ts`):
+- Imported `ToneCurve` type and `DEFAULT_TONE_CURVE` from decode types
+- Bumped `EDIT_SCHEMA_VERSION` from 1 to 2
+- Added `toneCurve: ToneCurve` property to `Adjustments` interface
+- Updated `DEFAULT_ADJUSTMENTS` to include `toneCurve: DEFAULT_TONE_CURVE`
+- Added `isModifiedToneCurve()` function for curve comparison
+- Updated `hasModifiedAdjustments()` to handle numeric keys separately and check tone curve
+
+**Edit Store Updated** (`apps/web/app/stores/edit.ts`):
+- Added imports for `CurvePoint`, `ToneCurve`, `DEFAULT_TONE_CURVE`, and `isModifiedToneCurve`
+- Added `NumericAdjustmentKey` type to restrict `setAdjustment()` to numeric keys only
+- Added `hasCurveModifications` computed property
+- Added 5 new tone curve actions:
+  - `setToneCurve(curve)` - Set complete curve
+  - `addCurvePoint(point)` - Add point with auto-sorting
+  - `updateCurvePoint(index, point)` - Update point with auto-sorting
+  - `deleteCurvePoint(index)` - Delete point (protects anchors)
+  - `resetToneCurve()` - Reset to linear curve
+
+**Related Files Updated**:
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Added `NumericAdjustmentKey` type for slider config
+- `apps/web/app/composables/useEditPreview.ts` - Added `toneCurve` to adjustments object, use `hasModifiedAdjustments()`
+- `packages/core/src/catalog/index.ts` - Export `isModifiedToneCurve`
+- `packages/core/src/catalog/edit-types.test.ts` - Updated tests for schema v2 and 11 properties, added tone curve tests
+
+**Files Modified**:
+- `packages/core/src/catalog/types.ts` - Extended Adjustments interface
+- `packages/core/src/catalog/index.ts` - Added export
+- `packages/core/src/catalog/edit-types.test.ts` - Updated tests (now 37 tests)
+- `apps/web/app/stores/edit.ts` - Added curve state management
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Type fixes
+- `apps/web/app/composables/useEditPreview.ts` - Added toneCurve, use hasModifiedAdjustments
+
+**Test Results**:
+- All 237 packages/core tests pass (11 new tests)
+- TypeScript compiles without errors
+
+**Next Step**: Phase 11.6 - useToneCurve Composable (canvas rendering and interaction)
+
+---
+
 ## 57: 2026-01-21 12:01 EST: Phase 11.3 & 11.4 Complete - TypeScript Types and Worker Integration
 
 **Objective**: Add TypeScript types, worker message definitions, and service methods for tone curve (Phases 11.3-11.4 of the Tone Curve plan).

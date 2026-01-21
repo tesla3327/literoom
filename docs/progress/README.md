@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 12:04 EST
-**Current Phase**: Phase 11 - Tone Curve (Phases 11.3-11.4 Complete, next: Phase 11.5)
+**Last Updated**: 2026-01-21 12:10 EST
+**Current Phase**: Phase 11 - Tone Curve (Phase 11.5 Complete, next: Phase 11.6 - useToneCurve Composable)
 
 ## Project Structure
 
@@ -183,8 +183,9 @@ literoom/
 | [53](./iterations-51-60.md:53) | 2026-01-21 | Fix Complete - Edit View Preview Now Loads |
 | [54](./iterations-51-60.md:42) | 2026-01-21 | Phase 11.1 Complete - Rust Curve Module |
 | [55](./iterations-51-60.md:53) | 2026-01-21 | Phase 11.2 Complete - WASM Bindings for Tone Curve |
-| [56](./iterations-51-60.md:3) | 2026-01-21 | Fixed Preview Update Issue in Demo Mode |
-| [57](./iterations-51-60.md:3) | 2026-01-21 | Phase 11.3 & 11.4 Complete - TS Types and Worker Integration |
+| [56](./iterations-51-60.md:42) | 2026-01-21 | Fixed Preview Update Issue in Demo Mode |
+| [57](./iterations-51-60.md:50) | 2026-01-21 | Phase 11.3 & 11.4 Complete - TS Types and Worker Integration |
+| [58](./iterations-51-60.md:3) | 2026-01-21 | Phase 11.5 Complete - Edit Store Extensions |
 
 ---
 
@@ -194,7 +195,7 @@ literoom/
 |---------|-------|--------|
 | literoom-core | 107 | Passing |
 | literoom-wasm | 30 | Passing |
-| packages/core | 226 | Passing |
+| packages/core | 237 | Passing |
 | apps/web (unit) | 1 | Passing |
 | apps/web (E2E) | 17 | Passing |
 

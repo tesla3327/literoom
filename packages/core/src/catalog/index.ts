@@ -49,6 +49,7 @@ export {
   DEFAULT_ADJUSTMENTS,
   createDefaultEditState,
   hasModifiedAdjustments,
+  isModifiedToneCurve,
 } from './types'
 
 // Services

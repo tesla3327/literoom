@@ -8,6 +8,9 @@
  * - Thumbnail generation coordination
  */
 
+import type { ToneCurve } from '../decode/types'
+import { DEFAULT_TONE_CURVE } from '../decode/types'
+
 // ============================================================================
 // Asset Types
 // ============================================================================
@@ -390,6 +393,13 @@ export interface ICatalogService {
    */
   onThumbnailReady: ThumbnailReadyCallback | null
 
+  // Session restoration
+  /**
+   * Load an existing catalog from the database.
+   * Returns true if a previous session was restored.
+   */
+  loadFromDatabase(): Promise<boolean>
+
   // Cleanup
   /**
    * Clean up resources and close the service.
@@ -448,7 +458,7 @@ export function getFilenameWithoutExtension(filename: string): string {
  * Current schema version for edit state.
  * Increment when making breaking changes to the schema.
  */
-export const EDIT_SCHEMA_VERSION = 1
+export const EDIT_SCHEMA_VERSION = 2
 
 /**
  * Basic image adjustments.
@@ -475,6 +485,8 @@ export interface Adjustments {
   vibrance: number
   /** Global saturation: -100 to 100 */
   saturation: number
+  /** Tone curve control points */
+  toneCurve: ToneCurve
 }
 
 /**
@@ -491,6 +503,7 @@ export const DEFAULT_ADJUSTMENTS: Readonly<Adjustments> = Object.freeze({
   blacks: 0,
   vibrance: 0,
   saturation: 0,
+  toneCurve: DEFAULT_TONE_CURVE,
 })
 
 /**
@@ -519,9 +532,46 @@ export function createDefaultEditState(): EditState {
 }
 
 /**
+ * Check if a tone curve differs from the default linear curve.
+ */
+export function isModifiedToneCurve(curve: ToneCurve): boolean {
+  const defaultPoints = DEFAULT_TONE_CURVE.points
+  if (curve.points.length !== defaultPoints.length) return true
+
+  for (let i = 0; i < curve.points.length; i++) {
+    if (
+      Math.abs(curve.points[i].x - defaultPoints[i].x) > 0.001
+      || Math.abs(curve.points[i].y - defaultPoints[i].y) > 0.001
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
  * Check if adjustments differ from defaults.
  */
 export function hasModifiedAdjustments(adjustments: Adjustments): boolean {
-  const keys = Object.keys(DEFAULT_ADJUSTMENTS) as (keyof Adjustments)[]
-  return keys.some((key) => adjustments[key] !== DEFAULT_ADJUSTMENTS[key])
+  // Check numeric adjustments
+  const numericKeys: (keyof Omit<Adjustments, 'toneCurve'>)[] = [
+    'temperature',
+    'tint',
+    'exposure',
+    'contrast',
+    'highlights',
+    'shadows',
+    'whites',
+    'blacks',
+    'vibrance',
+    'saturation',
+  ]
+
+  if (numericKeys.some(key => adjustments[key] !== DEFAULT_ADJUSTMENTS[key])) {
+    return true
+  }
+
+  // Check tone curve
+  return isModifiedToneCurve(adjustments.toneCurve)
 }

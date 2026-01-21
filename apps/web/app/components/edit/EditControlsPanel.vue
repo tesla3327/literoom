@@ -35,11 +35,16 @@ const _asset = computed(() => _catalogStore.assets.get(props.assetId))
 // ============================================================================
 
 /**
+ * Numeric adjustment keys (excludes toneCurve).
+ */
+type NumericAdjustmentKey = Exclude<keyof Adjustments, 'toneCurve'>
+
+/**
  * Configuration for each adjustment slider.
- * Key maps to Adjustments interface property.
+ * Key maps to numeric Adjustments interface properties only.
  */
 interface AdjustmentConfig {
-  key: keyof Adjustments
+  key: NumericAdjustmentKey
   label: string
   min: number
   max: number
@@ -82,7 +87,7 @@ const expandedSections = ref<string[]>(['basic'])
 /**
  * Handle adjustment change from slider.
  */
-function handleAdjustmentChange(key: keyof Adjustments, value: number) {
+function handleAdjustmentChange(key: NumericAdjustmentKey, value: number) {
   editStore.setAdjustment(key, value)
 }
 

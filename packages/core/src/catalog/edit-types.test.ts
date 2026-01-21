@@ -4,9 +4,11 @@ import {
   DEFAULT_ADJUSTMENTS,
   createDefaultEditState,
   hasModifiedAdjustments,
+  isModifiedToneCurve,
   type Adjustments,
   type EditState,
 } from './types'
+import { DEFAULT_TONE_CURVE } from '../decode/types'
 
 describe('EDIT_SCHEMA_VERSION', () => {
   it('is a positive integer', () => {
@@ -14,8 +16,8 @@ describe('EDIT_SCHEMA_VERSION', () => {
     expect(Number.isInteger(EDIT_SCHEMA_VERSION)).toBe(true)
   })
 
-  it('is currently version 1', () => {
-    expect(EDIT_SCHEMA_VERSION).toBe(1)
+  it('is currently version 2', () => {
+    expect(EDIT_SCHEMA_VERSION).toBe(2)
   })
 })
 
@@ -32,6 +34,7 @@ describe('DEFAULT_ADJUSTMENTS', () => {
       'blacks',
       'vibrance',
       'saturation',
+      'toneCurve',
     ]
 
     for (const key of requiredKeys) {
@@ -39,18 +42,37 @@ describe('DEFAULT_ADJUSTMENTS', () => {
     }
   })
 
-  it('has all values set to zero', () => {
-    for (const [key, value] of Object.entries(DEFAULT_ADJUSTMENTS)) {
-      expect(value).toBe(0)
+  it('has all numeric values set to zero', () => {
+    const numericKeys: (keyof Adjustments)[] = [
+      'temperature',
+      'tint',
+      'exposure',
+      'contrast',
+      'highlights',
+      'shadows',
+      'whites',
+      'blacks',
+      'vibrance',
+      'saturation',
+    ]
+
+    for (const key of numericKeys) {
+      expect(DEFAULT_ADJUSTMENTS[key]).toBe(0)
     }
+  })
+
+  it('has default tone curve as linear', () => {
+    expect(DEFAULT_ADJUSTMENTS.toneCurve.points).toHaveLength(2)
+    expect(DEFAULT_ADJUSTMENTS.toneCurve.points[0]).toEqual({ x: 0, y: 0 })
+    expect(DEFAULT_ADJUSTMENTS.toneCurve.points[1]).toEqual({ x: 1, y: 1 })
   })
 
   it('is frozen and cannot be modified', () => {
     expect(Object.isFrozen(DEFAULT_ADJUSTMENTS)).toBe(true)
   })
 
-  it('has exactly 10 adjustment properties', () => {
-    expect(Object.keys(DEFAULT_ADJUSTMENTS)).toHaveLength(10)
+  it('has exactly 11 adjustment properties', () => {
+    expect(Object.keys(DEFAULT_ADJUSTMENTS)).toHaveLength(11)
   })
 })
 
@@ -173,6 +195,108 @@ describe('hasModifiedAdjustments', () => {
 
     expect(hasModifiedAdjustments(adjustments)).toBe(true)
   })
+
+  it('returns true when tone curve has extra points', () => {
+    const adjustments: Adjustments = {
+      ...DEFAULT_ADJUSTMENTS,
+      toneCurve: {
+        points: [
+          { x: 0, y: 0 },
+          { x: 0.5, y: 0.6 },
+          { x: 1, y: 1 },
+        ],
+      },
+    }
+
+    expect(hasModifiedAdjustments(adjustments)).toBe(true)
+  })
+
+  it('returns true when tone curve point is moved', () => {
+    const adjustments: Adjustments = {
+      ...DEFAULT_ADJUSTMENTS,
+      toneCurve: {
+        points: [
+          { x: 0, y: 0.1 }, // Y moved
+          { x: 1, y: 1 },
+        ],
+      },
+    }
+
+    expect(hasModifiedAdjustments(adjustments)).toBe(true)
+  })
+
+  it('returns false when tone curve is default', () => {
+    const adjustments: Adjustments = {
+      ...DEFAULT_ADJUSTMENTS,
+      toneCurve: { ...DEFAULT_TONE_CURVE },
+    }
+
+    expect(hasModifiedAdjustments(adjustments)).toBe(false)
+  })
+})
+
+describe('isModifiedToneCurve', () => {
+  it('returns false for default linear curve', () => {
+    expect(isModifiedToneCurve(DEFAULT_TONE_CURVE)).toBe(false)
+  })
+
+  it('returns false for curve with identical points', () => {
+    const curve = {
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ],
+    }
+    expect(isModifiedToneCurve(curve)).toBe(false)
+  })
+
+  it('returns true when curve has extra points', () => {
+    const curve = {
+      points: [
+        { x: 0, y: 0 },
+        { x: 0.5, y: 0.6 },
+        { x: 1, y: 1 },
+      ],
+    }
+    expect(isModifiedToneCurve(curve)).toBe(true)
+  })
+
+  it('returns true when start point y is moved', () => {
+    const curve = {
+      points: [
+        { x: 0, y: 0.1 },
+        { x: 1, y: 1 },
+      ],
+    }
+    expect(isModifiedToneCurve(curve)).toBe(true)
+  })
+
+  it('returns true when end point y is moved', () => {
+    const curve = {
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0.9 },
+      ],
+    }
+    expect(isModifiedToneCurve(curve)).toBe(true)
+  })
+
+  it('returns false for very small differences (within tolerance)', () => {
+    const curve = {
+      points: [
+        { x: 0.0001, y: 0.0001 },
+        { x: 0.9999, y: 0.9999 },
+      ],
+    }
+    expect(isModifiedToneCurve(curve)).toBe(false)
+  })
+
+  it('returns true for single point curves (invalid but handled)', () => {
+    const curve = {
+      points: [{ x: 0.5, y: 0.5 }],
+    }
+    expect(isModifiedToneCurve(curve)).toBe(true)
+  })
 })
 
 describe('EditState interface', () => {
@@ -182,7 +306,7 @@ describe('EditState interface', () => {
       adjustments: { ...DEFAULT_ADJUSTMENTS },
     }
 
-    expect(state.version).toBe(1)
+    expect(state.version).toBe(2)
     expect(state.adjustments.exposure).toBe(0)
   })
 
@@ -200,6 +324,13 @@ describe('EditState interface', () => {
         blacks: 10,
         vibrance: 35,
         saturation: -20,
+        toneCurve: {
+          points: [
+            { x: 0, y: 0 },
+            { x: 0.5, y: 0.6 },
+            { x: 1, y: 1 },
+          ],
+        },
       },
     }
 
@@ -213,5 +344,6 @@ describe('EditState interface', () => {
     expect(state.adjustments.blacks).toBe(10)
     expect(state.adjustments.vibrance).toBe(35)
     expect(state.adjustments.saturation).toBe(-20)
+    expect(state.adjustments.toneCurve.points).toHaveLength(3)
   })
 })
