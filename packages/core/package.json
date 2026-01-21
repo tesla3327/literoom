@@ -20,6 +20,7 @@
     "literoom-wasm": "workspace:*"
   },
   "devDependencies": {
+    "@types/wicg-file-system-access": "^2023.10.7",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }

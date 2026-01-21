@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:32 EST
-**Current Phase**: Catalog Service - Phase 3 Complete (Thumbnail Service)
+**Last Updated**: 2026-01-20 22:36 EST
+**Current Phase**: Catalog Service - Phase 4 Complete (CatalogService)
 
 ## Project Structure
 
@@ -37,6 +37,50 @@ literoom/
 ```
 
 ## Completed Work
+
+### 27: 2026-01-20 22:36 EST: Catalog Service - Phase 4 Complete (CatalogService)
+
+**Objective**: Implement the main CatalogService that composes ScanService, ThumbnailService, and database.
+
+**Work Completed**:
+- Created `packages/core/src/catalog/catalog-service.ts`:
+  - Main service implementing `ICatalogService` interface
+  - Async factory pattern (`CatalogService.create()`)
+  - Folder selection via File System Access API with handle persistence
+  - Folder scanning with progress updates via ScanService
+  - Asset management with in-memory Map + Dexie database persistence
+  - Flag management (pick/reject) with batch support
+  - Thumbnail requests forwarded to ThumbnailService
+  - Callback-based event system (onAssetsAdded, onAssetUpdated, onThumbnailReady)
+  - `loadFromDatabase()` for restoring previous session
+  - Proper cleanup via `destroy()`
+
+- Added `@types/wicg-file-system-access` dev dependency for FSA types
+
+- Updated `packages/core/src/catalog/index.ts`:
+  - Exported `CatalogService` and `createCatalogService`
+
+**Key Features**:
+- Composes: ScanService, ThumbnailService, Dexie database
+- Handles native `FileSystemDirectoryHandle` for File System Access API
+- Persists folder handles via IndexedDB for session restoration
+- Converts between database `AssetRecord` and application `Asset` types
+- Creates `getBytes` functions for on-demand file reading
+
+**Test Summary**:
+- `packages/core`: 87 tests (all passing)
+- TypeScript compiles without errors
+
+**Files Created**:
+- `packages/core/src/catalog/catalog-service.ts`
+
+**Files Modified**:
+- `packages/core/src/catalog/index.ts`
+- `packages/core/package.json` (added @types/wicg-file-system-access)
+
+**Next Step**: Phase 5 - Pinia Stores (catalogStore, catalogUIStore, selectionStore).
+
+---
 
 ### 26: 2026-01-20 22:32 EST: Catalog Service - Phase 3 Complete (Thumbnail Service)
 

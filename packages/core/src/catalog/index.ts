@@ -62,6 +62,7 @@ export {
   createThumbnailService,
   type ThumbnailServiceOptions,
 } from './thumbnail-service'
+export { CatalogService, createCatalogService } from './catalog-service'
 
 // Database
 export type { AssetRecord, FolderRecord, EditRecord, CacheMetadataRecord } from './db'
