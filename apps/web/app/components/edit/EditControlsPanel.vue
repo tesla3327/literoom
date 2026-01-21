@@ -25,6 +25,7 @@ const props = defineProps<Props>()
 // ============================================================================
 
 const editStore = useEditStore()
+const editUIStore = useEditUIStore()
 const _catalogStore = useCatalogStore()
 
 // ============================================================================
@@ -55,17 +56,43 @@ interface AdjustmentConfig {
   step?: number
 }
 
-const adjustmentConfig: AdjustmentConfig[] = [
-  { key: 'temperature', label: 'Temp', min: -100, max: 100 },
-  { key: 'tint', label: 'Tint', min: -100, max: 100 },
-  { key: 'exposure', label: 'Exposure', min: -5, max: 5, step: 0.01 },
-  { key: 'contrast', label: 'Contrast', min: -100, max: 100 },
-  { key: 'highlights', label: 'Highlights', min: -100, max: 100 },
-  { key: 'shadows', label: 'Shadows', min: -100, max: 100 },
-  { key: 'whites', label: 'Whites', min: -100, max: 100 },
-  { key: 'blacks', label: 'Blacks', min: -100, max: 100 },
-  { key: 'vibrance', label: 'Vibrance', min: -100, max: 100 },
-  { key: 'saturation', label: 'Saturation', min: -100, max: 100 },
+/**
+ * Configuration for a group of adjustments.
+ */
+interface AdjustmentGroup {
+  name: string
+  sliders: AdjustmentConfig[]
+}
+
+/**
+ * Adjustments organized into Lightroom-style groups.
+ */
+const adjustmentGroups: AdjustmentGroup[] = [
+  {
+    name: 'White Balance',
+    sliders: [
+      { key: 'temperature', label: 'Temp', min: -100, max: 100 },
+      { key: 'tint', label: 'Tint', min: -100, max: 100 },
+    ],
+  },
+  {
+    name: 'Tone',
+    sliders: [
+      { key: 'exposure', label: 'Exposure', min: -5, max: 5, step: 0.01 },
+      { key: 'contrast', label: 'Contrast', min: -100, max: 100 },
+      { key: 'highlights', label: 'Highlights', min: -100, max: 100 },
+      { key: 'shadows', label: 'Shadows', min: -100, max: 100 },
+      { key: 'whites', label: 'Whites', min: -100, max: 100 },
+      { key: 'blacks', label: 'Blacks', min: -100, max: 100 },
+    ],
+  },
+  {
+    name: 'Presence',
+    sliders: [
+      { key: 'vibrance', label: 'Vibrance', min: -100, max: 100 },
+      { key: 'saturation', label: 'Saturation', min: -100, max: 100 },
+    ],
+  },
 ]
 
 // ============================================================================
@@ -83,6 +110,24 @@ const accordionItems = [
  * Basic is expanded by default.
  */
 const expandedSections = ref<string[]>(['basic'])
+
+/**
+ * Watch crop accordion expansion to toggle crop tool overlay.
+ * When crop section is expanded, show the crop overlay on the main preview.
+ * When collapsed, hide the crop overlay.
+ */
+watch(
+  () => expandedSections.value.includes('crop'),
+  (isCropExpanded) => {
+    if (isCropExpanded) {
+      editUIStore.activateCropTool()
+    }
+    else {
+      editUIStore.deactivateCropTool()
+    }
+  },
+  { immediate: true },
+)
 
 // ============================================================================
 // Event Handlers
@@ -133,18 +178,30 @@ function handleReset() {
     >
       <!-- Basic Adjustments Section -->
       <template #basic-body>
-        <div class="space-y-0.5 pt-2">
-          <EditAdjustmentSlider
-            v-for="adj in adjustmentConfig"
-            :key="adj.key"
-            :label="adj.label"
-            :model-value="editStore.adjustments[adj.key]"
-            :min="adj.min"
-            :max="adj.max"
-            :step="adj.step"
-            :data-testid="`slider-${adj.key}`"
-            @update:model-value="handleAdjustmentChange(adj.key, $event)"
-          />
+        <div class="pt-2 space-y-4">
+          <div
+            v-for="group in adjustmentGroups"
+            :key="group.name"
+          >
+            <!-- Group header -->
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              {{ group.name }}
+            </div>
+            <!-- Group sliders -->
+            <div class="space-y-0.5">
+              <EditAdjustmentSlider
+                v-for="adj in group.sliders"
+                :key="adj.key"
+                :label="adj.label"
+                :model-value="editStore.adjustments[adj.key]"
+                :min="adj.min"
+                :max="adj.max"
+                :step="adj.step"
+                :data-testid="`slider-${adj.key}`"
+                @update:model-value="handleAdjustmentChange(adj.key, $event)"
+              />
+            </div>
+          </div>
         </div>
       </template>
 

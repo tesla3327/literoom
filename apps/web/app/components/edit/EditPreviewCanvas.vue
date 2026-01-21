@@ -25,6 +25,7 @@ const props = defineProps<Props>()
 // ============================================================================
 
 const catalogStore = useCatalogStore()
+const editUIStore = useEditUIStore()
 
 /**
  * Preview management composable.
@@ -59,6 +60,9 @@ const previewImageRef = ref<HTMLImageElement | null>(null)
 
 /** Reference to the clipping overlay canvas */
 const clippingCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+/** Reference to the crop overlay canvas */
+const cropCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 // ============================================================================
 // Computed
@@ -128,6 +132,18 @@ useClippingOverlay({
   displayWidth: computed(() => renderedDimensions.value.width),
   displayHeight: computed(() => renderedDimensions.value.height),
 })
+
+/**
+ * Crop overlay composable.
+ * Renders and handles interaction with crop overlay on preview.
+ */
+const { isDragging: isCropDragging, cursorStyle: cropCursorStyle } = useCropOverlay({
+  canvasRef: cropCanvasRef,
+  displayWidth: computed(() => renderedDimensions.value.width),
+  displayHeight: computed(() => renderedDimensions.value.height),
+  imageWidth: computed(() => previewDimensions.value?.width ?? 0),
+  imageHeight: computed(() => previewDimensions.value?.height ?? 0),
+})
 </script>
 
 <template>
@@ -192,6 +208,27 @@ useClippingOverlay({
           height: renderedDimensions.height + 'px',
         }"
         data-testid="clipping-overlay-canvas"
+      />
+
+      <!-- Crop overlay canvas - positioned over the image, interactive -->
+      <canvas
+        v-if="editUIStore.isCropToolActive"
+        ref="cropCanvasRef"
+        class="absolute top-0 left-0"
+        :class="{
+          'cursor-grab': !isCropDragging,
+          'cursor-grabbing': isCropDragging,
+        }"
+        :width="renderedDimensions.width"
+        :height="renderedDimensions.height"
+        :style="{
+          width: renderedDimensions.width + 'px',
+          height: renderedDimensions.height + 'px',
+          cursor: cropCursorStyle,
+          zIndex: 20,
+          touchAction: 'none',
+        }"
+        data-testid="crop-overlay-canvas"
       />
     </div>
 

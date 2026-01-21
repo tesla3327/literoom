@@ -3,11 +3,11 @@
 ## Table of Contents
 
 ### Open Issues
-- [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview)
 - [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview---solved)
 - [Edit preview uses thumbnail instead of full preview (Critical)](#edit-preview-uses-thumbnail-instead-of-full-preview---solved)
 - [Histogram doesn't update when edits are made (High)](#histogram-doesnt-update-when-edits-are-made---solved)
 - [Edit sliders don't match Lightroom behavior (Medium)](#edit-sliders-dont-match-lightroom-behavior---solved)
@@ -29,46 +29,6 @@
 ---
 
 ## Open Issues
-
-### Crop/transform controls not overlayed on preview
-
-**Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
-
-The crop region and rotation controls are only visible in a small thumbnail in the right panel. Users cannot see crop guides or interact with the crop region directly on the main preview canvas.
-
-**Expected**: When using crop/transform tools, the main preview canvas should display:
-- Crop region overlay with draggable corner handles
-- Rule-of-thirds grid lines within the crop region
-- Semi-transparent darkening outside the crop area
-- Interactive dragging to resize and move the crop region
-- Visual feedback for rotation angle (rotation guides)
-
-**Observed**:
-- Crop region is only shown in a small thumbnail in the Crop & Transform panel
-- No crop overlay appears on the main preview canvas
-- The instructions say "Drag corners to resize | Drag inside to move" but this only works on the small panel thumbnail
-- Users cannot precisely position crops on the full-size preview
-
-**Impact**: This makes it difficult to make precise crop decisions, especially for large images where the panel thumbnail is too small to see details. Professional photo editing applications (Lightroom, Capture One, etc.) always overlay crop controls directly on the main preview.
-
-**Implementation Needed**:
-1. Add a crop overlay component to `EditPreviewCanvas.vue`
-2. Render the crop region as a resizable overlay on the main canvas
-3. Add corner handles that can be dragged to resize
-4. Add center drag to reposition the crop region
-5. Show rule-of-thirds grid when crop is active
-6. Darken the area outside the crop region
-7. Connect mouse events to update the crop state in the edit store
-
-**Files Involved**:
-- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Needs crop overlay
-- `apps/web/app/components/edit/EditCropEditor.vue` - Current panel-only implementation
-- `apps/web/app/stores/edit.ts` - Crop state management
-
-**Screenshots**:
-- `docs/screenshots/verify-transform-07-crop.png` - Shows crop only in panel thumbnail
-
----
 
 ### Direct edit URL only loads current thumbnail in filmstrip
 
@@ -170,6 +130,54 @@ Holding Alt/Option while dragging Whites/Blacks sliders shows detailed per-chann
 ---
 
 ## Solved Issues
+
+### Crop/transform controls not overlayed on preview - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+The crop overlay is now displayed on the main preview canvas when the "Crop & Transform" section is expanded. Users can interact with the crop region directly on the full-size preview.
+
+**Original Problem**:
+- Crop region only visible in small thumbnail in right panel
+- No crop overlay on main preview canvas
+- Users couldn't precisely position crops on the full-size preview
+
+**Implementation** (7 phases):
+1. Extended editUI store with `isCropToolActive` state and toggle methods
+2. Created `cropUtils.ts` with shared utilities (coordinates, rendering, hit detection)
+3. Created `useCropOverlay.ts` composable for overlay interaction
+4. Added crop canvas to `EditPreviewCanvas.vue` (conditionally rendered)
+5. Connected accordion expansion to crop tool activation
+6. Added cleanup on navigation (deactivate crop tool on unmount)
+7. Refactored useCropEditor to use shared utilities
+
+**Features Implemented**:
+- ✅ Dark mask outside crop region
+- ✅ Rule of thirds grid inside crop area
+- ✅ 8 resize handles (corners + midpoints)
+- ✅ Interactive resize via handle drag
+- ✅ Interactive move via interior drag
+- ✅ Aspect ratio constraint support
+- ✅ Debounced store sync during drag
+- ✅ Cursor feedback (resize cursors, grab/grabbing)
+- ✅ Overlay hidden when crop section collapsed
+
+**Files Created** (2 files):
+- `apps/web/app/composables/cropUtils.ts`
+- `apps/web/app/composables/useCropOverlay.ts`
+
+**Files Modified** (4 files):
+- `apps/web/app/stores/editUI.ts`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+- `apps/web/app/components/edit/EditControlsPanel.vue`
+- `apps/web/app/pages/edit/[id].vue`
+
+**Screenshots**:
+- `docs/screenshots/verify-crop-overlay-03-crop-expanded.png` - Crop overlay visible
+- `docs/screenshots/verify-crop-overlay-04-after-resize.png` - After resize interaction
+- `docs/screenshots/verify-crop-overlay-06-collapsed.png` - Overlay hidden when collapsed
+
+---
 
 ### Edit preview uses thumbnail instead of full preview - SOLVED
 

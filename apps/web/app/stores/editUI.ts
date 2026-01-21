@@ -20,6 +20,13 @@ export const useEditUIStore = defineStore('editUI', () => {
   const showShadowClipping = ref(false)
 
   // ============================================================================
+  // Crop Tool State
+  // ============================================================================
+
+  /** Whether the crop tool is active (overlay visible on main preview) */
+  const isCropToolActive = ref(false)
+
+  // ============================================================================
   // Clipping Toggle Methods
   // ============================================================================
 
@@ -60,14 +67,45 @@ export const useEditUIStore = defineStore('editUI', () => {
     showShadowClipping.value = false
   }
 
+  // ============================================================================
+  // Crop Tool Methods
+  // ============================================================================
+
+  /**
+   * Activate the crop tool (show overlay on main preview).
+   */
+  function activateCropTool(): void {
+    isCropToolActive.value = true
+  }
+
+  /**
+   * Deactivate the crop tool (hide overlay on main preview).
+   */
+  function deactivateCropTool(): void {
+    isCropToolActive.value = false
+  }
+
+  /**
+   * Toggle the crop tool active state.
+   */
+  function toggleCropTool(): void {
+    isCropToolActive.value = !isCropToolActive.value
+  }
+
   return {
-    // State
+    // Clipping State
     showHighlightClipping,
     showShadowClipping,
-    // Methods
+    // Clipping Methods
     toggleClippingOverlays,
     toggleShadowClipping,
     toggleHighlightClipping,
     resetClippingOverlays,
+    // Crop Tool State
+    isCropToolActive,
+    // Crop Tool Methods
+    activateCropTool,
+    deactivateCropTool,
+    toggleCropTool,
   }
 })

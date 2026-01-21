@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 16:25 EST
-**Current Phase**: Preview Generation - Complete
+**Last Updated**: 2026-01-21 16:36 EST
+**Current Phase**: Crop Overlay on Preview Canvas - Complete
 
 ## Project Structure
 
@@ -234,6 +234,8 @@ literoom/
 | [85](./iterations-81-90.md:3) | 2026-01-21 | Preview Generation - Research Complete |
 | [86](./iterations-81-90.md:3) | 2026-01-21 | Preview Generation - Implementation Plan |
 | [87](./iterations-81-90.md:3) | 2026-01-21 | Preview Generation - Implementation Complete |
+| [88](./iterations-81-90.md:3) | 2026-01-21 | Crop Overlay on Preview Canvas - Implementation Complete |
+| [89](./iterations-81-90.md:3) | 2026-01-21 | Crop Overlay on Preview Canvas - Verified Complete |
 
 ---
 

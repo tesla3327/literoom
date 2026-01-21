@@ -26,6 +26,7 @@ const catalogStore = useCatalogStore()
 const uiStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
 const editStore = useEditStore()
+const editUIStore = useEditUIStore()
 
 // ============================================================================
 // Preview Component Ref
@@ -157,6 +158,8 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   // Clear edit state when leaving edit view
   editStore.clear()
+  // Deactivate crop tool when leaving edit view
+  editUIStore.deactivateCropTool()
 })
 </script>
 

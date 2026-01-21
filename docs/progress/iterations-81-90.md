@@ -1,5 +1,100 @@
 # Iterations 81-90
 
+## 89: 2026-01-21 16:36 EST: Crop Overlay on Preview Canvas - Verified Complete
+
+**Objective**: Verify that the crop overlay implementation is fully functional.
+
+**Background**: Iteration #88 began implementation of the crop overlay feature. Upon review, all 7 phases were already implemented.
+
+**Verification Results** (via browser automation):
+
+1. ✅ **Crop overlay visible** - When "Crop & Transform" section is expanded, crop overlay appears on main preview
+2. ✅ **Dark mask** - Semi-transparent dark overlay outside crop region
+3. ✅ **Rule of thirds grid** - Grid lines visible inside crop region
+4. ✅ **Resize handles** - 8 handles visible at corners and midpoints (white squares)
+5. ✅ **Resize interaction** - Dragging corner handle resizes the crop region
+6. ✅ **Handle highlighting** - Active handle shows blue highlight
+7. ✅ **Overlay hidden when collapsed** - Crop overlay canvas removed from DOM when section collapsed
+8. ✅ **Store sync** - Crop changes committed to edit store
+
+**Files Involved**:
+- `apps/web/app/stores/editUI.ts` - Crop tool activation state
+- `apps/web/app/composables/cropUtils.ts` - Shared utilities
+- `apps/web/app/composables/useCropOverlay.ts` - Overlay composable
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Crop canvas element
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Accordion sync
+- `apps/web/app/pages/edit/[id].vue` - Cleanup on navigation
+
+**Screenshots**:
+- `docs/screenshots/verify-crop-overlay-01-catalog.png` - Catalog view
+- `docs/screenshots/verify-crop-overlay-02-edit-view.png` - Edit view initial
+- `docs/screenshots/verify-crop-overlay-03-crop-expanded.png` - Crop overlay visible
+- `docs/screenshots/verify-crop-overlay-04-after-resize.png` - After resize interaction
+- `docs/screenshots/verify-crop-overlay-06-collapsed.png` - Overlay hidden when collapsed
+
+**Status**: Feature complete and verified.
+
+---
+
+## 88: 2026-01-21 16:26 EST: Crop Overlay on Preview Canvas - Implementation Complete
+
+**Objective**: Implement interactive crop controls overlaid on the main preview canvas, allowing users to interact with the crop region directly on the full-size preview image.
+
+**Background**: Per `docs/issues.md`, this is a Medium severity issue. The crop region and rotation controls are only visible in a small thumbnail in the right panel. Users cannot see crop guides or interact with the crop region directly on the main preview canvas, making it difficult to make precise crop decisions.
+
+**Plan**: Following `docs/plans/2026-01-21-crop-overlay-plan.md` (7 phases)
+
+**Implementation Summary**:
+
+All 7 phases were implemented:
+
+1. **Phase 1: Extend editUI Store** (`apps/web/app/stores/editUI.ts`)
+   - Added `isCropToolActive` ref
+   - Added `activateCropTool()`, `deactivateCropTool()`, `toggleCropTool()` methods
+
+2. **Phase 2: Extract Shared Crop Utilities** (`apps/web/app/composables/cropUtils.ts`)
+   - Constants: `HANDLE_SIZE`, `HANDLE_HIT_RADIUS`, `COLORS`
+   - Types: `HandlePosition`, `HANDLES`
+   - Coordinate functions: `toNormalized()`, `toCanvas()`, `getHandlePositions()`, `findHandleAt()`, `isInsideCrop()`, `getCanvasCoords()`
+   - Rendering functions: `drawOverlay()`, `drawBorder()`, `drawGrid()`, `drawHandles()`
+   - Helpers: `getCursorForHandle()`, `debounce()`
+
+3. **Phase 3: Create useCropOverlay Composable** (`apps/web/app/composables/useCropOverlay.ts`)
+   - Full interaction handling (resize, move)
+   - Local state with debounced store sync
+   - Cursor management
+   - Watchers for store sync and dimension changes
+   - Event setup/teardown lifecycle
+
+4. **Phase 4: Update EditPreviewCanvas** (`apps/web/app/components/edit/EditPreviewCanvas.vue`)
+   - Added crop canvas ref and element
+   - Conditionally rendered when `editUIStore.isCropToolActive`
+   - Proper z-index and pointer events
+   - Dynamic cursor styling
+
+5. **Phase 5: Connect Accordion State** (`apps/web/app/components/edit/EditControlsPanel.vue`)
+   - Watch `expandedSections.includes('crop')`
+   - Call `activateCropTool()` / `deactivateCropTool()` accordingly
+
+6. **Phase 6: Cleanup on Navigation** (`apps/web/app/pages/edit/[id].vue`)
+   - Call `editUIStore.deactivateCropTool()` in `onUnmounted`
+
+7. **Phase 7: useCropEditor Refactoring** - Uses shared utilities from cropUtils.ts
+
+**Files Created** (2 files):
+- `apps/web/app/composables/cropUtils.ts` (~315 lines)
+- `apps/web/app/composables/useCropOverlay.ts` (~517 lines)
+
+**Files Modified** (4 files):
+- `apps/web/app/stores/editUI.ts`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+- `apps/web/app/components/edit/EditControlsPanel.vue`
+- `apps/web/app/pages/edit/[id].vue`
+
+**Status**: Implementation complete
+
+---
+
 ## 87: 2026-01-21 16:25 EST: Preview Generation - Implementation Complete
 
 **Objective**: Implement the preview generation feature to fix the critical issue where edit view uses thumbnails (512px) instead of proper previews (2560px).
