@@ -149,11 +149,44 @@ export const useCatalogStore = defineStore('catalog', () => {
   function updateThumbnail(
     assetId: string,
     status: ThumbnailStatus,
-    url: string | null
+    url: string | null,
   ): void {
     updateAsset(assetId, {
       thumbnailStatus: status,
       thumbnailUrl: url,
+    })
+  }
+
+  /**
+   * Update preview 1x status for an asset.
+   */
+  function updatePreviewStatus(assetId: string, status: ThumbnailStatus): void {
+    updateAsset(assetId, {
+      preview1xStatus: status,
+    })
+  }
+
+  /**
+   * Update preview 1x URL for an asset.
+   */
+  function updatePreviewUrl(assetId: string, url: string | null): void {
+    updateAsset(assetId, {
+      preview1xUrl: url,
+      preview1xStatus: url ? 'ready' : 'error',
+    })
+  }
+
+  /**
+   * Update preview 1x status and URL for an asset.
+   */
+  function updatePreview(
+    assetId: string,
+    status: ThumbnailStatus,
+    url: string | null,
+  ): void {
+    updateAsset(assetId, {
+      preview1xStatus: status,
+      preview1xUrl: url,
     })
   }
 
@@ -192,7 +225,7 @@ export const useCatalogStore = defineStore('catalog', () => {
    */
   function getOrderedAssets(): Asset[] {
     return assetIds.value
-      .map((id) => assets.value.get(id))
+      .map(id => assets.value.get(id))
       .filter((asset): asset is Asset => asset !== undefined)
   }
 
@@ -231,10 +264,13 @@ export const useCatalogStore = defineStore('catalog', () => {
    * Clear all state (e.g., when switching folders).
    */
   function clear(): void {
-    // Revoke any existing thumbnail URLs to prevent memory leaks
+    // Revoke any existing thumbnail and preview URLs to prevent memory leaks
     for (const asset of assets.value.values()) {
       if (asset.thumbnailUrl) {
         URL.revokeObjectURL(asset.thumbnailUrl)
+      }
+      if (asset.preview1xUrl) {
+        URL.revokeObjectURL(asset.preview1xUrl)
       }
     }
 
@@ -279,6 +315,9 @@ export const useCatalogStore = defineStore('catalog', () => {
     addAssetBatch,
     updateAsset,
     updateThumbnail,
+    updatePreviewStatus,
+    updatePreviewUrl,
+    updatePreview,
     setFlag,
     setFlagBatch,
     getAsset,

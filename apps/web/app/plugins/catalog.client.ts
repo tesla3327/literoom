@@ -55,11 +55,12 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     })
   }
   else {
-    // Real mode: use actual services
+    // Real mode: use actual services with pooled workers for parallel processing
     const { CatalogService } = await import('@literoom/core/catalog')
     const { DecodeService } = await import('@literoom/core/decode')
 
-    decodeService = await DecodeService.create()
+    // Use pooled decode service for parallel thumbnail generation
+    decodeService = await DecodeService.createPooled()
     catalogService = await CatalogService.create(decodeService)
   }
 
@@ -74,6 +75,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   catalogService.onThumbnailReady = (assetId, url) => {
     catalogStore.updateThumbnail(assetId, 'ready', url)
+  }
+
+  catalogService.onPreviewReady = (assetId, url) => {
+    catalogStore.updatePreview(assetId, 'ready', url)
   }
 
   // Cleanup on page unload

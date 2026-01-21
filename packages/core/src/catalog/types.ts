@@ -45,6 +45,10 @@ export interface Asset {
   thumbnailStatus: ThumbnailStatus
   /** Object URL for the thumbnail, null if not ready */
   thumbnailUrl: string | null
+  /** Current preview 1x (2560px) generation status */
+  preview1xStatus?: ThumbnailStatus
+  /** Object URL for the preview 1x, null if not ready */
+  preview1xUrl?: string | null
 }
 
 /**
@@ -248,6 +252,16 @@ export type ThumbnailReadyCallback = (assetId: string, url: string) => void
 export type ThumbnailErrorCallback = (assetId: string, error: Error) => void
 
 /**
+ * Callback for preview ready events.
+ */
+export type PreviewReadyCallback = (assetId: string, url: string) => void
+
+/**
+ * Callback for preview error events.
+ */
+export type PreviewErrorCallback = (assetId: string, error: Error) => void
+
+/**
  * Interface for the thumbnail service.
  */
 export interface IThumbnailService {
@@ -295,6 +309,54 @@ export interface IThumbnailService {
 
   /** Whether the service is currently processing */
   readonly isProcessing: boolean
+
+  // Preview generation methods
+
+  /**
+   * Request preview generation with priority.
+   * Previews are larger (2560px) than thumbnails (512px).
+   */
+  requestPreview(
+    assetId: string,
+    getBytes: () => Promise<Uint8Array>,
+    priority: ThumbnailPriority
+  ): void
+
+  /**
+   * Update priority of a queued preview request.
+   */
+  updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void
+
+  /**
+   * Cancel a pending preview request.
+   */
+  cancelPreview(assetId: string): void
+
+  /**
+   * Cancel all pending preview requests.
+   */
+  cancelAllPreviews(): void
+
+  /**
+   * Clear the in-memory preview cache.
+   */
+  clearPreviewCache(): void
+
+  /**
+   * Set callback for when a preview is ready.
+   */
+  onPreviewReady: PreviewReadyCallback | null
+
+  /**
+   * Set callback for when a preview fails.
+   */
+  onPreviewError: PreviewErrorCallback | null
+
+  /** Current preview queue size */
+  readonly previewQueueSize: number
+
+  /** Whether the service is currently processing previews */
+  readonly isProcessingPreviews: boolean
 }
 
 /**
@@ -377,6 +439,18 @@ export interface ICatalogService {
    */
   updateThumbnailPriority(assetId: string, priority: ThumbnailPriority): void
 
+  // Preview requests
+  /**
+   * Request preview generation for an asset.
+   * Previews are larger (2560px) than thumbnails (512px).
+   */
+  requestPreview(assetId: string, priority: ThumbnailPriority): void
+
+  /**
+   * Update the priority of a preview request.
+   */
+  updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void
+
   // Events
   /**
    * Set callback for when assets are added.
@@ -392,6 +466,11 @@ export interface ICatalogService {
    * Set callback for when a thumbnail is ready.
    */
   onThumbnailReady: ThumbnailReadyCallback | null
+
+  /**
+   * Set callback for when a preview is ready.
+   */
+  onPreviewReady: PreviewReadyCallback | null
 
   // Session restoration
   /**

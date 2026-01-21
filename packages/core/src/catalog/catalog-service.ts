@@ -27,6 +27,7 @@ import {
   type AssetsAddedCallback,
   type AssetUpdatedCallback,
   type ThumbnailReadyCallback,
+  type PreviewReadyCallback,
   ThumbnailPriority,
   CatalogError,
 } from './types'
@@ -82,6 +83,7 @@ export class CatalogService implements ICatalogService {
   private _onAssetsAdded: AssetsAddedCallback | null = null
   private _onAssetUpdated: AssetUpdatedCallback | null = null
   private _onThumbnailReady: ThumbnailReadyCallback | null = null
+  private _onPreviewReady: PreviewReadyCallback | null = null
 
   /**
    * Private constructor - use CatalogService.create() instead.
@@ -96,6 +98,10 @@ export class CatalogService implements ICatalogService {
     // Wire up thumbnail callbacks
     this.thumbnailService.onThumbnailReady = this.handleThumbnailReady.bind(this)
     this.thumbnailService.onThumbnailError = this.handleThumbnailError.bind(this)
+
+    // Wire up preview callbacks
+    this.thumbnailService.onPreviewReady = this.handlePreviewReady.bind(this)
+    this.thumbnailService.onPreviewError = this.handlePreviewError.bind(this)
   }
 
   /**
@@ -464,6 +470,40 @@ export class CatalogService implements ICatalogService {
     this.thumbnailService.updatePriority(assetId, priority)
   }
 
+  // ==========================================================================
+  // ICatalogService Implementation - Preview Requests
+  // ==========================================================================
+
+  /**
+   * Request preview generation for an asset.
+   * Previews are larger (2560px) than thumbnails (512px).
+   */
+  requestPreview(assetId: string, priority: ThumbnailPriority): void {
+    const asset = this._assets.get(assetId)
+    if (!asset) {
+      return
+    }
+
+    // Get file bytes function
+    const getBytes = this.createGetBytesFunction(asset)
+
+    // Request from thumbnail service (which also handles previews)
+    this.thumbnailService.requestPreview(assetId, getBytes, priority)
+
+    // Update asset status
+    if (!asset.preview1xStatus || asset.preview1xStatus === 'pending') {
+      const updatedAsset: Asset = { ...asset, preview1xStatus: 'loading' }
+      this._assets.set(assetId, updatedAsset)
+    }
+  }
+
+  /**
+   * Update the priority of a preview request.
+   */
+  updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void {
+    this.thumbnailService.updatePreviewPriority(assetId, priority)
+  }
+
   /**
    * Create a function that returns the file bytes for an asset.
    */
@@ -532,6 +572,14 @@ export class CatalogService implements ICatalogService {
     return this._onThumbnailReady
   }
 
+  set onPreviewReady(callback: PreviewReadyCallback | null) {
+    this._onPreviewReady = callback
+  }
+
+  get onPreviewReady(): PreviewReadyCallback | null {
+    return this._onPreviewReady
+  }
+
   // ==========================================================================
   // ICatalogService Implementation - Cleanup
   // ==========================================================================
@@ -542,6 +590,7 @@ export class CatalogService implements ICatalogService {
   destroy(): void {
     this.cancelScan()
     this.thumbnailService.cancelAll()
+    this.thumbnailService.cancelAllPreviews()
     this._assets.clear()
     this._currentFolder = null
     this._currentFolderId = null
@@ -587,6 +636,43 @@ export class CatalogService implements ICatalogService {
 
     // Log error (could add error callback later)
     console.error(`Thumbnail error for ${assetId}:`, error)
+  }
+
+  /**
+   * Handle preview ready callback from ThumbnailService.
+   */
+  private handlePreviewReady(assetId: string, url: string): void {
+    const asset = this._assets.get(assetId)
+    if (asset) {
+      const updatedAsset: Asset = {
+        ...asset,
+        preview1xStatus: 'ready',
+        preview1xUrl: url,
+      }
+      this._assets.set(assetId, updatedAsset)
+      this._onAssetUpdated?.(updatedAsset)
+    }
+
+    // Forward to external callback
+    this._onPreviewReady?.(assetId, url)
+  }
+
+  /**
+   * Handle preview error callback from ThumbnailService.
+   */
+  private handlePreviewError(assetId: string, error: Error): void {
+    const asset = this._assets.get(assetId)
+    if (asset) {
+      const updatedAsset: Asset = {
+        ...asset,
+        preview1xStatus: 'error',
+      }
+      this._assets.set(assetId, updatedAsset)
+      this._onAssetUpdated?.(updatedAsset)
+    }
+
+    // Log error (could add error callback later)
+    console.error(`Preview error for ${assetId}:`, error)
   }
 
   /**

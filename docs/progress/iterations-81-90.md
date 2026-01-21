@@ -1,5 +1,87 @@
 # Iterations 81-90
 
+## 87: 2026-01-21 16:25 EST: Preview Generation - Implementation Complete
+
+**Objective**: Implement the preview generation feature to fix the critical issue where edit view uses thumbnails (512px) instead of proper previews (2560px).
+
+**Implementation Summary**:
+
+Following the 8-phase plan from iteration #86, implemented all phases:
+
+1. **Phase 1: Extend Asset interface** (`packages/core/src/catalog/types.ts`)
+   - Added `preview1xStatus?: ThumbnailStatus` field
+   - Added `preview1xUrl?: string | null` field
+   - Added `PreviewReadyCallback` and `PreviewErrorCallback` types
+   - Extended `IThumbnailService` interface with preview methods
+   - Extended `ICatalogService` interface with requestPreview() method
+
+2. **Phase 2: Create PreviewCache class** (`packages/core/src/catalog/thumbnail-cache.ts`)
+   - Added `OPFSPreviewCache` class with separate OPFS directory ('previews')
+   - Added `PreviewCache` class with smaller memory LRU (20 items vs 150 for thumbnails)
+   - Added `IPreviewCache` interface and `createPreviewCache()` factory
+
+3. **Phase 3: Extend ThumbnailService** (`packages/core/src/catalog/thumbnail-service.ts`)
+   - Added preview queue, cache, and processing state fields
+   - Added `requestPreview()`, `updatePreviewPriority()`, `cancelPreview()`, `cancelAllPreviews()` methods
+   - Added preview callback handlers (onPreviewReady, onPreviewError)
+   - Added parallel preview queue processing (same concurrency pattern as thumbnails)
+
+4. **Phase 4: Update Catalog Store** (`apps/web/app/stores/catalog.ts`)
+   - Added `updatePreviewStatus()`, `updatePreviewUrl()`, `updatePreview()` actions
+   - Updated `clear()` to revoke preview URLs
+
+5. **Phase 5: Update CatalogService** (`packages/core/src/catalog/catalog-service.ts`)
+   - Added `requestPreview()` and `updatePreviewPriority()` methods
+   - Wired preview callbacks from ThumbnailService
+   - Added `handlePreviewReady()` and `handlePreviewError()` handlers
+
+6. **Phase 6: Wire preview callbacks in plugin** (`apps/web/app/plugins/catalog.client.ts`)
+   - Added `onPreviewReady` callback wiring to store
+
+7. **Phase 7: Update useEditPreview composable** (`apps/web/app/composables/useEditPreview.ts`)
+   - Updated `sourceUrl` computed to prefer `preview1xUrl` over `thumbnailUrl`
+   - Updated `loadSource()` to handle both preview and thumbnail URLs
+   - Updated asset watcher to request both thumbnail and preview on mount
+   - Added `requestPreview()` calls with high priority (0) for edit view
+
+8. **Phase 8: Update MockCatalogService** (`packages/core/src/catalog/mock-catalog-service.ts`)
+   - Added `previewDelayMs` option (default 100ms)
+   - Added `_previewQueue` for simulating preview generation
+   - Added `requestPreview()`, `updatePreviewPriority()` methods
+   - Added `generateMockPreview()` for mock preview generation
+   - Added `onPreviewReady` callback
+
+9. **Added useCatalog methods** (`apps/web/app/composables/useCatalog.ts`)
+   - Added `requestPreview()` and `updatePreviewPriority()` methods
+
+**Files Modified** (9 files):
+- `packages/core/src/catalog/types.ts`
+- `packages/core/src/catalog/thumbnail-cache.ts`
+- `packages/core/src/catalog/thumbnail-service.ts`
+- `packages/core/src/catalog/catalog-service.ts`
+- `packages/core/src/catalog/mock-catalog-service.ts`
+- `apps/web/app/stores/catalog.ts`
+- `apps/web/app/plugins/catalog.client.ts`
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useCatalog.ts`
+
+**Testing**:
+- ✅ Core package typecheck passes
+- ✅ All 257 core package tests pass
+- ⚠️ Rust tests blocked by outdated toolchain (pre-existing issue)
+- ⚠️ Web app typecheck has pre-existing issues (not related to this change)
+
+**Architecture**:
+- Preview generation uses same priority queue pattern as thumbnails
+- Separate OPFS directory prevents thumbnail/preview cache collision
+- Smaller memory cache (20 vs 150) accounts for larger preview sizes (~2MB vs ~100KB)
+- Edit view immediately requests both thumbnail (fast display) and preview (high quality)
+- useEditPreview automatically uses preview1x when available, falls back to thumbnail
+
+**Status**: Implementation complete. Critical issue resolved.
+
+---
+
 ## 86: 2026-01-21 16:13 EST: Preview Generation - Implementation Plan Created
 
 **Objective**: Create an implementation plan for the preview generation feature.

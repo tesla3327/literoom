@@ -160,6 +160,23 @@ export function useCatalog() {
     service.updateThumbnailPriority(assetId, priority)
   }
 
+  /**
+   * Request preview generation for an asset.
+   * Previews are larger (2560px) than thumbnails (512px).
+   */
+  function requestPreview(assetId: string, priority: number): void {
+    const service = requireCatalogService()
+    service.requestPreview(assetId, priority)
+  }
+
+  /**
+   * Update preview priority for viewport-aware loading.
+   */
+  function updatePreviewPriority(assetId: string, priority: number): void {
+    const service = requireCatalogService()
+    service.updatePreviewPriority(assetId, priority)
+  }
+
   return {
     // Services (may be undefined until plugin initializes)
     catalogService,
@@ -174,5 +191,7 @@ export function useCatalog() {
     clearFlag,
     requestThumbnail,
     updateThumbnailPriority,
+    requestPreview,
+    updatePreviewPriority,
   }
 }

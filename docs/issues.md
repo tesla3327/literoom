@@ -4,8 +4,11 @@
 
 ### Open Issues
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview)
+- [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip)
+- [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Edit preview uses thumbnail instead of full preview (Critical)](#edit-preview-uses-thumbnail-instead-of-full-preview---solved)
 - [Histogram doesn't update when edits are made (High)](#histogram-doesnt-update-when-edits-are-made---solved)
 - [Edit sliders don't match Lightroom behavior (Medium)](#edit-sliders-dont-match-lightroom-behavior---solved)
 - [Direct URL navigation to edit view (Critical)](#direct-url-navigation-to-edit-view---solved)
@@ -67,7 +70,148 @@ The crop region and rotation controls are only visible in a small thumbnail in t
 
 ---
 
+### Direct edit URL only loads current thumbnail in filmstrip
+
+**Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
+
+When navigating directly to `/edit/[id]` via URL (e.g., page refresh, shared link, or typing URL directly), only the current image's thumbnail loads in the filmstrip. Other thumbnails remain in a loading/placeholder state.
+
+**Expected**: All thumbnails in the filmstrip should load, allowing users to navigate between images by clicking on any thumbnail.
+
+**Observed**:
+- Direct URL navigation to `/edit/[id]` only loads the thumbnail for the currently viewed image
+- Other filmstrip thumbnails show loading state indefinitely
+- Thumbnails only load when actually editing/viewing that specific image
+- If user first visits home page and then navigates to edit, all thumbnails load correctly
+
+**Root Cause (suspected)**: When initializing the catalog via direct URL navigation, thumbnail generation is only requested for the current asset. The filmstrip component may not be triggering `requestThumbnail()` for visible thumbnails, or the intersection observer isn't working correctly in this scenario.
+
+**Impact**: Users cannot see previews of other images in the filmstrip when accessing edit view directly, making it harder to navigate between photos.
+
+**Files Involved**:
+- `apps/web/app/components/edit/EditFilmstrip.vue` - Filmstrip component with thumbnails
+- `apps/web/app/plugins/catalog.client.ts` - Catalog initialization on direct navigation
+- `apps/web/app/composables/useIntersectionObserver.ts` - Lazy loading trigger
+
+---
+
+### Clipping detection has false positives
+
+**Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
+
+The clipping overlay shows false positives - pixels are marked as clipped when they aren't actually losing detail. Additionally, our implementation lacks Lightroom's per-channel clipping visualization.
+
+**Current Algorithm** (`useEditPreview.ts:201-230`):
+```typescript
+// Shadow clipping: any channel at minimum
+if (r === 0 || g === 0 || b === 0) {
+  clipType |= 1  // Mark as shadow clipped
+}
+
+// Highlight clipping: any channel at maximum
+if (r === 255 || g === 255 || b === 255) {
+  clipType |= 2  // Mark as highlight clipped
+}
+```
+
+**Problem**: We show all clipping the same way (red for highlights, blue for shadows), but Lightroom distinguishes between all-channel and per-channel clipping with different colors.
+
+---
+
+**How Lightroom Actually Works** (researched 2026-01-21):
+
+#### 1. Histogram Triangle Indicators
+The triangles at the top corners of the histogram show clipping status with **color-coded feedback**:
+- **White triangle** = ALL channels clipped (true highlight/shadow clipping - complete detail loss)
+- **Colored triangle** (cyan, magenta, yellow, red, green, blue) = Only one or two channels clipped
+
+This tells photographers at a glance whether clipping is "real" (all channels) or partial (single channel, often acceptable in saturated colors).
+
+#### 2. Overlay Colors
+When toggling clipping display (`J` key or clicking triangles):
+- **Red overlay** = Highlight clipping in one or more channels
+- **Blue overlay** = Shadow clipping in one or more channels
+
+#### 3. Alt/Option + Slider Drag (Per-Channel View)
+Holding Alt/Option while dragging Whites/Blacks sliders shows detailed per-channel clipping:
+- **White areas** = All channels clipped (complete detail loss)
+- **Black areas** = No clipping
+- **Colored areas** = Specific channel(s) clipped:
+  - Red, Green, Blue = single channel clipped
+  - Cyan (G+B), Magenta (R+B), Yellow (R+G) = two channels clipped
+
+---
+
+**Implementation Plan**:
+
+1. **Update overlay to show per-channel clipping colors**:
+   - White/gray = all 3 channels clipped (true blown highlight)
+   - Black = all 3 channels at 0 (true crushed shadow)
+   - Red/Green/Blue = single channel clipped
+   - Cyan/Magenta/Yellow = two channels clipped
+
+2. **Update histogram triangle indicators**:
+   - White triangle = all channels clipping somewhere in image
+   - Colored triangle = partial channel clipping (show the color of most-clipped channel)
+
+3. **Keep current toggle behavior** (`J` key toggles both overlays)
+
+4. **Optional**: Add Alt+drag on sliders for detailed per-channel view
+
+**Files Involved**:
+- `apps/web/app/composables/useEditPreview.ts:201-230` - `detectClippedPixels()` function
+- `apps/web/app/composables/useClippingOverlay.ts` - Overlay rendering (needs color mapping)
+- `apps/web/app/components/edit/EditHistogramDisplay.vue` - Triangle indicator colors
+
+**Sources**:
+- [Adobe Lightroom Classic Help - Image Tone and Color](https://helpx.adobe.com/lightroom-classic/help/image-tone-color.html)
+- [Lightroom Queen Forums - Understanding the clipping triangles](https://www.lightroomqueen.com/community/threads/understanding-the-clipping-triangles-in-the-histogram.42075/)
+
+---
+
 ## Solved Issues
+
+### Edit preview uses thumbnail instead of full preview - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-21
+
+The edit view now uses high-resolution previews (2560px) instead of small thumbnails (512px) for the preview canvas.
+
+**Original Problem**:
+- Edit preview used the same small thumbnail displayed in the grid view
+- Image appeared pixelated/blurry when displayed at edit view size
+- Cannot see fine details needed for editing decisions
+- Professional editing workflow completely blocked
+
+**Fix Applied** (8-phase implementation):
+1. Extended `Asset` interface with `preview1xStatus` and `preview1xUrl` fields
+2. Created `PreviewCache` class with separate OPFS directory and smaller memory LRU (20 items)
+3. Extended `ThumbnailService` with preview queue, cache, and processing methods
+4. Added preview update actions to catalog store
+5. Added preview request methods to `CatalogService`
+6. Wired preview callbacks in catalog plugin
+7. Updated `useEditPreview` to prefer `preview1xUrl`, request preview on mount
+8. Updated `MockCatalogService` for demo mode support
+
+**Files Modified** (9 files):
+- `packages/core/src/catalog/types.ts`
+- `packages/core/src/catalog/thumbnail-cache.ts`
+- `packages/core/src/catalog/thumbnail-service.ts`
+- `packages/core/src/catalog/catalog-service.ts`
+- `packages/core/src/catalog/mock-catalog-service.ts`
+- `apps/web/app/stores/catalog.ts`
+- `apps/web/app/plugins/catalog.client.ts`
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useCatalog.ts`
+
+**Architecture**:
+- Preview generation uses same priority queue pattern as thumbnails
+- Separate OPFS directory ('previews') prevents cache collision
+- Smaller memory cache (20 vs 150 items) accounts for larger preview sizes
+- Edit view immediately requests both thumbnail (fast) and preview (high quality)
+- `useEditPreview` automatically uses preview1x when available, falls back to thumbnail
+
+---
 
 ### Histogram doesn't update when edits are made - SOLVED
 

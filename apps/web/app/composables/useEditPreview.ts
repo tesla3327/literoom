@@ -5,7 +5,8 @@
  * - Loads source preview for an asset
  * - Watches for edit changes and triggers re-renders
  * - Applies transforms (rotation, crop) and adjustments via WASM decode service
- * - Implements debouncing to prevent excessive renders during slider drag
+ * - Implements throttling to prevent excessive renders during slider drag
+ *   (first update is immediate, subsequent ones rate-limited)
  * - Provides draft/full render quality indicators
  *
  * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
@@ -64,36 +65,60 @@ export interface UseEditPreviewReturn {
 }
 
 // ============================================================================
-// Debounce Utility
+// Throttle Utility
 // ============================================================================
 
 /**
- * Simple debounce function to avoid adding VueUse dependency.
+ * Throttle function with leading and trailing edge execution.
+ * - First call executes immediately (leading edge) for responsive feel
+ * - Subsequent calls during the delay period are throttled
+ * - Last call is guaranteed to execute (trailing edge) to capture final value
  */
-function debounce<T extends (...args: unknown[]) => void>(
+function throttle<T extends (...args: unknown[]) => void>(
   fn: T,
   delay: number,
 ): T & { cancel: () => void } {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
+  let lastArgs: Parameters<T> | null = null
+  let lastCallTime = 0
 
-  const debounced = (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId)
-    }
-    timeoutId = setTimeout(() => {
+  const throttled = (...args: Parameters<T>) => {
+    const now = Date.now()
+    const timeSinceLastCall = now - lastCallTime
+
+    // If enough time has passed, execute immediately (leading edge)
+    if (timeSinceLastCall >= delay) {
+      lastCallTime = now
       fn(...args)
-      timeoutId = null
-    }, delay)
+      return
+    }
+
+    // Store args for trailing edge execution
+    lastArgs = args
+
+    // Schedule trailing edge if not already scheduled
+    if (timeoutId === null) {
+      const remainingTime = delay - timeSinceLastCall
+      timeoutId = setTimeout(() => {
+        timeoutId = null
+        if (lastArgs !== null) {
+          lastCallTime = Date.now()
+          fn(...lastArgs)
+          lastArgs = null
+        }
+      }, remainingTime)
+    }
   }
 
-  debounced.cancel = () => {
+  throttled.cancel = () => {
     if (timeoutId !== null) {
       clearTimeout(timeoutId)
       timeoutId = null
     }
+    lastArgs = null
   }
 
-  return debounced as T & { cancel: () => void }
+  return throttled as T & { cancel: () => void }
 }
 
 // ============================================================================
@@ -308,12 +333,12 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /**
    * Get source image URL for the current asset.
-   * Prefers larger preview if available, falls back to thumbnail.
+   * Prefers larger preview (2560px) if available, falls back to thumbnail (512px).
    */
   const sourceUrl = computed(() => {
     const asset = catalogStore.assets.get(assetId.value)
-    // TODO: Use preview1x when available, fall back to thumbnail
-    return asset?.thumbnailUrl ?? null
+    // Prefer higher resolution preview, fall back to thumbnail
+    return asset?.preview1xUrl ?? asset?.thumbnailUrl ?? null
   })
 
   // ============================================================================
@@ -322,11 +347,13 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /**
    * Load source pixels for an asset.
-   * If a blob URL has been revoked (LRU eviction), re-request the thumbnail.
+   * Prefers preview1x (2560px) over thumbnail (512px).
+   * If a blob URL has been revoked (LRU eviction), re-request the image.
    */
   async function loadSource(id: string): Promise<void> {
     const asset = catalogStore.assets.get(id)
-    const url = asset?.thumbnailUrl
+    // Prefer preview1x over thumbnail
+    const url = asset?.preview1xUrl ?? asset?.thumbnailUrl
 
     if (!url) {
       sourceCache.value = null
@@ -347,18 +374,23 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       sourceCache.value = null
 
       // If the blob URL failed (likely revoked due to LRU eviction),
-      // re-request the thumbnail from the service which will re-create it from OPFS
+      // re-request from the service which will re-create it from OPFS
       if (url.startsWith('blob:') && import.meta.client && catalog) {
-        console.log('[useEditPreview] Blob URL revoked, re-requesting thumbnail for:', id)
-        // Clear the stale URL from store to prevent retry loops
-        catalogStore.updateThumbnail(id, 'pending', null)
-        // Request fresh thumbnail (will be loaded from OPFS cache)
-        catalog.requestThumbnail(id, 0)
+        console.log('[useEditPreview] Blob URL revoked, re-requesting image for:', id)
+        // Determine if this was a preview or thumbnail URL
+        if (asset?.preview1xUrl === url) {
+          catalogStore.updatePreview(id, 'pending', null)
+          catalog.requestPreview(id, 0)
+        }
+        else {
+          catalogStore.updateThumbnail(id, 'pending', null)
+          catalog.requestThumbnail(id, 0)
+        }
         // The sourceUrl watcher will pick up the new URL when it's ready
         return
       }
 
-      // Still show the thumbnail as fallback for non-blob URLs
+      // Still show the image as fallback for non-blob URLs
       previewUrl.value = url
       isPreviewUrlOwned.value = false
     }
@@ -543,40 +575,40 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   }
 
   /**
-   * Debounced render for use during slider drag.
-   * Triggers draft quality render after 300ms of inactivity.
+   * Throttled render for use during slider drag.
+   * First update is immediate, subsequent updates throttled to 150ms.
    */
-  const debouncedRender = debounce(() => {
+  const throttledRender = throttle(() => {
     renderPreview('draft')
-  }, 300)
+  }, 150)
 
   // ============================================================================
   // Watchers
   // ============================================================================
 
   /**
-   * Watch for adjustment changes and trigger debounced render.
+   * Watch for adjustment changes and trigger throttled render.
    * Deep watch to catch individual slider changes.
    */
   watch(
     () => editStore.adjustments,
     () => {
       if (sourceCache.value) {
-        debouncedRender()
+        throttledRender()
       }
     },
     { deep: true },
   )
 
   /**
-   * Watch for crop/transform changes and trigger debounced render.
+   * Watch for crop/transform changes and trigger throttled render.
    * Deep watch to catch rotation and crop region changes.
    */
   watch(
     () => editStore.cropTransform,
     () => {
       if (sourceCache.value) {
-        debouncedRender()
+        throttledRender()
       }
     },
     { deep: true },
@@ -585,6 +617,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /**
    * Watch for asset changes and immediately load new source.
    * Uses generation counter to prevent stale updates during rapid navigation.
+   *
+   * Priority order for source image:
+   * 1. preview1x (2560px) - best quality for editing
+   * 2. thumbnail (512px) - fallback while preview generates
    */
   watch(
     assetId,
@@ -593,8 +629,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       renderGeneration.value++
       const currentGen = renderGeneration.value
 
-      // Cancel any pending debounced renders
-      debouncedRender.cancel()
+      // Cancel any pending throttled renders
+      throttledRender.cancel()
 
       // Reset state
       error.value = null
@@ -606,20 +642,23 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         return
       }
 
-      // Request thumbnail generation (priority 0 = highest for edit view)
-      // This ensures the thumbnail is generated even if we navigate directly to edit view
+      // Request generation (priority 0 = highest for edit view)
+      // This ensures we have images even if navigating directly to edit view
       // Only run on client (catalog service is client-only)
       if (import.meta.client && catalog) {
+        // Request both thumbnail (for immediate display) and preview (for high quality)
         catalog.requestThumbnail(id, 0)
+        catalog.requestPreview(id, 0)
       }
 
-      // Show thumbnail immediately while loading pixels (borrowed URL from store)
+      // Show best available image immediately (borrowed URL from store)
       const asset = catalogStore.assets.get(id)
-      previewUrl.value = asset?.thumbnailUrl ?? null
+      const immediateUrl = asset?.preview1xUrl ?? asset?.thumbnailUrl ?? null
+      previewUrl.value = immediateUrl
       isPreviewUrlOwned.value = false
 
-      // Early return if no thumbnail URL yet - the sourceUrl watcher will pick up when it's ready
-      if (!asset?.thumbnailUrl) {
+      // Early return if no image URL yet - the sourceUrl watcher will pick up when it's ready
+      if (!immediateUrl) {
         return
       }
 
@@ -689,7 +728,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   // ============================================================================
 
   onUnmounted(() => {
-    debouncedRender.cancel()
+    throttledRender.cancel()
     // Only revoke blob URL if we created it (owned), not if it's borrowed from the store
     if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
       URL.revokeObjectURL(previewUrl.value)

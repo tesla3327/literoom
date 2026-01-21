@@ -20,6 +20,7 @@ import {
   type AssetsAddedCallback,
   type AssetUpdatedCallback,
   type ThumbnailReadyCallback,
+  type PreviewReadyCallback,
   ThumbnailPriority,
   CatalogError,
 } from './types'
@@ -39,6 +40,8 @@ export interface MockCatalogServiceOptions {
   scanBatchSize?: number
   /** Delay for thumbnail generation in ms (default: 0) */
   thumbnailDelayMs?: number
+  /** Delay for preview generation in ms (default: 100) */
+  previewDelayMs?: number
   /** Whether to fail scan for error testing (default: false) */
   failScan?: boolean
   /** Whether to fail setFlag for error testing (default: false) */
@@ -56,17 +59,76 @@ const DEFAULT_OPTIONS: Required<MockCatalogServiceOptions> = {
   scanDelayMs: 0,
   scanBatchSize: 10,
   thumbnailDelayMs: 0,
+  previewDelayMs: 100, // Slightly longer than thumbnails to simulate larger image
   failScan: false,
   failSetFlag: false,
   thumbnailBaseColor: '#3b82f6', // Blue
 }
 
 /**
- * Generate a data URL for a solid color thumbnail.
+ * Generate a data URL for a visually interesting thumbnail.
+ * Creates gradient backgrounds with abstract shapes to simulate photos.
  */
-function generateThumbnailDataUrl(color: string, size: number = 256): string {
-  // Create a simple SVG as a data URL
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="100%" height="100%" fill="${color}"/></svg>`
+function generateThumbnailDataUrl(color: string, index: number, size: number = 256): string {
+  // Generate deterministic variations based on index
+  const hueShift = (index * 37) % 360
+  const pattern = index % 5
+
+  // Create different visual patterns for variety
+  let content: string
+  switch (pattern) {
+    case 0:
+      // Diagonal gradient with circle
+      content = `
+        <defs>
+          <linearGradient id="g${index}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:${color};stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1"/>
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#g${index})"/>
+        <circle cx="${70 + (index % 3) * 40}" cy="${70 + (index % 4) * 30}" r="${40 + (index % 3) * 15}" fill="${color}" opacity="0.3"/>
+      `
+      break
+    case 1:
+      // Horizontal bands
+      content = `
+        <rect width="100%" height="100%" fill="#1a1a2e"/>
+        <rect y="0" width="100%" height="33%" fill="${color}" opacity="0.7"/>
+        <rect y="66%" width="100%" height="34%" fill="${color}" opacity="0.4"/>
+      `
+      break
+    case 2:
+      // Radial glow
+      content = `
+        <defs>
+          <radialGradient id="r${index}" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" style="stop-color:${color};stop-opacity:0.8"/>
+            <stop offset="100%" style="stop-color:#0f0f1a;stop-opacity:1"/>
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#r${index})"/>
+      `
+      break
+    case 3:
+      // Corner accent
+      content = `
+        <rect width="100%" height="100%" fill="#16162a"/>
+        <polygon points="0,0 ${size},0 0,${size}" fill="${color}" opacity="0.5"/>
+        <circle cx="${size * 0.7}" cy="${size * 0.7}" r="${size * 0.2}" fill="${color}" opacity="0.3"/>
+      `
+      break
+    default:
+      // Layered rectangles
+      content = `
+        <rect width="100%" height="100%" fill="#1a1a2e"/>
+        <rect x="10%" y="10%" width="80%" height="80%" fill="${color}" opacity="0.2"/>
+        <rect x="20%" y="20%" width="60%" height="60%" fill="${color}" opacity="0.3"/>
+        <rect x="30%" y="30%" width="40%" height="40%" fill="${color}" opacity="0.4"/>
+      `
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">${content}</svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
@@ -104,10 +166,14 @@ export class MockCatalogService implements ICatalogService {
   // Thumbnail queue simulation
   private _thumbnailQueue: Map<string, { priority: ThumbnailPriority; timeoutId?: ReturnType<typeof setTimeout> }> = new Map()
 
+  // Preview queue simulation
+  private _previewQueue: Map<string, { priority: ThumbnailPriority; timeoutId?: ReturnType<typeof setTimeout> }> = new Map()
+
   // Callbacks
   private _onAssetsAdded: AssetsAddedCallback | null = null
   private _onAssetUpdated: AssetUpdatedCallback | null = null
   private _onThumbnailReady: ThumbnailReadyCallback | null = null
+  private _onPreviewReady: PreviewReadyCallback | null = null
 
   /**
    * Private constructor - use MockCatalogService.create() instead.
@@ -382,9 +448,12 @@ export class MockCatalogService implements ICatalogService {
       return
     }
 
-    // Generate data URL based on flag color
+    // Generate data URL based on flag color and asset index for variety
     const color = getColorForFlag(asset.flag)
-    const thumbnailUrl = generateThumbnailDataUrl(color)
+    // Extract index from asset id (e.g., "demo-asset-5" -> 5)
+    const indexMatch = assetId.match(/\d+$/)
+    const index = indexMatch ? parseInt(indexMatch[0], 10) : 0
+    const thumbnailUrl = generateThumbnailDataUrl(color, index)
 
     // Update asset
     const updatedAsset: Asset = {
@@ -400,6 +469,82 @@ export class MockCatalogService implements ICatalogService {
     // Notify listeners
     this._onAssetUpdated?.(updatedAsset)
     this._onThumbnailReady?.(assetId, thumbnailUrl)
+  }
+
+  // ==========================================================================
+  // ICatalogService Implementation - Preview Requests
+  // ==========================================================================
+
+  /**
+   * Request preview generation for an asset.
+   * Simulates async preview generation with configurable delay.
+   * Previews are larger (2560px) than thumbnails (512px).
+   */
+  requestPreview(assetId: string, priority: ThumbnailPriority): void {
+    const asset = this._assets.get(assetId)
+    if (!asset) {
+      return
+    }
+
+    // Check if already in queue or ready
+    if (this._previewQueue.has(assetId) || asset.preview1xStatus === 'ready') {
+      return
+    }
+
+    // Update asset status to loading
+    const loadingAsset: Asset = { ...asset, preview1xStatus: 'loading' }
+    this._assets.set(assetId, loadingAsset)
+
+    // Schedule preview generation (slightly longer delay than thumbnails)
+    const timeoutId = setTimeout(() => {
+      this.generateMockPreview(assetId)
+    }, this.options.previewDelayMs)
+
+    this._previewQueue.set(assetId, { priority, timeoutId })
+  }
+
+  /**
+   * Update the priority of a preview request.
+   */
+  updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void {
+    const queued = this._previewQueue.get(assetId)
+    if (queued) {
+      queued.priority = priority
+    }
+  }
+
+  /**
+   * Generate a mock preview for an asset.
+   * Uses a larger size to simulate actual preview generation.
+   */
+  private generateMockPreview(assetId: string): void {
+    const asset = this._assets.get(assetId)
+    if (!asset) {
+      this._previewQueue.delete(assetId)
+      return
+    }
+
+    // Generate data URL based on flag color and asset index
+    // Use larger size (512 instead of 256) to simulate higher resolution
+    const color = getColorForFlag(asset.flag)
+    const indexMatch = assetId.match(/\d+$/)
+    const index = indexMatch ? parseInt(indexMatch[0], 10) : 0
+    const previewUrl = generateThumbnailDataUrl(color, index, 512)
+
+    // Update asset
+    const updatedAsset: Asset = {
+      ...asset,
+      preview1xStatus: 'ready',
+      preview1xUrl: previewUrl,
+    }
+    this._assets.set(assetId, updatedAsset)
+
+    // Remove from queue
+    this._previewQueue.delete(assetId)
+
+    // Notify listeners
+    this._onAssetUpdated?.(updatedAsset)
+    this._onPreviewReady?.(assetId, previewUrl)
   }
 
   // ==========================================================================
@@ -430,6 +575,14 @@ export class MockCatalogService implements ICatalogService {
     return this._onThumbnailReady
   }
 
+  set onPreviewReady(callback: PreviewReadyCallback | null) {
+    this._onPreviewReady = callback
+  }
+
+  get onPreviewReady(): PreviewReadyCallback | null {
+    return this._onPreviewReady
+  }
+
   // ==========================================================================
   // ICatalogService Implementation - Cleanup
   // ==========================================================================
@@ -447,6 +600,14 @@ export class MockCatalogService implements ICatalogService {
       }
     }
     this._thumbnailQueue.clear()
+
+    // Clear preview queue
+    for (const [, queued] of this._previewQueue) {
+      if (queued.timeoutId) {
+        clearTimeout(queued.timeoutId)
+      }
+    }
+    this._previewQueue.clear()
 
     this._assets.clear()
     this._currentFolderName = null
