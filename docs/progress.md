@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:04 EST
-**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Complete
+**Last Updated**: 2026-01-20 22:15 EST
+**Current Phase**: Catalog Service - Research Complete
 
 ## Project Structure
 
@@ -36,6 +36,52 @@ literoom/
 ```
 
 ## Completed Work
+
+### 24: 2026-01-20 22:15 EST: Catalog Service Research Complete
+
+**Objective**: Research and plan the Catalog Service - the core system enabling folder scanning, asset discovery, thumbnail generation, and state management.
+
+**Work Completed**:
+- Created research plan: [Catalog Service Research Plan](./research/2026-01-20-catalog-service-research-plan.md)
+- Completed parallel research across 6 areas:
+  - **Area 1 (Storage)**: Dexie.js for IndexedDB, OPFS for binary blobs (2-4x faster)
+  - **Area 2 (Scanning)**: Async generators with batched yielding, AbortController cancellation
+  - **Area 3 (Thumbnails)**: Priority queue with viewport awareness, LRU + OPFS caching
+  - **Area 4 (State)**: Normalized Pinia stores with shallowRef for performance
+  - **Area 5 (Permissions)**: Use existing FileSystemProvider, recovery UI patterns
+  - **Area 6 (Codebase)**: Follow DecodeService patterns (async factory, interface-first)
+- Created synthesis document: [Catalog Service Synthesis](./research/2026-01-20-catalog-service-synthesis.md)
+
+**Key Architecture Decisions**:
+1. **Storage**: Dexie.js for metadata (compound indexes for filtering), OPFS for thumbnails/previews
+2. **Scanning**: Async generator yielding batches of 50 files, extension-based file detection
+3. **Thumbnails**: Priority queue with viewport-aware ordering, 150-item LRU memory cache
+4. **State**: Normalized stores (`Map<id, Asset>` + `string[]` for order) with `shallowRef`
+5. **Permissions**: Leverage existing `FileSystemProvider.saveHandle/loadHandle`
+6. **Service**: Async factory pattern matching DecodeService
+
+**Implementation Phases Defined**:
+1. Core Types and Database (Dexie schema)
+2. Scan Service (folder iteration)
+3. Thumbnail Service (priority queue + caching)
+4. Catalog Service (composition)
+5. Pinia Stores
+6. UI Components (virtual grid, filter bar)
+7. Integration and Testing
+
+**Research Documents Created**:
+- `docs/research/2026-01-20-catalog-service-research-plan.md`
+- `docs/research/2026-01-20-catalog-area-1-storage.md`
+- `docs/research/2026-01-20-catalog-area-2-scanning.md`
+- `docs/research/2026-01-20-catalog-area-3-thumbnails.md`
+- `docs/research/2026-01-20-catalog-area-4-state.md`
+- `docs/research/2026-01-20-catalog-area-5-permissions.md`
+- `docs/research/2026-01-20-catalog-area-6-codebase-review.md`
+- `docs/research/2026-01-20-catalog-service-synthesis.md`
+
+**Next Step**: Create implementation plan from synthesis, then begin Phase 1 (Core Types and Database).
+
+---
 
 ### 23: 2026-01-20 22:04 EST: TypeScript Integration - Phase 5 Complete (Testing)
 
