@@ -1,5 +1,41 @@
 # Iterations 61-70
 
+## 63: 2026-01-21 12:32 EST: Phase 12 - Crop/Rotate/Straighten - Research Complete
+
+**Objective**: Research the implementation approach for crop, rotate, and straighten functionality.
+
+**Context**:
+- Phase 11 (Tone Curve) is complete
+- Crop/rotate/straighten is listed in spec section 3.5 as a core editing feature
+- Part of v1 acceptance criteria: "User can open edit view and adjust basic sliders + tone curve + crop/rotate/straighten"
+
+**Research Areas Completed**:
+1. **Mathematics & Algorithms** - 2D rotation transforms, bounding box calculations, straighten angle computation
+2. **Codebase Review** - EditState structure, edit store patterns, WASM worker patterns
+3. **Canvas UI** - Crop overlay rendering, handle interaction, rotation preview
+4. **Export Pipeline** - Transform order (rotate -> crop -> adjustments), WASM implementation strategy
+5. **State Management** - TypeScript types, default values, copy/paste behavior
+
+**Key Decisions**:
+- Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+- Implementation: WASM (Rust) for rotation and crop (performance)
+- Crop representation: `null` = no crop (full image)
+- Coordinates: Normalized (0-1) for image-size independence
+- Aspect lock: UI state only (not persisted)
+
+**Research Documents Created**:
+- `docs/research/2026-01-21-crop-rotate-research-plan.md`
+- `docs/research/2026-01-21-crop-rotate-area-1-mathematics.md`
+- `docs/research/2026-01-21-crop-rotate-area-2-codebase-review.md`
+- `docs/research/2026-01-21-crop-rotate-area-3-canvas-ui.md`
+- `docs/research/2026-01-21-crop-rotate-area-4-export.md`
+- `docs/research/2026-01-21-crop-rotate-area-5-state.md`
+- `docs/research/2026-01-21-crop-rotate-synthesis.md`
+
+**Status**: Complete - Ready to create implementation plan
+
+---
+
 ## 62: 2026-01-21 12:38 EST: Fix Direct URL Navigation to Edit View - Complete
 
 **Objective**: Fix the critical issue where navigating directly to `/edit/demo-asset-1` causes a 500 Server Error due to `$catalogService` being undefined.
