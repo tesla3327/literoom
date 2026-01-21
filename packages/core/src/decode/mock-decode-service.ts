@@ -369,29 +369,37 @@ export class MockDecodeService implements IDecodeService {
       return this.options.onComputeHistogram(pixels, width, height)
     }
 
-    // Default: return a mock bell-curve histogram centered at 128
+    // Actually compute histogram from pixel data (RGB format)
     const red = new Uint32Array(256)
     const green = new Uint32Array(256)
     const blue = new Uint32Array(256)
     const luminance = new Uint32Array(256)
 
-    // Generate bell-curve-like distribution
-    const totalPixels = width * height
-    for (let i = 0; i < 256; i++) {
-      const value = Math.floor(
-        (totalPixels / 256) * Math.exp(-Math.pow(i - 128, 2) / 5000)
-      )
-      red[i] = value
-      green[i] = value
-      blue[i] = value
-      luminance[i] = value
+    // Process pixels in RGB triplets
+    for (let i = 0; i < pixels.length; i += 3) {
+      const r = pixels[i] ?? 0
+      const g = pixels[i + 1] ?? 0
+      const b = pixels[i + 2] ?? 0
+
+      // Bin each channel
+      red[r]++
+      green[g]++
+      blue[b]++
+
+      // Compute luminance (BT.709)
+      const lum = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b)
+      luminance[Math.min(255, Math.max(0, lum))]++
     }
 
-    // Find max value
+    // Find max value across RGB channels
     let maxValue = 0
     for (let i = 0; i < 256; i++) {
-      maxValue = Math.max(maxValue, red[i], green[i], blue[i])
+      maxValue = Math.max(maxValue, red[i]!, green[i]!, blue[i]!)
     }
+
+    // Check for clipping
+    const hasHighlightClipping = (red[255]! > 0 || green[255]! > 0 || blue[255]! > 0)
+    const hasShadowClipping = (red[0]! > 0 || green[0]! > 0 || blue[0]! > 0)
 
     return {
       red,
@@ -399,8 +407,8 @@ export class MockDecodeService implements IDecodeService {
       blue,
       luminance,
       maxValue,
-      hasHighlightClipping: false,
-      hasShadowClipping: false
+      hasHighlightClipping,
+      hasShadowClipping
     }
   }
 

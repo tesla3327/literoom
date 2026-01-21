@@ -178,6 +178,7 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
   /**
    * Render histogram data to the canvas.
+   * Draws each RGB channel as a semi-transparent filled area with proper layering.
    */
   function renderHistogram(): void {
     const canvas = canvasRef.value
@@ -197,31 +198,50 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
     if (max === 0) return
 
-    // Draw RGB channels with alpha blending
-    ctx.globalAlpha = 0.4
+    // Draw each channel as a filled path with proper colors
+    // Order: Blue first (back), then Green, then Red (front) - matches Lightroom
+    const channels: Array<{ data: Uint32Array; color: string; fillColor: string }> = [
+      { data: hist.blue, color: COLORS.blue, fillColor: 'rgba(0, 100, 255, 0.4)' },
+      { data: hist.green, color: COLORS.green, fillColor: 'rgba(0, 200, 0, 0.4)' },
+      { data: hist.red, color: COLORS.red, fillColor: 'rgba(255, 50, 50, 0.4)' },
+    ]
 
-    const barWidth = Math.ceil(width / 256)
+    for (const channel of channels) {
+      ctx.beginPath()
+      ctx.moveTo(0, height)
 
-    for (let i = 0; i < 256; i++) {
-      const x = (i / 256) * width
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 255) * width
+        const binValue = channel.data[i] ?? 0
+        const barHeight = (binValue / max) * height
+        ctx.lineTo(x, height - barHeight)
+      }
 
-      // Red channel
-      const redHeight = (hist.red[i]! / max) * height
-      ctx.fillStyle = COLORS.red
-      ctx.fillRect(x, height - redHeight, barWidth, redHeight)
+      // Close the path at the bottom
+      ctx.lineTo(width, height)
+      ctx.closePath()
 
-      // Green channel
-      const greenHeight = (hist.green[i]! / max) * height
-      ctx.fillStyle = COLORS.green
-      ctx.fillRect(x, height - greenHeight, barWidth, greenHeight)
+      // Fill with semi-transparent color
+      ctx.fillStyle = channel.fillColor
+      ctx.fill()
 
-      // Blue channel
-      const blueHeight = (hist.blue[i]! / max) * height
-      ctx.fillStyle = COLORS.blue
-      ctx.fillRect(x, height - blueHeight, barWidth, blueHeight)
+      // Draw outline for better visibility
+      ctx.strokeStyle = channel.color
+      ctx.lineWidth = 1
+      ctx.globalAlpha = 0.6
+
+      // Re-trace just the curve (not the closing lines)
+      ctx.beginPath()
+      ctx.moveTo(0, height - ((channel.data[0] ?? 0) / max) * height)
+      for (let i = 1; i < 256; i++) {
+        const x = (i / 255) * width
+        const binValue = channel.data[i] ?? 0
+        const barHeight = (binValue / max) * height
+        ctx.lineTo(x, height - barHeight)
+      }
+      ctx.stroke()
+      ctx.globalAlpha = 1
     }
-
-    ctx.globalAlpha = 1
 
     // Draw clipping indicators
     drawClippingIndicators(ctx, width, height, hist)

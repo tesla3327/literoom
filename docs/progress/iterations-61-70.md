@@ -1,5 +1,43 @@
 # Iterations 61-70
 
+## 68: 2026-01-21 14:05 EST: Fix Histogram RGB Channel Rendering
+
+**Objective**: Fix the critical histogram rendering issue where RGB channels appeared as a single gray shape instead of separate colored curves.
+
+**Root Cause Analysis**:
+1. The `renderHistogram()` function drew bars with alpha blending that resulted in muddy gray appearance when channels overlapped
+2. The `MockDecodeService.computeHistogram()` returned fake bell-curve data with identical values for all RGB channels
+
+**Work Completed**:
+
+**1. Rewrote `useHistogramDisplay.ts` renderHistogram():**
+- Changed from bar-based rendering to filled path rendering
+- Each channel is drawn as a filled area with stroke outline
+- Proper layering: blue (back), green (middle), red (front)
+- Uses semi-transparent fills with visible colored strokes
+
+**2. Fixed `MockDecodeService.computeHistogram()`:**
+- Now actually computes histogram from pixel data (RGB triplets)
+- Bins each R, G, B value separately into their respective arrays
+- Computes luminance using BT.709 coefficients
+- Detects shadow/highlight clipping from actual pixel values
+
+**Files Modified**:
+- `apps/web/app/composables/useHistogramDisplay.ts` - Rewrote `renderHistogram()`
+- `packages/core/src/decode/mock-decode-service.ts` - Rewrote `computeHistogram()`
+
+**Verification**:
+- All 257 packages/core tests pass
+- Visual verification in browser shows proper RGB channel separation
+- Red images show red histogram peak, blue images show blue peak, etc.
+- Histogram now correctly reflects the actual color distribution of images
+
+**Status**: Complete
+
+**Next Step**: Continue with Phase 12.5 - Worker Integration for transforms
+
+---
+
 ## 67: 2026-01-21 13:44 EST: Phase 12.4 Complete - WASM Transform Bindings
 
 **Objective**: Expose Rust transform functions (rotation and crop) to JavaScript via WASM bindings.
