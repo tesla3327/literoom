@@ -13,7 +13,8 @@ import type {
   ThumbnailOptions,
   PreviewOptions,
   FileType,
-  ErrorCode
+  ErrorCode,
+  Adjustments
 } from './types'
 import { DecodeError, filterToNumber } from './types'
 
@@ -45,6 +46,13 @@ export interface IDecodeService {
   ): Promise<DecodedImage>
   /** Detect the file type from magic bytes */
   detectFileType(bytes: Uint8Array): Promise<FileType>
+  /** Apply adjustments to image pixel data */
+  applyAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    adjustments: Adjustments
+  ): Promise<DecodedImage>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -257,6 +265,26 @@ export class DecodeService implements IDecodeService {
       id: this.generateId(),
       type: 'detect-file-type',
       bytes
+    })
+  }
+
+  /**
+   * Apply adjustments to image pixel data.
+   * Returns a new image with adjustments applied.
+   */
+  async applyAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    adjustments: Adjustments
+  ): Promise<DecodedImage> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'apply-adjustments',
+      pixels,
+      width,
+      height,
+      adjustments
     })
   }
 

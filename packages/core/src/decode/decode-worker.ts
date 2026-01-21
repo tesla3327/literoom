@@ -18,7 +18,9 @@ import init, {
   generate_thumbnail,
   resize_to_fit,
   is_raw_file,
-  type JsDecodedImage
+  apply_adjustments,
+  BasicAdjustments,
+  JsDecodedImage
 } from 'literoom-wasm'
 
 import type {
@@ -193,6 +195,51 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
           fileType
         }
         self.postMessage(response)
+        break
+      }
+
+      case 'apply-adjustments': {
+        const { pixels, width, height, adjustments } = request
+
+        // Create BasicAdjustments instance and set values
+        const wasmAdj = new BasicAdjustments()
+        wasmAdj.temperature = adjustments.temperature
+        wasmAdj.tint = adjustments.tint
+        wasmAdj.exposure = adjustments.exposure
+        wasmAdj.contrast = adjustments.contrast
+        wasmAdj.highlights = adjustments.highlights
+        wasmAdj.shadows = adjustments.shadows
+        wasmAdj.whites = adjustments.whites
+        wasmAdj.blacks = adjustments.blacks
+        wasmAdj.vibrance = adjustments.vibrance
+        wasmAdj.saturation = adjustments.saturation
+
+        // Create input image from pixels
+        const inputImage = new JsDecodedImage(width, height, pixels)
+
+        // Apply adjustments (returns new image)
+        const outputImage = apply_adjustments(inputImage, wasmAdj)
+        const outputPixels = outputImage.pixels()
+        const outputWidth = outputImage.width
+        const outputHeight = outputImage.height
+
+        // Free WASM memory
+        inputImage.free()
+        wasmAdj.free()
+
+        const response: DecodeSuccessResponse = {
+          id,
+          type: 'success',
+          width: outputWidth,
+          height: outputHeight,
+          pixels: outputPixels
+        }
+
+        // Transfer the pixel buffer to avoid copying
+        self.postMessage(response, [outputPixels.buffer])
+
+        // Free output image WASM memory
+        outputImage.free()
         break
       }
 

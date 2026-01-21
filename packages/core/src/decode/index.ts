@@ -26,6 +26,7 @@ export {
   type GenerateThumbnailRequest,
   type GeneratePreviewRequest,
   type DetectFileTypeRequest,
+  type ApplyAdjustmentsRequest,
   type DecodeResponse,
   type DecodeSuccessResponse,
   type FileTypeResponse,

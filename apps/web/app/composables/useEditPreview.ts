@@ -4,13 +4,12 @@
  * Manages the preview rendering pipeline for the edit view:
  * - Loads source preview for an asset
  * - Watches for edit changes and triggers re-renders
+ * - Applies adjustments via WASM decode service
  * - Implements debouncing to prevent excessive renders during slider drag
  * - Provides draft/full render quality indicators
- *
- * Currently serves as a placeholder that displays the source image.
- * Full WASM-based edit application will be added in Phase 9.
  */
 import type { Ref } from 'vue'
+import type { Adjustments } from '@literoom/core/catalog'
 
 // ============================================================================
 // Types
@@ -61,6 +60,98 @@ function debounce<T extends (...args: unknown[]) => void>(
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Convert RGB pixel data (3 bytes per pixel) to RGBA (4 bytes per pixel).
+ */
+function rgbToRgba(rgb: Uint8Array): Uint8ClampedArray {
+  const pixelCount = rgb.length / 3
+  const rgba = new Uint8ClampedArray(pixelCount * 4)
+
+  for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
+    rgba[j] = rgb[i]! // R
+    rgba[j + 1] = rgb[i + 1]! // G
+    rgba[j + 2] = rgb[i + 2]! // B
+    rgba[j + 3] = 255 // A (fully opaque)
+  }
+
+  return rgba
+}
+
+/**
+ * Convert pixels to a blob URL for display in an <img> tag.
+ */
+async function pixelsToUrl(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): Promise<string> {
+  // Create canvas and draw pixels
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')!
+
+  const rgbaPixels = rgbToRgba(pixels)
+  const imageData = ctx.createImageData(width, height)
+  imageData.data.set(rgbaPixels)
+  ctx.putImageData(imageData, 0, 0)
+
+  // Convert to blob URL
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => {
+        if (b) resolve(b)
+        else reject(new Error('Failed to create blob'))
+      },
+      'image/jpeg',
+      0.9,
+    )
+  })
+
+  return URL.createObjectURL(blob)
+}
+
+/**
+ * Load an image from a URL and return its pixels.
+ */
+async function loadImagePixels(
+  url: string,
+): Promise<{ pixels: Uint8Array; width: number; height: number }> {
+  // Load image
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = url
+  })
+
+  // Draw to canvas and extract pixels
+  const canvas = document.createElement('canvas')
+  canvas.width = img.width
+  canvas.height = img.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+
+  const imageData = ctx.getImageData(0, 0, img.width, img.height)
+  const rgba = imageData.data
+
+  // Convert RGBA to RGB
+  const rgb = new Uint8Array((rgba.length / 4) * 3)
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+    rgb[j] = rgba[i]! // R
+    rgb[j + 1] = rgba[i + 1]! // G
+    rgb[j + 2] = rgba[i + 2]! // B
+  }
+
+  return { pixels: rgb, width: img.width, height: img.height }
+}
+
+// ============================================================================
 // Composable
 // ============================================================================
 
@@ -73,6 +164,7 @@ function debounce<T extends (...args: unknown[]) => void>(
 export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
+  const { $decodeService } = useNuxtApp()
 
   // ============================================================================
   // State
@@ -89,6 +181,14 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /** Error message if render failed */
   const error = ref<string | null>(null)
+
+  /** Cached source pixels to avoid re-loading on every adjustment */
+  const sourceCache = ref<{
+    assetId: string
+    pixels: Uint8Array
+    width: number
+    height: number
+  } | null>(null)
 
   // ============================================================================
   // Computed
@@ -109,29 +209,112 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   // ============================================================================
 
   /**
+   * Load source pixels for an asset.
+   */
+  async function loadSource(id: string): Promise<void> {
+    const asset = catalogStore.assets.get(id)
+    const url = asset?.thumbnailUrl
+
+    if (!url) {
+      sourceCache.value = null
+      previewUrl.value = null
+      return
+    }
+
+    try {
+      const { pixels, width, height } = await loadImagePixels(url)
+      sourceCache.value = { assetId: id, pixels, width, height }
+
+      // Show initial preview immediately
+      previewUrl.value = url
+    }
+    catch (e) {
+      console.error('Failed to load source pixels:', e)
+      sourceCache.value = null
+      // Still show the thumbnail as fallback
+      previewUrl.value = url
+    }
+  }
+
+  /**
    * Render the preview with current adjustments.
-   * Currently a placeholder - will be replaced with WASM-based processing.
    *
    * @param quality - 'draft' for fast render during drag, 'full' for high quality
    */
   async function renderPreview(quality: 'draft' | 'full'): Promise<void> {
-    if (!sourceUrl.value) return
+    if (!sourceCache.value) {
+      // No source loaded yet
+      return
+    }
+
+    // Don't re-render if still rendering
+    if (isRendering.value) {
+      return
+    }
 
     error.value = null
     isRendering.value = true
     renderQuality.value = quality
 
     try {
-      // TODO: Phase 9 - Apply adjustments via WASM
-      // For now, just use the source URL directly
-      // The adjustments are stored in editStore.adjustments but not yet applied
+      const { pixels, width, height, assetId: cachedId } = sourceCache.value
 
-      // Simulate a small delay for draft renders to show the indicator
-      if (quality === 'draft') {
-        await new Promise(resolve => setTimeout(resolve, 50))
+      // Check if asset changed while we were waiting
+      if (cachedId !== assetId.value) {
+        return
       }
 
-      previewUrl.value = sourceUrl.value
+      // Get current adjustments from store
+      const adjustments: Adjustments = {
+        temperature: editStore.adjustments.temperature,
+        tint: editStore.adjustments.tint,
+        exposure: editStore.adjustments.exposure,
+        contrast: editStore.adjustments.contrast,
+        highlights: editStore.adjustments.highlights,
+        shadows: editStore.adjustments.shadows,
+        whites: editStore.adjustments.whites,
+        blacks: editStore.adjustments.blacks,
+        vibrance: editStore.adjustments.vibrance,
+        saturation: editStore.adjustments.saturation,
+      }
+
+      // Check if any adjustments are non-default
+      const hasAdjustments = Object.values(adjustments).some(v => v !== 0)
+
+      let resultUrl: string
+
+      if (!hasAdjustments) {
+        // No adjustments, use source directly
+        resultUrl = sourceUrl.value!
+      }
+      else {
+        // Apply adjustments via WASM
+        const result = await $decodeService.applyAdjustments(
+          pixels,
+          width,
+          height,
+          adjustments,
+        )
+
+        // Convert result to blob URL
+        resultUrl = await pixelsToUrl(result.pixels, result.width, result.height)
+
+        // Revoke old URL if it was a blob URL
+        if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl.value)
+        }
+      }
+
+      // Check again if asset changed
+      if (cachedId !== assetId.value) {
+        // Asset changed, discard result
+        if (resultUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(resultUrl)
+        }
+        return
+      }
+
+      previewUrl.value = resultUrl
     }
     catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to render preview'
@@ -162,20 +345,34 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   watch(
     () => editStore.adjustments,
     () => {
-      debouncedRender()
+      if (sourceCache.value) {
+        debouncedRender()
+      }
     },
     { deep: true },
   )
 
   /**
-   * Watch for asset changes and immediately load new preview.
+   * Watch for asset changes and immediately load new source.
    */
   watch(
     assetId,
-    () => {
+    async (id) => {
       debouncedRender.cancel()
-      previewUrl.value = sourceUrl.value
       error.value = null
+      sourceCache.value = null
+
+      // Show thumbnail immediately while loading pixels
+      const asset = catalogStore.assets.get(id)
+      previewUrl.value = asset?.thumbnailUrl ?? null
+
+      // Load source pixels in background
+      await loadSource(id)
+
+      // Render with current adjustments if any
+      if (sourceCache.value && editStore.isDirty) {
+        renderPreview('full')
+      }
     },
     { immediate: true },
   )
@@ -185,9 +382,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
    */
   watch(
     sourceUrl,
-    (url) => {
-      if (url && !previewUrl.value) {
-        previewUrl.value = url
+    async (url) => {
+      if (url && !sourceCache.value) {
+        await loadSource(assetId.value)
       }
     },
   )
@@ -198,6 +395,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   onUnmounted(() => {
     debouncedRender.cancel()
+    // Revoke blob URL if any
+    if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl.value)
+    }
   })
 
   return {

@@ -5,7 +5,7 @@
  * Each message has a unique `id` for request/response correlation.
  */
 
-import type { ErrorCode } from './types'
+import type { Adjustments, ErrorCode } from './types'
 
 /**
  * Request message sent from main thread to decode worker.
@@ -16,6 +16,7 @@ export type DecodeRequest =
   | GenerateThumbnailRequest
   | GeneratePreviewRequest
   | DetectFileTypeRequest
+  | ApplyAdjustmentsRequest
 
 /**
  * Decode a JPEG file to raw RGB pixels.
@@ -66,6 +67,22 @@ export interface DetectFileTypeRequest {
   id: string
   type: 'detect-file-type'
   bytes: Uint8Array
+}
+
+/**
+ * Apply adjustments to image pixels.
+ */
+export interface ApplyAdjustmentsRequest {
+  id: string
+  type: 'apply-adjustments'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+  /** Adjustment values to apply */
+  adjustments: Adjustments
 }
 
 /**

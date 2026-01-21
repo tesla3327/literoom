@@ -87,6 +87,34 @@ export interface DecodeServiceState {
 }
 
 /**
+ * Basic adjustment values for image processing.
+ *
+ * These correspond to the 10 sliders in the edit panel.
+ */
+export interface Adjustments {
+  /** White balance warm/cool shift (-100 to +100) */
+  temperature: number
+  /** Green/magenta tint shift (-100 to +100) */
+  tint: number
+  /** Exposure in stops (-5 to +5) */
+  exposure: number
+  /** Contrast adjustment (-100 to +100) */
+  contrast: number
+  /** Highlight recovery (-100 to +100) */
+  highlights: number
+  /** Shadow recovery (-100 to +100) */
+  shadows: number
+  /** White point adjustment (-100 to +100) */
+  whites: number
+  /** Black point adjustment (-100 to +100) */
+  blacks: number
+  /** Vibrance - smart saturation (-100 to +100) */
+  vibrance: number
+  /** Global saturation (-100 to +100) */
+  saturation: number
+}
+
+/**
  * Convert filter type string to numeric value for WASM.
  */
 export function filterToNumber(filter: FilterType | undefined): number {

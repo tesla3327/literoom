@@ -16,7 +16,8 @@ import type {
   DecodeServiceState,
   ThumbnailOptions,
   PreviewOptions,
-  FileType
+  FileType,
+  Adjustments
 } from './types'
 import { DecodeError } from './types'
 
@@ -46,6 +47,13 @@ export interface MockDecodeServiceOptions {
   ) => Promise<DecodedImage>
   /** Custom handler for detectFileType */
   onDetectFileType?: (bytes: Uint8Array) => Promise<FileType>
+  /** Custom handler for applyAdjustments */
+  onApplyAdjustments?: (
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    adjustments: Adjustments
+  ) => Promise<DecodedImage>
 }
 
 /**
@@ -218,6 +226,24 @@ export class MockDecodeService implements IDecodeService {
 
     // Default: use actual magic byte detection
     return detectFileTypeFromBytes(bytes)
+  }
+
+  async applyAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    adjustments: Adjustments
+  ): Promise<DecodedImage> {
+    await this.simulateOperation()
+
+    if (this.options.onApplyAdjustments) {
+      return this.options.onApplyAdjustments(pixels, width, height, adjustments)
+    }
+
+    // Default: return a copy of the input (no actual adjustments applied)
+    const outputPixels = new Uint8Array(pixels.length)
+    outputPixels.set(pixels)
+    return { width, height, pixels: outputPixels }
   }
 
   destroy(): void {

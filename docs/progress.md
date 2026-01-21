@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 10:09 EST
-**Current Phase**: Phase 9.2 Complete - WASM Bindings for apply_adjustments()
+**Last Updated**: 2026-01-21 10:20 EST
+**Current Phase**: Phase 9 Complete - TypeScript Integration for apply_adjustments()
 
 ## Project Structure
 
@@ -37,6 +37,56 @@ literoom/
 ```
 
 ## Completed Work
+
+### 50: 2026-01-21 10:20 EST: Phase 9 Complete - TypeScript Integration for apply_adjustments()
+
+**Objective**: Complete Phases 9.3-9.6 to enable real-time photo editing with WASM-based adjustments.
+
+**Work Completed**:
+
+**Phase 9.3 - Worker Message Types**:
+- Added `Adjustments` interface to `packages/core/src/decode/types.ts` (10 adjustment properties)
+- Added `ApplyAdjustmentsRequest` to `packages/core/src/decode/worker-messages.ts`
+- Exported new types from `packages/core/src/decode/index.ts`
+
+**Phase 9.4 - Worker Handler**:
+- Added `apply-adjustments` case to decode-worker.ts switch statement
+- Imports `apply_adjustments`, `BasicAdjustments`, `JsDecodedImage` from WASM
+- Creates WASM types, applies adjustments, returns result with Transferable pixels
+- Proper WASM memory cleanup (free input, output, and adjustments)
+
+**Phase 9.5 - Decode Service Method**:
+- Added `applyAdjustments()` method to `IDecodeService` interface
+- Implemented method in `DecodeService` class
+- Implemented method in `MockDecodeService` for testing
+- Added `onApplyAdjustments` handler option to mock service options
+
+**Phase 9.6 - Preview Integration**:
+- Rewrote `useEditPreview.ts` composable to use WASM-based adjustment application
+- Added helper functions: `rgbToRgba()`, `pixelsToUrl()`, `loadImagePixels()`
+- Caches source pixels to avoid reloading on each adjustment change
+- Uses `$decodeService.applyAdjustments()` to apply edits in Web Worker
+- Proper blob URL memory management (revokes old URLs)
+- Debounced renders (300ms) during slider drag
+
+**Test Results**:
+- `packages/core`: 226 tests passing
+- `literoom-core`: 76 tests passing
+- `literoom-wasm`: 19 tests passing
+- TypeScript compiles (pre-existing errors in catalog unrelated)
+
+**Files Modified**:
+- `packages/core/src/decode/types.ts` (added Adjustments)
+- `packages/core/src/decode/worker-messages.ts` (added ApplyAdjustmentsRequest)
+- `packages/core/src/decode/index.ts` (added export)
+- `packages/core/src/decode/decode-worker.ts` (added handler)
+- `packages/core/src/decode/decode-service.ts` (added method)
+- `packages/core/src/decode/mock-decode-service.ts` (added method)
+- `apps/web/app/composables/useEditPreview.ts` (full rewrite)
+
+**Next Step**: Test the edit view in browser to verify adjustments work, or move to Phase 10 (Histogram Display).
+
+---
 
 ### 49: 2026-01-21 10:09 EST: Phase 9.2 Complete - WASM Bindings for apply_adjustments()
 
