@@ -18,6 +18,7 @@ const router = useRouter()
 const catalogStore = useCatalogStore()
 const uiStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
+const editStore = useEditStore()
 
 // ============================================================================
 // Computed
@@ -95,12 +96,28 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+// ============================================================================
+// Edit State Loading
+// ============================================================================
+
+/**
+ * Load edit state when asset changes.
+ * The store handles saving any dirty state before loading new.
+ */
+watch(assetId, async (id) => {
+  if (id) {
+    await editStore.loadForAsset(id)
+  }
+}, { immediate: true })
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  // Clear edit state when leaving edit view
+  editStore.clear()
 })
 </script>
 

@@ -2,9 +2,12 @@
 /**
  * EditControlsPanel Component
  *
- * Placeholder for edit controls panel.
- * Will contain Basic Adjustments, Tone Curve, Crop, etc.
+ * Right panel in edit view containing:
+ * - Basic Adjustments (10 sliders)
+ * - Tone Curve (placeholder)
+ * - Crop & Transform (placeholder)
  */
+import type { Adjustments } from '@literoom/core/catalog'
 
 interface Props {
   /** The asset ID being edited */
@@ -17,6 +20,7 @@ const props = defineProps<Props>()
 // Stores
 // ============================================================================
 
+const editStore = useEditStore()
 const catalogStore = useCatalogStore()
 
 // ============================================================================
@@ -24,10 +28,73 @@ const catalogStore = useCatalogStore()
 // ============================================================================
 
 const asset = computed(() => catalogStore.assets.get(props.assetId))
+
+// ============================================================================
+// Adjustment Configuration
+// ============================================================================
+
+/**
+ * Configuration for each adjustment slider.
+ * Key maps to Adjustments interface property.
+ */
+interface AdjustmentConfig {
+  key: keyof Adjustments
+  label: string
+  min: number
+  max: number
+  step?: number
+}
+
+const adjustmentConfig: AdjustmentConfig[] = [
+  { key: 'temperature', label: 'Temp', min: -100, max: 100 },
+  { key: 'tint', label: 'Tint', min: -100, max: 100 },
+  { key: 'exposure', label: 'Exposure', min: -5, max: 5, step: 0.01 },
+  { key: 'contrast', label: 'Contrast', min: -100, max: 100 },
+  { key: 'highlights', label: 'Highlights', min: -100, max: 100 },
+  { key: 'shadows', label: 'Shadows', min: -100, max: 100 },
+  { key: 'whites', label: 'Whites', min: -100, max: 100 },
+  { key: 'blacks', label: 'Blacks', min: -100, max: 100 },
+  { key: 'vibrance', label: 'Vibrance', min: -100, max: 100 },
+  { key: 'saturation', label: 'Saturation', min: -100, max: 100 },
+]
+
+// ============================================================================
+// Accordion Configuration
+// ============================================================================
+
+const accordionItems = [
+  { value: 'basic', label: 'Basic', slot: 'basic' },
+  { value: 'tonecurve', label: 'Tone Curve', slot: 'tonecurve' },
+  { value: 'crop', label: 'Crop & Transform', slot: 'crop' },
+]
+
+/**
+ * Track expanded accordion sections.
+ * Basic is expanded by default.
+ */
+const expandedSections = ref<string[]>(['basic'])
+
+// ============================================================================
+// Event Handlers
+// ============================================================================
+
+/**
+ * Handle adjustment change from slider.
+ */
+function handleAdjustmentChange(key: keyof Adjustments, value: number) {
+  editStore.setAdjustment(key, value)
+}
+
+/**
+ * Reset all adjustments to defaults.
+ */
+function handleReset() {
+  editStore.reset()
+}
 </script>
 
 <template>
-  <div class="p-4 space-y-6" data-testid="edit-controls-panel">
+  <div class="p-4 space-y-4" data-testid="edit-controls-panel">
     <!-- Header with reset -->
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold">Edit</h2>
@@ -35,52 +102,70 @@ const asset = computed(() => catalogStore.assets.get(props.assetId))
         variant="ghost"
         size="xs"
         icon="i-heroicons-arrow-path"
-        disabled
+        :disabled="!editStore.hasModifications"
+        data-testid="reset-adjustments"
+        @click="handleReset"
       >
         Reset
       </UButton>
     </div>
 
-    <!-- Basic Adjustments - Placeholder -->
-    <div class="space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-gray-400">Basic</h3>
-        <UIcon name="i-heroicons-chevron-down" class="w-4 h-4 text-gray-500" />
-      </div>
+    <!-- Accordion for grouped controls -->
+    <UAccordion
+      v-model="expandedSections"
+      type="multiple"
+      :items="accordionItems"
+    >
+      <!-- Basic Adjustments Section -->
+      <template #basic-body>
+        <div class="space-y-0.5 pt-2">
+          <EditAdjustmentSlider
+            v-for="adj in adjustmentConfig"
+            :key="adj.key"
+            :label="adj.label"
+            :model-value="editStore.adjustments[adj.key]"
+            :min="adj.min"
+            :max="adj.max"
+            :step="adj.step"
+            :data-testid="`slider-${adj.key}`"
+            @update:model-value="handleAdjustmentChange(adj.key, $event)"
+          />
+        </div>
+      </template>
 
-      <div class="space-y-2 text-sm text-gray-500">
-        <p>Adjustment sliders coming in Phase 8.3</p>
-        <ul class="list-disc list-inside text-xs space-y-1">
-          <li>Temperature</li>
-          <li>Tint</li>
-          <li>Exposure</li>
-          <li>Contrast</li>
-          <li>Highlights</li>
-          <li>Shadows</li>
-          <li>Whites</li>
-          <li>Blacks</li>
-          <li>Vibrance</li>
-          <li>Saturation</li>
-        </ul>
-      </div>
+      <!-- Tone Curve Section (Placeholder) -->
+      <template #tonecurve-body>
+        <div class="py-4 text-center">
+          <UIcon name="i-heroicons-chart-bar" class="w-8 h-8 text-gray-600 mx-auto mb-2" />
+          <p class="text-sm text-gray-500">Tone curve coming in Phase 11</p>
+        </div>
+      </template>
+
+      <!-- Crop & Transform Section (Placeholder) -->
+      <template #crop-body>
+        <div class="py-4 text-center">
+          <UIcon name="i-heroicons-scissors" class="w-8 h-8 text-gray-600 mx-auto mb-2" />
+          <p class="text-sm text-gray-500">Crop & transform coming in Phase 12</p>
+        </div>
+      </template>
+    </UAccordion>
+
+    <!-- Dirty indicator -->
+    <div
+      v-if="editStore.isDirty"
+      class="text-xs text-yellow-500 flex items-center gap-1"
+    >
+      <UIcon name="i-heroicons-pencil" class="w-3 h-3" />
+      <span>Unsaved changes</span>
     </div>
 
-    <!-- Tone Curve - Placeholder -->
-    <div class="space-y-3 pt-4 border-t border-gray-800">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-gray-400">Tone Curve</h3>
-        <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-500" />
-      </div>
-      <p class="text-xs text-gray-600">Coming later</p>
-    </div>
-
-    <!-- Crop - Placeholder -->
-    <div class="space-y-3 pt-4 border-t border-gray-800">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-gray-400">Crop & Transform</h3>
-        <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-500" />
-      </div>
-      <p class="text-xs text-gray-600">Coming later</p>
+    <!-- Error indicator -->
+    <div
+      v-if="editStore.error"
+      class="text-xs text-red-500 flex items-center gap-1"
+    >
+      <UIcon name="i-heroicons-exclamation-triangle" class="w-3 h-3" />
+      <span>{{ editStore.error }}</span>
     </div>
   </div>
 </template>

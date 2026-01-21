@@ -2,41 +2,43 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 09:38 EST
+**Last Updated**: 2026-01-21 09:50 EST
 
-### Phase 8: Edit View - Phase 8.2 Complete ✅
+### Phase 8: Edit View - Phase 8.3 Complete ✅
 
-Completed Phase 8.2: Edit State Store (Pinia)
+Completed Phase 8.3: Basic Adjustments UI (10 sliders)
 
 **Files Created/Modified:**
-- `packages/core/src/catalog/types.ts` - Added edit types (Adjustments, EditState, utilities)
-- `packages/core/src/catalog/index.ts` - Exported new edit types
-- `packages/core/src/catalog/edit-types.test.ts` - 26 unit tests for edit types
-- `apps/web/app/stores/edit.ts` - Pinia store for edit state management
+- `apps/web/app/components/edit/EditAdjustmentSlider.vue` - Reusable slider component
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Updated with 10 adjustment sliders
+- `apps/web/app/pages/edit/[id].vue` - Wired to edit store for state loading
 
 **Features Implemented:**
-- `Adjustments` interface with 10 properties (temperature, tint, exposure, contrast, highlights, shadows, whites, blacks, vibrance, saturation)
-- `EditState` interface with versioning for future migrations
-- `DEFAULT_ADJUSTMENTS` frozen constant
-- `createDefaultEditState()` and `hasModifiedAdjustments()` utilities
-- `useEditStore` Pinia store with:
-  - `loadForAsset()` - Load edit state for an asset
-  - `setAdjustment()` - Update single adjustment value
-  - `setAdjustments()` - Update multiple adjustments at once
-  - `reset()` - Reset to defaults
-  - `save()` - Save to database (TODO: persistence)
-  - Dirty flag tracking and error handling
+- EditAdjustmentSlider component with:
+  - Label, slider, and formatted value display (+/- prefix)
+  - Double-click label to reset individual value to zero
+  - Proper step handling for exposure (0.01) vs other adjustments (1)
+- EditControlsPanel with:
+  - All 10 adjustment sliders (Temp, Tint, Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Vibrance, Saturation)
+  - UAccordion organization (Basic expanded, Tone Curve/Crop placeholders)
+  - Reset button (enabled when modifications exist)
+  - Dirty indicator showing unsaved changes
+  - Error indicator for operation failures
+- Edit page integration:
+  - Loads edit state when navigating to asset
+  - Clears state when leaving edit view
+  - Auto-saves dirty state before switching assets
 
 **Tests:**
 - All unit tests passing: 227 tests (226 core + 1 web)
 - All E2E tests passing: 28 tests
 
-**Next Task**: Phase 8.3 - Basic Adjustments UI (10 sliders)
+**Next Task**: Phase 8.4 - Preview with Edits (debounced rendering)
 
 **Implementation Plan Progress:**
 - ✅ Phase 8.1: Edit page shell (`/edit/[id]` route)
 - ✅ Phase 8.2: Edit state store (Pinia)
-- ⏳ Phase 8.3: Basic adjustments UI (10 sliders)
+- ✅ Phase 8.3: Basic adjustments UI (10 sliders)
 - ⏳ Phase 8.4: Preview with edits (debounced rendering)
 - ⏳ Phase 8.5: Keyboard shortcuts for flagging
 
@@ -46,7 +48,7 @@ Completed Phase 8.2: Edit State Store (Pinia)
 | 1. Folder selection & persistence | ✅ Complete |
 | 2. Scanning & grid display | ✅ Complete |
 | 3. Pick/reject/filter | ✅ Complete |
-| 4. Edit view with sliders + tone curve + crop | 🔄 Shell complete |
+| 4. Edit view with sliders + tone curve + crop | 🔄 Basic sliders complete |
 | 5. Histogram with clipping | ❌ Not started |
 | 6. Copy/paste settings | ❌ Not started |
 | 7. Export dialog | ❌ Not started |
