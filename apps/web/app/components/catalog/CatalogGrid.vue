@@ -222,11 +222,19 @@ function scrollToCurrentItem(id: string, index: number) {
   })
 }
 
+// Create a ref that syncs with the selection store for keyboard navigation
+const keyboardIndex = ref(currentIndex.value)
+
+// Keep keyboard index in sync with selection store changes
+watch(currentIndex, (newIndex) => {
+  keyboardIndex.value = newIndex
+}, { immediate: true })
+
 const { handleKeydown } = useGridKeyboard({
   columnsCount,
   totalItems: computed(() => sortedAssetIds.value.length),
   orderedIds: sortedAssetIds,
-  currentIndex: ref(currentIndex.value), // Pass as ref for two-way binding
+  currentIndex: keyboardIndex,
   onNavigate: (id, index) => {
     selectionStore.selectSingle(id)
     scrollToCurrentItem(id, index)

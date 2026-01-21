@@ -99,7 +99,7 @@ function setSort(field: SortField, direction: SortDirection): void {
 </script>
 
 <template>
-  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950" data-testid="filter-bar">
+  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950 relative z-20" data-testid="filter-bar">
     <!-- Filter buttons -->
     <div class="flex gap-1">
       <UButton

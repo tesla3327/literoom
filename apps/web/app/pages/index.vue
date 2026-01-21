@@ -204,7 +204,7 @@ onMounted(() => {
       <FilterBar />
 
       <!-- Grid or empty state -->
-      <div class="flex-1 min-h-0">
+      <div class="flex-1 min-h-0 overflow-hidden">
         <CatalogGrid v-if="hasAssets" />
         <div v-else class="h-full flex flex-col items-center justify-center text-center">
           <UIcon name="i-heroicons-photo" class="w-16 h-16 text-gray-600 mb-4" />
