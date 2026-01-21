@@ -119,3 +119,96 @@ All 6 phases completed:
 **Status**: Implementation complete. Feature ready for testing.
 
 ---
+
+## 93: 2026-01-21 16:54 EST: Export Workflow - Research Plan Created
+
+**Objective**: Create a research plan for the Export workflow feature, the last major v1 requirement.
+
+**Background**: According to the v1 acceptance criteria (spec section 12), the app needs:
+- Export dialog with destination folder selection
+- JPEG quality slider
+- Resize option (none or long-edge pixels)
+- Filename templating with numbering ({orig}, {seq}, {date} tokens)
+- Default: export Picks only
+- Progress dialog showing total count and current file
+- Auto-increment on filename collision
+
+**v1 Spec Requirements** (section 3.7):
+- Destination folder selection via folder picker
+- File naming template with tokens: `{orig}`, `{seq:N}`, `{date}`
+- JPEG quality slider
+- Resize option (none or long-edge pixels)
+- Export scope: Picks only (default), current selection, or all
+- Rejects excluded unless explicitly included
+- Collision handling: auto-increment
+- Progress dialog with count tracking
+- On completion: show destination path
+
+**Research Areas**:
+1. **File System Access API for writing** - How to write files to user-selected folder
+2. **JPEG encoding in WASM** - Options for high-quality JPEG encoding
+3. **Template parsing** - Pattern matching and string interpolation for filenames
+4. **Current codebase** - Existing FileSystem abstraction, edit pipeline
+5. **UI components** - Modal design, progress indicators
+
+**Status**: Research complete. See `docs/research/2026-01-21-export-workflow-synthesis.md`
+
+**Key Findings**:
+- ~80% of infrastructure already exists
+- Need to add JPEG encoding to WASM layer (using existing `image` crate)
+- Need filename template parser (simple regex-based)
+- Need export service to coordinate operations
+- UI patterns already established (UModal, useToast, etc.)
+
+---
+
+## 94: 2026-01-21 16:59 EST: Export Workflow - Research Synthesis Complete
+
+**Objective**: Synthesize research from 5 parallel sub-agents into comprehensive implementation guidance.
+
+**Research Areas Investigated**:
+1. File System Access API for writing files
+2. JPEG encoding in Rust/WASM
+3. Current codebase infrastructure review
+4. Filename template parsing approaches
+5. Nuxt UI 4 component patterns
+
+**Key Findings**:
+
+1. **Infrastructure Readiness**: ~80% exists
+   - File writing: ✅ `FileSystemProvider.writeFile()` already implemented
+   - Image loading/processing: ✅ Full edit pipeline exists
+   - Worker communication: ✅ Pattern established
+   - UI components: ✅ Modal, toast patterns ready
+
+2. **Gaps to Fill**:
+   - JPEG encoding in WASM (use existing `image` crate)
+   - Filename template parser (simple regex)
+   - Export coordination service
+
+3. **JPEG Encoding Recommendation**:
+   - Use `image` crate (already in dependencies)
+   - Pure Rust, safe for WASM
+   - Default quality: 90 (Lightroom standard)
+
+4. **Template Tokens** (from spec 5.3):
+   - `{orig}` - Original filename without extension
+   - `{seq:N}` - Sequence number with padding
+   - `{date}` - Capture date (use modifiedDate as fallback)
+
+5. **Complete Pipeline**:
+   ```
+   Load image → Apply edits → Resize (optional) → Encode JPEG → Write file
+   ```
+
+**Files to Create** (17 total across 6 phases):
+- Rust/WASM: 5 files
+- TypeScript/Core: 3 files
+- Vue/Web: 5 files
+- Tests: 2 files
+
+**Research Document**: `docs/research/2026-01-21-export-workflow-synthesis.md`
+
+**Status**: Research synthesis complete. Ready to create implementation plan.
+
+---

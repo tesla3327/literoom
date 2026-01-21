@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 16:48 EST
-**Current Phase**: Copy/Paste Settings - Implementation Complete
+**Last Updated**: 2026-01-21 16:59 EST
+**Current Phase**: Export Workflow - Research Complete
 
 ## Project Structure
 
@@ -253,6 +253,8 @@ literoom/
 |---|------|-------|
 | [91](./iterations-91-100.md:3) | 2026-01-21 | Copy/Paste Settings - Implementation Plan Created |
 | [92](./iterations-91-100.md:57) | 2026-01-21 | Copy/Paste Settings - Implementation Complete |
+| [93](./iterations-91-100.md:121) | 2026-01-21 | Export Workflow - Research Plan Created |
+| [94](./iterations-91-100.md:162) | 2026-01-21 | Export Workflow - Research Synthesis Complete |
 
 ---
 
