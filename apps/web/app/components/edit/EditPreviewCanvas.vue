@@ -2,8 +2,13 @@
 /**
  * EditPreviewCanvas Component
  *
- * Displays the photo preview in the edit view.
- * Shows thumbnail initially, will later show full preview with edits applied.
+ * Displays the photo preview in the edit view with:
+ * - Source image display
+ * - Rendering indicator during edit updates
+ * - Quality indicator (draft/full)
+ * - Error handling
+ *
+ * Uses the useEditPreview composable for preview management.
  */
 
 interface Props {
@@ -14,10 +19,21 @@ interface Props {
 const props = defineProps<Props>()
 
 // ============================================================================
-// Stores
+// Composables
 // ============================================================================
 
 const catalogStore = useCatalogStore()
+
+/**
+ * Preview management composable.
+ * Handles rendering with debouncing and quality levels.
+ */
+const {
+  previewUrl,
+  isRendering,
+  renderQuality,
+  error,
+} = useEditPreview(toRef(props, 'assetId'))
 
 // ============================================================================
 // Computed
@@ -25,44 +41,10 @@ const catalogStore = useCatalogStore()
 
 const asset = computed(() => catalogStore.assets.get(props.assetId))
 
-// Preview state
-const isLoading = ref(true)
-const previewUrl = ref<string | null>(null)
-
-// ============================================================================
-// Preview Loading
-// ============================================================================
-
 /**
- * Load preview when asset changes.
- * For now, uses thumbnail. Will be replaced with full preview + edits.
+ * Whether we're in an initial loading state (no preview yet).
  */
-watch(() => props.assetId, async (id) => {
-  if (!id) return
-
-  isLoading.value = true
-
-  // TODO: Load full preview from decode service and apply edits
-  // For now, use thumbnail as placeholder
-  const a = catalogStore.assets.get(id)
-  if (a?.thumbnailUrl) {
-    previewUrl.value = a.thumbnailUrl
-    isLoading.value = false
-  }
-  else {
-    // No thumbnail yet - wait for it
-    isLoading.value = true
-    previewUrl.value = null
-  }
-}, { immediate: true })
-
-// Also watch for thumbnail updates
-watch(() => asset.value?.thumbnailUrl, (url) => {
-  if (url && isLoading.value) {
-    previewUrl.value = url
-    isLoading.value = false
-  }
-})
+const isInitialLoading = computed(() => !previewUrl.value && !error.value)
 </script>
 
 <template>
@@ -70,12 +52,35 @@ watch(() => asset.value?.thumbnailUrl, (url) => {
     class="absolute inset-0 flex items-center justify-center bg-gray-900"
     data-testid="edit-preview-canvas"
   >
-    <!-- Loading state -->
+    <!-- Rendering indicator (top-right) -->
     <div
-      v-if="isLoading"
-      class="flex flex-col items-center gap-2 text-gray-500"
+      v-if="isRendering"
+      class="absolute top-4 right-4 z-10 flex items-center gap-2 px-2 py-1 bg-gray-800/80 rounded text-xs text-gray-400"
+      data-testid="rendering-indicator"
     >
-      <UIcon name="i-heroicons-photo" class="w-12 h-12" />
+      <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+      <span>Rendering...</span>
+    </div>
+
+    <!-- Quality indicator (top-left) - only show during draft renders -->
+    <div
+      v-if="renderQuality === 'draft' && !isInitialLoading"
+      class="absolute top-4 left-4 z-10 px-2 py-1 bg-yellow-500/20 rounded text-xs text-yellow-400"
+      data-testid="quality-indicator"
+    >
+      Draft
+    </div>
+
+    <!-- Initial loading state -->
+    <div
+      v-if="isInitialLoading"
+      class="flex flex-col items-center gap-2 text-gray-500"
+      data-testid="loading-state"
+    >
+      <UIcon
+        name="i-heroicons-photo"
+        class="w-12 h-12"
+      />
       <span class="text-sm">Loading preview...</span>
     </div>
 
@@ -86,18 +91,34 @@ watch(() => asset.value?.thumbnailUrl, (url) => {
       :alt="asset?.filename"
       class="max-w-full max-h-full object-contain"
       data-testid="preview-image"
-    />
+    >
 
-    <!-- No preview available -->
+    <!-- Error state -->
+    <div
+      v-else-if="error"
+      class="flex flex-col items-center gap-2 text-red-400"
+      data-testid="error-state"
+    >
+      <UIcon
+        name="i-heroicons-exclamation-triangle"
+        class="w-12 h-12"
+      />
+      <span class="text-sm">{{ error }}</span>
+    </div>
+
+    <!-- Fallback: no preview available -->
     <div
       v-else
       class="flex flex-col items-center gap-2 text-gray-500"
+      data-testid="no-preview-state"
     >
-      <UIcon name="i-heroicons-exclamation-triangle" class="w-12 h-12" />
+      <UIcon
+        name="i-heroicons-exclamation-triangle"
+        class="w-12 h-12"
+      />
       <span class="text-sm">Preview not available</span>
     </div>
 
-    <!-- TODO: Add zoom/pan controls -->
-    <!-- TODO: Add rendering indicator during edits -->
+    <!-- TODO: Add zoom/pan controls (Phase 8.6+) -->
   </div>
 </template>

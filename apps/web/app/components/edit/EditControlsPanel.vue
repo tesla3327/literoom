@@ -21,13 +21,14 @@ const props = defineProps<Props>()
 // ============================================================================
 
 const editStore = useEditStore()
-const catalogStore = useCatalogStore()
+const _catalogStore = useCatalogStore()
 
 // ============================================================================
 // Computed
 // ============================================================================
 
-const asset = computed(() => catalogStore.assets.get(props.assetId))
+// Prefixed with _ because it's not currently used but will be needed for future features
+const _asset = computed(() => _catalogStore.assets.get(props.assetId))
 
 // ============================================================================
 // Adjustment Configuration
@@ -94,10 +95,15 @@ function handleReset() {
 </script>
 
 <template>
-  <div class="p-4 space-y-4" data-testid="edit-controls-panel">
+  <div
+    class="p-4 space-y-4"
+    data-testid="edit-controls-panel"
+  >
     <!-- Header with reset -->
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold">Edit</h2>
+      <h2 class="text-lg font-semibold">
+        Edit
+      </h2>
       <UButton
         variant="ghost"
         size="xs"
@@ -136,16 +142,26 @@ function handleReset() {
       <!-- Tone Curve Section (Placeholder) -->
       <template #tonecurve-body>
         <div class="py-4 text-center">
-          <UIcon name="i-heroicons-chart-bar" class="w-8 h-8 text-gray-600 mx-auto mb-2" />
-          <p class="text-sm text-gray-500">Tone curve coming in Phase 11</p>
+          <UIcon
+            name="i-heroicons-chart-bar"
+            class="w-8 h-8 text-gray-600 mx-auto mb-2"
+          />
+          <p class="text-sm text-gray-500">
+            Tone curve coming in Phase 11
+          </p>
         </div>
       </template>
 
       <!-- Crop & Transform Section (Placeholder) -->
       <template #crop-body>
         <div class="py-4 text-center">
-          <UIcon name="i-heroicons-scissors" class="w-8 h-8 text-gray-600 mx-auto mb-2" />
-          <p class="text-sm text-gray-500">Crop & transform coming in Phase 12</p>
+          <UIcon
+            name="i-heroicons-scissors"
+            class="w-8 h-8 text-gray-600 mx-auto mb-2"
+          />
+          <p class="text-sm text-gray-500">
+            Crop & transform coming in Phase 12
+          </p>
         </div>
       </template>
     </UAccordion>
@@ -155,7 +171,10 @@ function handleReset() {
       v-if="editStore.isDirty"
       class="text-xs text-yellow-500 flex items-center gap-1"
     >
-      <UIcon name="i-heroicons-pencil" class="w-3 h-3" />
+      <UIcon
+        name="i-heroicons-pencil"
+        class="w-3 h-3"
+      />
       <span>Unsaved changes</span>
     </div>
 
@@ -164,7 +183,10 @@ function handleReset() {
       v-if="editStore.error"
       class="text-xs text-red-500 flex items-center gap-1"
     >
-      <UIcon name="i-heroicons-exclamation-triangle" class="w-3 h-3" />
+      <UIcon
+        name="i-heroicons-exclamation-triangle"
+        class="w-3 h-3"
+      />
       <span>{{ editStore.error }}</span>
     </div>
   </div>

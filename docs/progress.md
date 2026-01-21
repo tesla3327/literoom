@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 09:05 EST
-**Current Phase**: E2E Infrastructure Fixed - 17 of 28 Tests Passing
+**Last Updated**: 2026-01-21 09:57 EST
+**Current Phase**: Phase 8.4 Complete - Preview with Edits
 
 ## Project Structure
 
@@ -37,6 +37,49 @@ literoom/
 ```
 
 ## Completed Work
+
+### 44: 2026-01-21 09:57 EST: Phase 8.4 Complete - Preview with Edits
+
+**Objective**: Implement the useEditPreview composable for managing preview rendering in the edit view.
+
+**Work Completed**:
+
+**useEditPreview Composable** (`apps/web/app/composables/useEditPreview.ts`):
+- Manages preview rendering pipeline for edit view
+- Loads source preview for asset (currently uses thumbnail)
+- Watches for edit changes and triggers debounced renders
+- Provides draft/full render quality indicators
+- Implements internal debounce utility (no VueUse dependency needed)
+- Placeholder for WASM-based edit application (Phase 9)
+
+**EditPreviewCanvas Updates** (`apps/web/app/components/edit/EditPreviewCanvas.vue`):
+- Now uses useEditPreview composable
+- Shows rendering indicator (top-right) during preview updates
+- Shows quality indicator (Draft) during draft renders
+- Proper states: loading, preview, error, no-preview
+- All states have data-testid for E2E testing
+
+**Key Features**:
+- 300ms debounce for slider changes
+- Immediate preview load when asset changes
+- Debounce cancellation on asset switch
+- Error handling with user-friendly messages
+- Placeholder ready for WASM integration in Phase 9
+
+**Test Results**:
+- `packages/core`: 226 tests passing
+- No new lint errors in created files
+
+**Files Created**:
+- `apps/web/app/composables/useEditPreview.ts`
+
+**Files Modified**:
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+- `apps/web/app/components/edit/EditControlsPanel.vue` (fixed unused var lint error)
+
+**Next Step**: Phase 8.5 - Keyboard Shortcuts for edit view (Escape to return, Left/Right to navigate).
+
+---
 
 ### 43: 2026-01-21 09:05 EST: E2E Infrastructure Fixed - Tailwind CSS v4 and Plugin Issues Resolved
 
