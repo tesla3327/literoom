@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 06:46 EST
-**Current Phase**: Phase 6.5 Complete - PermissionRecovery
+**Last Updated**: 2026-01-21 01:52 EST
+**Current Phase**: Phase 6 Complete - UI Components
 
 ## Project Structure
 
@@ -37,6 +37,62 @@ literoom/
 ```
 
 ## Completed Work
+
+### 37: 2026-01-21 01:52 EST: Phase 6.6 Complete - Page Integration
+
+**Objective**: Wire all Phase 6 UI components together on the main catalog page.
+
+**Work Completed**:
+- Rewrote `apps/web/app/pages/index.vue` to integrate all catalog components:
+  - Welcome screen with folder selection when no folder is selected
+  - Loading state during initial folder scan
+  - Main catalog view with header, FilterBar, and CatalogGrid
+  - Permission recovery modal integration
+
+**Key Features**:
+- **Folder Selection**: Uses `BrowserFileSystemProvider.selectDirectory()` to pick folders
+- **Handle Persistence**: Saves folder handle to IndexedDB for session restoration
+- **Scanning**: Lists directory recursively, filters for supported extensions (JPEG, ARW)
+- **Batched Processing**: Processes files in batches of 50 for responsive UI
+- **Progress Tracking**: Updates `catalogStore.scanProgress` during scan
+- **Permission Recovery**: Checks saved handle permissions on app load, shows modal if needed
+- **Empty State**: Shows helpful message when no supported images found
+
+**Page Layout**:
+```
+┌─────────────────────────────────────────────┐
+│ Header: [Folder Name] | Selection Count     │
+├─────────────────────────────────────────────┤
+│ FilterBar: [All][Picks][Rejects][Unflagged] │
+│            Sort: Date ▼                     │
+├─────────────────────────────────────────────┤
+│                                             │
+│           CatalogGrid                       │
+│     (Virtual scrolling thumbnails)          │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+**Files Modified**:
+- `apps/web/app/pages/index.vue` (complete rewrite)
+
+**Verification**:
+- No TypeScript errors in index.vue or app files
+- Pre-existing errors in packages/core are unrelated to this change
+
+**Phase 6 Complete!**
+
+The UI Components phase is now finished. All components are wired together:
+- Phase 6.1: Composables (useIntersectionObserver, useGridKeyboard)
+- Phase 6.2: CatalogThumbnail component
+- Phase 6.3: CatalogGrid with virtual scrolling
+- Phase 6.4: FilterBar component
+- Phase 6.5: PermissionRecovery store and component
+- Phase 6.6: Page integration
+
+**Next Step**: Phase 7 - Integration and Testing (E2E tests, demo mode).
+
+---
 
 ### 36: 2026-01-21 06:46 EST: Phase 6.5 Complete - PermissionRecovery Store and Component
 
