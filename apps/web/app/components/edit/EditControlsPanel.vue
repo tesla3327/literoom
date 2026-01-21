@@ -27,6 +27,7 @@ const props = defineProps<Props>()
 const editStore = useEditStore()
 const editUIStore = useEditUIStore()
 const _catalogStore = useCatalogStore()
+const { openCopyModal, pasteSettings, canPaste, clipboardSummary } = useCopyPasteSettings()
 
 // ============================================================================
 // Computed
@@ -153,21 +154,45 @@ function handleReset() {
     class="p-4 space-y-4"
     data-testid="edit-controls-panel"
   >
-    <!-- Header with reset -->
+    <!-- Header with actions -->
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold">
         Edit
       </h2>
-      <UButton
-        variant="ghost"
-        size="xs"
-        icon="i-heroicons-arrow-path"
-        :disabled="!editStore.hasModifications"
-        data-testid="reset-adjustments"
-        @click="handleReset"
-      >
-        Reset
-      </UButton>
+      <div class="flex items-center gap-1">
+        <!-- Copy/Paste buttons -->
+        <UButton
+          variant="ghost"
+          size="xs"
+          icon="i-heroicons-document-duplicate"
+          data-testid="copy-settings-button"
+          @click="openCopyModal"
+        >
+          Copy
+        </UButton>
+        <UButton
+          variant="ghost"
+          size="xs"
+          icon="i-heroicons-clipboard-document"
+          :disabled="!canPaste"
+          :title="canPaste ? `Paste: ${clipboardSummary}` : 'Nothing to paste'"
+          data-testid="paste-settings-button"
+          @click="pasteSettings()"
+        >
+          Paste
+        </UButton>
+        <!-- Reset button -->
+        <UButton
+          variant="ghost"
+          size="xs"
+          icon="i-heroicons-arrow-path"
+          :disabled="!editStore.hasModifications"
+          data-testid="reset-adjustments"
+          @click="handleReset"
+        >
+          Reset
+        </UButton>
+      </div>
     </div>
 
     <!-- Accordion for grouped controls -->

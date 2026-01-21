@@ -54,3 +54,68 @@
 **Status**: Plan created. Ready for implementation.
 
 ---
+
+## 92: 2026-01-21 16:48 EST: Copy/Paste Settings - Implementation Complete
+
+**Objective**: Implement the copy/paste settings feature for the edit view.
+
+**Background**: This is a v1 requirement (spec section 3.6) that allows users to copy edit settings from one photo and paste them selectively to one or many other photos.
+
+**Implementation Summary**:
+
+All 6 phases completed:
+
+1. **Phase 1: editClipboard Store** - Created `apps/web/app/stores/editClipboard.ts`
+   - Manages copied settings data and source asset ID
+   - Tracks selected groups for copy (basicAdjustments, toneCurve, crop, rotation)
+   - Modal visibility state
+   - Preset methods: selectAll, selectNone, toggleGroup
+
+2. **Phase 2: useCopyPasteSettings Composable** - Created `apps/web/app/composables/useCopyPasteSettings.ts`
+   - `copySettings()` - copies current asset's settings to clipboard
+   - `pasteSettings()` - applies clipboard settings to current or selected assets
+   - Integration with VueUse's `useClipboard()` for browser clipboard
+   - Toast notifications for success/error feedback
+
+3. **Phase 3: EditCopySettingsModal Component** - Created `apps/web/app/components/edit/EditCopySettingsModal.vue`
+   - Checkbox groups for Basic Adjustments, Tone Curve, Crop, Rotation
+   - All/None preset buttons
+   - Crop/Rotation excluded by default (safety)
+   - Copy/Cancel buttons
+
+4. **Phase 4: Paste Logic** - Implemented in composable
+   - Deep cloning of settings to handle readonly refs
+   - Applies to edit store via existing methods
+
+5. **Phase 5: Keyboard Shortcuts** - Updated `apps/web/app/pages/edit/[id].vue`
+   - `Cmd+Shift+C` (Mac) / `Ctrl+Shift+C` (Windows) - Open copy modal
+   - `Cmd+Shift+V` (Mac) / `Ctrl+Shift+V` (Windows) - Paste settings
+   - Added modal component to edit page
+
+6. **Phase 6: UI Integration** - Updated `apps/web/app/components/edit/EditControlsPanel.vue`
+   - Added Copy and Paste buttons to header
+   - Paste button disabled when clipboard empty
+   - Tooltip shows clipboard summary
+
+**Files Created** (3 files):
+- `apps/web/app/stores/editClipboard.ts`
+- `apps/web/app/composables/useCopyPasteSettings.ts`
+- `apps/web/app/components/edit/EditCopySettingsModal.vue`
+
+**Files Modified** (2 files):
+- `apps/web/app/pages/edit/[id].vue` - Keyboard shortcuts and modal
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Copy/Paste buttons
+
+**Features Implemented**:
+- ✅ Copy settings from current photo
+- ✅ Modal with checkbox groups for selective copy
+- ✅ Paste settings to current photo
+- ✅ Keyboard shortcuts (Cmd+Shift+C/V)
+- ✅ Copy/Paste buttons in edit controls panel
+- ✅ Toast notifications for feedback
+- ✅ Crop/Rotation excluded by default (safety)
+- ✅ Clipboard summary display on paste button tooltip
+
+**Status**: Implementation complete. Feature ready for testing.
+
+---

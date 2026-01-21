@@ -27,6 +27,7 @@ const uiStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
 const editStore = useEditStore()
 const editUIStore = useEditUIStore()
+const { openCopyModal, pasteSettings, canPaste } = useCopyPasteSettings()
 
 // ============================================================================
 // Preview Component Ref
@@ -111,6 +112,23 @@ function handleKeydown(e: KeyboardEvent) {
   const target = e.target as HTMLElement
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && target.getAttribute?.('role') === 'slider') {
     return
+  }
+
+  // Copy/Paste shortcuts (Cmd/Ctrl+Shift+C/V)
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+    const key = e.key.toLowerCase()
+    if (key === 'c') {
+      e.preventDefault()
+      openCopyModal()
+      return
+    }
+    if (key === 'v') {
+      e.preventDefault()
+      if (canPaste.value) {
+        pasteSettings()
+      }
+      return
+    }
   }
 
   switch (e.key) {
@@ -273,6 +291,9 @@ onUnmounted(() => {
       class="h-24 border-t border-gray-800 flex-shrink-0"
       :current-asset-id="assetId"
     />
+
+    <!-- Copy Settings Modal -->
+    <EditCopySettingsModal />
   </div>
 </template>
 
