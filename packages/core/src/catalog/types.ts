@@ -439,3 +439,89 @@ export function getFilenameWithoutExtension(filename: string): string {
   }
   return filename.slice(0, lastDot)
 }
+
+// ============================================================================
+// Edit Types
+// ============================================================================
+
+/**
+ * Current schema version for edit state.
+ * Increment when making breaking changes to the schema.
+ */
+export const EDIT_SCHEMA_VERSION = 1
+
+/**
+ * Basic image adjustments.
+ * All values use normalized ranges that the WASM pipeline interprets.
+ */
+export interface Adjustments {
+  /** White balance temperature: -100 to 100 (cool to warm) */
+  temperature: number
+  /** White balance tint: -100 to 100 (green to magenta) */
+  tint: number
+  /** Exposure compensation: -5 to 5 stops */
+  exposure: number
+  /** Contrast adjustment: -100 to 100 */
+  contrast: number
+  /** Highlights recovery: -100 to 100 */
+  highlights: number
+  /** Shadow lift: -100 to 100 */
+  shadows: number
+  /** White point: -100 to 100 */
+  whites: number
+  /** Black point: -100 to 100 */
+  blacks: number
+  /** Vibrance (saturation of less-saturated colors): -100 to 100 */
+  vibrance: number
+  /** Global saturation: -100 to 100 */
+  saturation: number
+}
+
+/**
+ * Default adjustment values (no modifications).
+ */
+export const DEFAULT_ADJUSTMENTS: Readonly<Adjustments> = Object.freeze({
+  temperature: 0,
+  tint: 0,
+  exposure: 0,
+  contrast: 0,
+  highlights: 0,
+  shadows: 0,
+  whites: 0,
+  blacks: 0,
+  vibrance: 0,
+  saturation: 0,
+})
+
+/**
+ * Full edit state for an asset.
+ * Versioned for future schema migrations.
+ */
+export interface EditState {
+  /** Schema version for migrations */
+  version: typeof EDIT_SCHEMA_VERSION
+  /** Basic adjustment values */
+  adjustments: Adjustments
+  // Future additions:
+  // toneCurve?: ToneCurve
+  // crop?: CropTransform
+  // masks?: Mask[]
+}
+
+/**
+ * Create a new default edit state.
+ */
+export function createDefaultEditState(): EditState {
+  return {
+    version: EDIT_SCHEMA_VERSION,
+    adjustments: { ...DEFAULT_ADJUSTMENTS },
+  }
+}
+
+/**
+ * Check if adjustments differ from defaults.
+ */
+export function hasModifiedAdjustments(adjustments: Adjustments): boolean {
+  const keys = Object.keys(DEFAULT_ADJUSTMENTS) as (keyof Adjustments)[]
+  return keys.some((key) => adjustments[key] !== DEFAULT_ADJUSTMENTS[key])
+}

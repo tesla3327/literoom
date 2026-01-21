@@ -32,17 +32,23 @@ export type {
   AssetsAddedCallback,
   AssetUpdatedCallback,
   SupportedExtension,
+  Adjustments,
+  EditState,
 } from './types'
 
 // Classes and enums
 export { CatalogError, ThumbnailPriority } from './types'
 
-// Utility functions
+// Utility functions and constants
 export {
   SUPPORTED_EXTENSIONS,
   isSupportedExtension,
   getExtension,
   getFilenameWithoutExtension,
+  EDIT_SCHEMA_VERSION,
+  DEFAULT_ADJUSTMENTS,
+  createDefaultEditState,
+  hasModifiedAdjustments,
 } from './types'
 
 // Services
