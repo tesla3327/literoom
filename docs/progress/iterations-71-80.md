@@ -1,5 +1,55 @@
 # Iterations 71-80
 
+## 79: 2026-01-21 15:25 EST: Direct URL Navigation Fix - Implementation Complete
+
+**Objective**: Implement the fix for direct URL navigation to `/edit/[id]` showing empty state.
+
+**Problem**: When navigating directly to edit page via URL (refresh, shared link), the catalog hadn't been initialized with assets. The middleware only waited for the service to be created, not for data to be loaded.
+
+**Implementation**:
+
+**Phase 1: Enhanced Plugin with Initialization Helper**
+- Added `initializeCatalog()` async function to `catalog.client.ts` plugin
+- Function checks if `catalogStore.assetIds.length === 0`
+- In demo mode: auto-loads demo catalog via `selectFolder()` + `scanFolder()`
+- In real mode: restores from database via `loadFromDatabase()`
+- Added initialization promise tracking to prevent concurrent calls
+- Provided function as `$initializeCatalog` for middleware access
+
+**Phase 2: Enhanced Middleware**
+- Updated `ensure-catalog.ts` middleware to call `$initializeCatalog()` after `$catalogReady`
+- If initialization fails in real mode, redirects to home page
+- In demo mode, initialization should always succeed
+
+**Phase 3: TypeScript Type Augmentation**
+- Added type augmentation for `NuxtApp` interface
+- Defined types for `$catalogReady`, `$catalogService`, `$decodeService`, `$isDemoMode`, `$initializeCatalog`
+
+**Files Modified**:
+- `apps/web/app/plugins/catalog.client.ts` - Added `initializeCatalog()` helper + type augmentation
+- `apps/web/app/middleware/ensure-catalog.ts` - Call initialization helper
+
+**Verification** (browser automation in demo mode):
+- ✅ Direct URL navigation to `/edit/demo-asset-5` loads correctly
+- ✅ Preview loads (not stuck on "Loading preview...")
+- ✅ Histogram displays with RGB channels (not stuck on "Loading...")
+- ✅ Header shows correct position "6 / 50"
+- ✅ Filmstrip shows thumbnails
+- ✅ File metadata shows (Format: ARW, Size: 23.6 MB)
+- ✅ Page refresh maintains state
+- ✅ Navigation to different asset `/edit/demo-asset-20` works correctly
+
+**Screenshots Captured**:
+- `docs/screenshots/verify-direct-url-02-after-wait.png` - Direct URL navigation working
+- `docs/screenshots/verify-direct-url-03-after-reload.png` - Page refresh working
+- `docs/screenshots/verify-direct-url-04-different-asset.png` - Different asset URL working
+
+**Tests**: 257 packages/core tests passing
+
+**Status**: Complete. Direct URL navigation issue is FIXED.
+
+---
+
 ## 78: 2026-01-21 15:10 EST: Direct URL Navigation Fix - Research Complete
 
 **Objective**: Research and plan fix for the critical issue where direct URL navigation to `/edit/[id]` shows empty state.

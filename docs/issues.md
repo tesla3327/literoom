@@ -3,10 +3,10 @@
 ## Table of Contents
 
 ### Open Issues
-- [Direct URL navigation to edit view (Critical - Partial)](#direct-url-navigation-to-edit-view)
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview)
 
 ### Solved Issues
+- [Direct URL navigation to edit view (Critical)](#direct-url-navigation-to-edit-view---solved)
 - [Clipping overlay not rendered on preview (High)](#clipping-overlay-not-rendered-on-preview---solved)
 - [Filmstrip navigation causes stuck loading state (Critical)](#filmstrip-navigation-causes-stuck-loading-state---solved)
 - [E/Enter/D keys don't navigate to edit view (Medium)](#eenterd-keys-dont-navigate-to-edit-view---solved)
@@ -24,49 +24,6 @@
 ---
 
 ## Open Issues
-
-### Direct URL navigation to edit view
-
-**Severity**: Critical | **Status**: Partially Fixed (2026-01-21)
-
-The 500 server error is resolved, but the page doesn't load data correctly when navigating directly to `/edit/[id]`.
-
-**Original Root Cause**: When accessing the edit view directly via URL, the catalog store is empty and `useCatalog()` returns an undefined `catalogService` because the plugin's async initialization hasn't completed or the folder hasn't been selected.
-
-**Original Fix Applied**:
-- Added `$catalogReady` promise to catalog plugin
-- Created `ensure-catalog` middleware to wait for service initialization
-- Made `useHistogramDisplay` and `useEditPreview` composables SSR-safe
-- Added defensive null-checking to `useCatalog` composable
-- Disabled SSR for edit page (`ssr: false`) since it requires client-only services
-
-**Current Status**:
-- ✅ 500 server error is fixed - page renders without crash
-- ❌ Edit page shows empty state when navigating directly:
-  - Header shows "0 / 0" instead of asset position
-  - Preview shows "Loading preview..." indefinitely
-  - Histogram shows "Loading..." indefinitely
-  - No filename, format, or size displayed
-  - No filmstrip at bottom
-- ✅ Navigation via double-click from catalog works perfectly
-
-**Remaining Root Cause**: The edit page renders before the catalog data is populated. In demo mode, the catalog auto-loads on the home page but not when navigating directly to `/edit/[id]`.
-
-**Recommended Fix**:
-1. Edit page should await `$catalogReady` AND verify assets are populated
-2. In demo mode, trigger catalog initialization if assets are empty
-3. Show a loading state while waiting for catalog data
-4. Consider redirecting to home with return URL if catalog cannot be initialized
-
-**Files Modified** (original fix):
-- `apps/web/app/plugins/catalog.client.ts`
-- `apps/web/app/middleware/ensure-catalog.ts` (NEW)
-- `apps/web/app/pages/edit/[id].vue`
-- `apps/web/app/composables/useCatalog.ts`
-- `apps/web/app/composables/useHistogramDisplay.ts`
-- `apps/web/app/composables/useEditPreview.ts`
-
----
 
 ### Crop/transform controls not overlayed on preview
 
@@ -109,6 +66,41 @@ The crop region and rotation controls are only visible in a small thumbnail in t
 ---
 
 ## Solved Issues
+
+### Direct URL navigation to edit view - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+Direct URL navigation to `/edit/[id]` now works correctly. When navigating directly via URL (e.g., refreshing the page or sharing a link), the edit page loads with all data populated.
+
+**Original Problem**:
+- Edit page showed empty state when navigating directly
+- Header showed "0 / 0" instead of asset position
+- Preview showed "Loading preview..." indefinitely
+- Histogram showed "Loading..." indefinitely
+- Catalog assets were not loaded when bypassing home page
+
+**Root Cause**: The `ensure-catalog` middleware only waited for the catalog service to be created, not for assets to be loaded. In demo mode, assets were only loaded via `selectFolder()` on the home page.
+
+**Fix Applied**:
+1. Added `initializeCatalog()` helper function to `catalog.client.ts` plugin
+2. Function checks if assets exist, if not initializes catalog
+3. In demo mode: auto-loads demo catalog via `selectFolder()` + `scanFolder()`
+4. In real mode: restores from database via `loadFromDatabase()`
+5. Updated middleware to call `$initializeCatalog()` after `$catalogReady`
+6. Added TypeScript type augmentation for `NuxtApp` interface
+
+**Files Modified**:
+- `apps/web/app/plugins/catalog.client.ts` - Added initialization helper
+- `apps/web/app/middleware/ensure-catalog.ts` - Call initialization helper
+
+**Verification**:
+- ✅ Direct URL navigation works in demo mode
+- ✅ Page refresh maintains state
+- ✅ Navigation to different assets via URL works
+- ✅ Preview, histogram, filmstrip all load correctly
+
+---
 
 ### Clipping overlay not rendered on preview - SOLVED
 
