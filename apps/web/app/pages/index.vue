@@ -7,20 +7,17 @@
  * - FilterBar for filtering and sorting
  * - CatalogGrid with virtual scrolling thumbnails
  *
- * Handles folder selection and scanning workflow.
+ * Uses the useCatalog composable for service access.
  */
-import { BrowserFileSystemProvider } from '@literoom/core/filesystem'
-import type { DirectoryHandle, FileEntry, FileHandle } from '@literoom/core/filesystem'
-import type { Asset } from '@literoom/core/catalog'
-import { isSupportedExtension, getExtension, getFilenameWithoutExtension } from '@literoom/core/catalog'
 
 // ============================================================================
-// Stores
+// Stores and Composables
 // ============================================================================
 
 const catalogStore = useCatalogStore()
 const selectionStore = useSelectionStore()
 const permissionStore = usePermissionRecoveryStore()
+const { selectFolder, restoreSession, isDemoMode } = useCatalog()
 
 // ============================================================================
 // State
@@ -28,19 +25,6 @@ const permissionStore = usePermissionRecoveryStore()
 
 const isLoading = ref(false)
 const scanError = ref<string | null>(null)
-
-// File system provider (lazily initialized)
-let fsProvider: BrowserFileSystemProvider | null = null
-
-function getProvider(): BrowserFileSystemProvider {
-  if (!fsProvider) {
-    fsProvider = new BrowserFileSystemProvider()
-  }
-  return fsProvider
-}
-
-// Current folder handle
-const currentFolderHandle = ref<DirectoryHandle | null>(null)
 
 // ============================================================================
 // Computed
@@ -59,31 +43,14 @@ const folderName = computed(() => {
 // ============================================================================
 
 /**
- * Open folder picker and select a folder to scan.
+ * Handle folder selection.
  */
-async function selectFolder() {
+async function handleSelectFolder() {
   isLoading.value = true
   scanError.value = null
 
   try {
-    const provider = getProvider()
-
-    // Show folder picker
-    const handle = await provider.selectDirectory()
-    currentFolderHandle.value = handle
-
-    // Save handle for persistence
-    await provider.saveHandle('current-folder', handle)
-
-    // Clear previous state
-    catalogStore.clear()
-    selectionStore.clear()
-
-    // Set folder path
-    catalogStore.setFolderPath(handle.name)
-
-    // Start scanning
-    await scanFolder(handle)
+    await selectFolder()
   }
   catch (error) {
     if (error instanceof Error && error.message.includes('cancelled')) {
@@ -98,96 +65,6 @@ async function selectFolder() {
   }
 }
 
-/**
- * Scan the folder for supported image files.
- * Uses the FileSystemProvider abstraction for cross-platform compatibility.
- */
-async function scanFolder(handle: DirectoryHandle) {
-  const provider = getProvider()
-
-  catalogStore.setScanning(true)
-  catalogStore.setScanProgress({ totalFound: 0, processed: 0 })
-
-  try {
-    // List all files recursively
-    const entries = await provider.listDirectory(handle, true)
-
-    // Filter for supported image files
-    const imageEntries = entries.filter((entry): entry is FileEntry & { handle: FileHandle } => {
-      if (entry.kind !== 'file') return false
-      const ext = getExtension(entry.name)
-      return isSupportedExtension(ext)
-    })
-
-    // Process in batches
-    const batchSize = 50
-    let batch: Asset[] = []
-    let totalFound = 0
-
-    for (let i = 0; i < imageEntries.length; i++) {
-      const entry = imageEntries[i]
-      if (!entry) continue
-
-      const ext = getExtension(entry.name)
-      const filename = getFilenameWithoutExtension(entry.name)
-
-      // Get file metadata
-      let fileSize = 0
-      let modifiedDate = new Date()
-      try {
-        const metadata = await provider.getFileMetadata(entry.handle)
-        fileSize = metadata.size
-        modifiedDate = new Date(metadata.lastModified)
-      }
-      catch {
-        // Skip files we can't access
-        continue
-      }
-
-      const asset: Asset = {
-        id: `asset-${i}`,
-        folderId: handle.name,
-        path: entry.name,
-        filename,
-        extension: ext,
-        flag: 'none',
-        captureDate: null, // Would be extracted from EXIF in full implementation
-        modifiedDate,
-        fileSize,
-        thumbnailStatus: 'pending',
-        thumbnailUrl: null,
-      }
-
-      batch.push(asset)
-      totalFound++
-
-      // Update progress
-      catalogStore.setScanProgress({
-        totalFound,
-        processed: totalFound,
-        currentFile: filename,
-      })
-
-      // Flush batch
-      if (batch.length >= batchSize) {
-        catalogStore.addAssetBatch(batch)
-        batch = []
-      }
-    }
-
-    // Flush remaining batch
-    if (batch.length > 0) {
-      catalogStore.addAssetBatch(batch)
-    }
-  }
-  catch (error) {
-    scanError.value = error instanceof Error ? error.message : 'Scan failed'
-  }
-  finally {
-    catalogStore.setScanning(false)
-  }
-}
-
 // ============================================================================
 // Permission Recovery
 // ============================================================================
@@ -195,11 +72,9 @@ async function scanFolder(handle: DirectoryHandle) {
 /**
  * Handle successful folder re-authorization.
  */
-function handleReauthorized(folderId: string) {
-  // If this was the current folder, rescan it
-  if (folderId === 'current-folder' && currentFolderHandle.value) {
-    scanFolder(currentFolderHandle.value)
-  }
+async function handleReauthorized(_folderId: string) {
+  // Re-scan after re-authorization
+  await handleSelectFolder()
 }
 
 /**
@@ -214,37 +89,19 @@ function handleContinue() {
 // ============================================================================
 
 /**
- * Check for saved folder on app load and verify permissions.
+ * Initialize app and restore session if possible.
  */
 async function initializeApp() {
-  const provider = getProvider()
-
   try {
-    // Check for saved folder handle
-    const savedHandle = await provider.loadHandle('current-folder')
-    if (!savedHandle) return
-
-    // Query permission
-    const permissionState = await provider.queryPermission(savedHandle, 'read')
-
-    if (permissionState === 'granted') {
-      // Permission still valid - load the folder
-      currentFolderHandle.value = savedHandle
-      catalogStore.setFolderPath(savedHandle.name)
-      await scanFolder(savedHandle)
-    }
-    else {
-      // Permission lost - show recovery modal
-      permissionStore.addFolderIssue(
-        'current-folder',
-        savedHandle.name,
-        savedHandle.name,
-        permissionState as 'prompt' | 'denied'
-      )
+    const restored = await restoreSession()
+    if (!restored && !isDemoMode) {
+      // Session restoration failed - may need permission recovery
+      // This is handled by the restoreSession function internally
     }
   }
-  catch {
-    // No saved state or error loading - start fresh
+  catch (error) {
+    // Start fresh if restoration fails
+    console.warn('Session restoration failed:', error)
   }
 }
 
@@ -255,16 +112,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="catalog-page">
+  <div class="catalog-page" data-testid="catalog-page">
     <!-- Permission recovery modal -->
     <CatalogPermissionRecovery
-      @select-new-folder="selectFolder"
+      @select-new-folder="handleSelectFolder"
       @continue="handleContinue"
       @reauthorized="handleReauthorized"
     />
 
     <!-- Welcome screen (no folder selected) -->
-    <div v-if="!hasFolder && !isLoading" class="welcome-screen">
+    <div v-if="!hasFolder && !isLoading" class="welcome-screen" data-testid="welcome-screen">
       <div class="welcome-content">
         <h1 class="text-4xl font-bold">
           Literoom
@@ -275,11 +132,18 @@ onMounted(() => {
           Your photos stay local, your edits persist.
         </p>
 
+        <div v-if="isDemoMode" class="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <p class="text-sm text-blue-400">
+            Demo Mode: Using mock data for testing
+          </p>
+        </div>
+
         <div class="mt-8 space-y-4">
           <UButton
             size="xl"
             :loading="isLoading"
-            @click="selectFolder"
+            data-testid="choose-folder-button"
+            @click="handleSelectFolder"
           >
             Choose Folder
           </UButton>
@@ -318,7 +182,7 @@ onMounted(() => {
             variant="ghost"
             icon="i-heroicons-folder"
             size="sm"
-            @click="selectFolder"
+            @click="handleSelectFolder"
           >
             {{ folderName }}
           </UButton>
@@ -341,7 +205,7 @@ onMounted(() => {
 
       <!-- Grid or empty state -->
       <div class="catalog-content">
-        <CatalogCatalogGrid v-if="hasAssets" />
+        <CatalogCatalogGrid v-if="hasAssets" data-testid="catalog-grid" />
         <div v-else class="empty-state">
           <UIcon name="i-heroicons-photo" class="w-16 h-16 text-gray-600 mb-4" />
           <p class="text-gray-500">No supported images found</p>

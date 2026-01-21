@@ -8,6 +8,12 @@ export default defineNuxtConfig({
     compatibilityVersion: 4,
   },
 
+  runtimeConfig: {
+    public: {
+      demoMode: process.env.LITEROOM_DEMO_MODE === 'true',
+    },
+  },
+
   modules: [
     '@nuxt/ui',
     '@nuxt/eslint',

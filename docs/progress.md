@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 07:00 EST
-**Current Phase**: Phase 7 Implementation Plan Created - Integration and Testing
+**Last Updated**: 2026-01-21 07:14 EST
+**Current Phase**: Phase 7.2 Complete - Nuxt Plugin Integration
 
 ## Project Structure
 
@@ -37,6 +37,66 @@ literoom/
 ```
 
 ## Completed Work
+
+### 40: 2026-01-21 07:14 EST: Phase 7.1 & 7.2 Complete - Mock Services & Nuxt Plugin Integration
+
+**Objective**: Implement mock services for demo mode and integrate CatalogService with Nuxt plugin.
+
+**Work Completed**:
+
+**Phase 7.1 (Mock Services)** - Already implemented:
+- Verified `packages/core/src/catalog/demo-assets.ts` exists with:
+  - `createDemoAsset()` and `createDemoAssets()` functions
+  - Configurable flag distribution (pick/reject/unflagged rates)
+  - Deterministic generation based on index
+  - 24 unit tests passing
+- Verified `packages/core/src/catalog/mock-catalog-service.ts` exists with:
+  - Full `ICatalogService` implementation
+  - Configurable delays for scan and thumbnail operations
+  - Callback support (onAssetsAdded, onAssetUpdated, onThumbnailReady)
+  - 46 unit tests passing
+- Verified `packages/core/src/filesystem/mock.ts` exists with:
+  - `MockFileSystemProvider` implementing `FileSystemProvider`
+  - Configurable permission states and failure modes
+  - 43 unit tests passing
+
+**Phase 7.2 (Nuxt Plugin Integration)** - Newly implemented:
+- Updated `apps/web/nuxt.config.ts`:
+  - Added `runtimeConfig.public.demoMode` from `LITEROOM_DEMO_MODE` env var
+- Created `apps/web/app/plugins/catalog.client.ts`:
+  - Creates CatalogService (real or mock based on demo mode)
+  - Creates DecodeService (real or mock based on demo mode)
+  - Wires service callbacks to Pinia stores
+  - Provides `$catalogService`, `$decodeService`, `$isDemoMode`
+- Created `apps/web/app/composables/useCatalog.ts`:
+  - `selectFolder()` - handles folder selection (mock or real)
+  - `restoreSession()` - restore from saved handle
+  - `setFlag()`, `pick()`, `reject()`, `clearFlag()` - flag operations
+  - `requestThumbnail()`, `updateThumbnailPriority()` - thumbnail requests
+- Updated `apps/web/app/pages/index.vue`:
+  - Simplified to use `useCatalog` composable
+  - Removed direct service instantiation
+  - Added demo mode indicator banner
+  - Added data-testid attributes for E2E testing
+- Created `.nvmrc` file specifying Node 22
+
+**Test Summary**:
+- `packages/core`: 200 tests passing (including mock services)
+- No new type errors in plugin/composable files
+
+**Files Created**:
+- `apps/web/app/plugins/catalog.client.ts`
+- `apps/web/app/composables/useCatalog.ts`
+- `.nvmrc`
+
+**Files Modified**:
+- `apps/web/nuxt.config.ts`
+- `apps/web/app/pages/index.vue`
+- `docs/progress.md`
+
+**Next Step**: Phase 7.3 - Demo Mode Assets (create demo images in public/demo-images/).
+
+---
 
 ### 39: 2026-01-21 07:00 EST: Phase 7 Implementation Plan Created
 
