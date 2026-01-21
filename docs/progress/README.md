@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 15:25 EST
-**Current Phase**: Direct URL Navigation Fix - Complete
+**Last Updated**: 2026-01-21 15:19 EST
+**Current Phase**: Crop Overlay on Preview Canvas - Research
 
 ## Project Structure
 
@@ -221,6 +221,7 @@ literoom/
 | [77](./iterations-71-80.md:3) | 2026-01-21 | Clipping Overlay Implementation - Complete |
 | [78](./iterations-71-80.md:3) | 2026-01-21 | Direct URL Navigation Fix - Research |
 | [79](./iterations-71-80.md:3) | 2026-01-21 | Direct URL Navigation Fix - Complete |
+| [80](./iterations-71-80.md:3) | 2026-01-21 | Crop Overlay on Preview Canvas - Research |
 
 ---
 

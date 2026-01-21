@@ -1,5 +1,75 @@
 # Iterations 71-80
 
+## 80: 2026-01-21 15:19 EST: Crop Overlay on Preview Canvas - Research Complete
+
+**Objective**: Research and plan the implementation of crop controls overlaid on the main preview canvas.
+
+**Background**: Currently, crop region is only visible in a small thumbnail in the right panel. Users cannot interact with crop controls on the main preview, making precise cropping difficult. Professional photo editors (Lightroom, Capture One) always overlay crop controls on the main preview.
+
+**Research Completed**:
+- Launched 5 parallel research agents to investigate:
+  1. Current crop editor implementation and state management
+  2. Preview canvas component architecture
+  3. Canvas overlay positioning and coordinate systems
+  4. Mouse event handling patterns in the codebase
+  5. Edit page layout and crop tool activation
+
+**Key Findings**:
+
+1. **Existing crop editor (useCropEditor.ts)**:
+   - Fully-featured with rendering (dark mask, border, grid, handles)
+   - Coordinate conversion between canvas and normalized (0-1) space
+   - Handle drag for resize, interior drag for move
+   - Aspect ratio constraints
+   - Debounced store updates (32ms)
+   - Can extract ~150 lines as shared utilities
+
+2. **Preview canvas architecture**:
+   - Clipping overlay already demonstrates the pattern
+   - Absolute positioning within relative container
+   - ResizeObserver tracks rendered dimensions
+   - Canvas sized to match `img.clientWidth/clientHeight`
+
+3. **Coordinate system**:
+   - Normalized (0-1) coordinates stored in edit store
+   - DPI-aware conversion via getBoundingClientRect + scale
+   - `object-contain` CSS handles letterboxing automatically
+
+4. **Mouse event patterns**:
+   - Element-level attachment (not document)
+   - Radius-based hit detection (20px for handles)
+   - Local state during drag, debounced store sync
+   - Cancel debounce + commit on mouseup
+
+5. **Tool activation**:
+   - editUI store can be extended with `isCropToolActive`
+   - Sync with accordion expansion state
+   - Deactivate on navigation or section collapse
+
+**Design Decisions**:
+- Show crop overlay when "Crop & Transform" section is expanded
+- Fully interactive overlay (not just display)
+- Create new `useCropOverlay` composable (reuses useCropEditor logic)
+- Crop canvas: `pointer-events-auto`, z-index 20 (above clipping overlay)
+
+**Files Created**:
+- `docs/research/2026-01-21-crop-overlay-research-plan.md`
+- `docs/research/2026-01-21-crop-overlay-synthesis.md`
+- `docs/plans/2026-01-21-crop-overlay-plan.md`
+
+**Implementation Plan Summary**:
+1. Phase 1: Extend editUI store with `isCropToolActive`
+2. Phase 2: Extract shared crop utilities to cropUtils.ts
+3. Phase 3: Create useCropOverlay composable
+4. Phase 4: Update EditPreviewCanvas with crop canvas
+5. Phase 5: Connect accordion state to crop tool activation
+6. Phase 6: Cleanup on navigation
+7. Phase 7: Refactor useCropEditor to use shared utilities
+
+**Status**: Research complete, plan created. Ready for implementation.
+
+---
+
 ## 79: 2026-01-21 15:25 EST: Direct URL Navigation Fix - Implementation Complete
 
 **Objective**: Implement the fix for direct URL navigation to `/edit/[id]` showing empty state.
