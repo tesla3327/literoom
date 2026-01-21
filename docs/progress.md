@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 21:54 EST
-**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 2 Complete
+**Last Updated**: 2026-01-20 21:57 EST
+**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 3 Complete
 
 ## Project Structure
 
@@ -36,6 +36,36 @@ literoom/
 ```
 
 ## Completed Work
+
+### 21: 2026-01-20 21:57 EST: TypeScript Integration - Phase 3 Complete (DecodeService)
+
+**Objective**: Implement Phase 3 of the TypeScript Integration Plan - DecodeService class.
+
+**Work Completed**:
+- Created `packages/core/src/decode/decode-service.ts`:
+  - `IDecodeService` interface for testability and mock support
+  - `DecodeService` class with factory pattern (`DecodeService.create()`)
+  - Worker creation using `new URL('./decode-worker.ts', import.meta.url)` pattern
+  - Request/response correlation using UUID and Map
+  - 30-second timeout handling with proper cleanup
+  - All decode methods: `decodeJpeg`, `decodeRawThumbnail`, `generateThumbnail`, `generatePreview`, `detectFileType`
+  - Proper cleanup on `destroy()` - rejects pending requests, terminates worker
+
+- Updated `packages/core/src/decode/index.ts`:
+  - Added exports for `DecodeService` and `IDecodeService`
+
+**Key Implementation Details**:
+- Private constructor pattern - must use `DecodeService.create()` for async initialization
+- All pending requests tracked in Map with timeout IDs
+- Proper error handling - converts worker errors to `DecodeError` instances
+- `filterToNumber()` helper used for PreviewOptions filter conversion
+- Service state tracked via `DecodeServiceState` interface
+
+**TypeScript Verification**: No errors in decode files (pre-existing browser.ts errors are unrelated).
+
+**Next Step**: Phase 4 - Nuxt Integration (nuxt.config.ts, plugin, composable).
+
+---
 
 ### 20: 2026-01-20 21:54 EST: TypeScript Integration - Phase 2 Complete (Decode Worker)
 

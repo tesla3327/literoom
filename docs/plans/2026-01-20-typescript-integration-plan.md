@@ -228,20 +228,20 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
 ---
 
-### Phase 3: DecodeService Class ⬜
+### Phase 3: DecodeService Class ✅
 
 **Goal**: Create main thread service that manages worker communication.
 
 #### Tasks
 
-- [ ] 3.1. Create `packages/core/src/decode/decode-service.ts`
+- [x] 3.1. Create `packages/core/src/decode/decode-service.ts`
   - Implement `IDecodeService` interface
   - Create worker and handle messages
   - Implement request/response correlation with UUID
   - Add 30-second timeout handling
   - Implement all decode methods
 
-- [ ] 3.2. Create `IDecodeService` interface
+- [x] 3.2. Create `IDecodeService` interface
   - Define all public methods
   - Enable mock implementations for testing
 

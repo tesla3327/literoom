@@ -31,3 +31,6 @@ export {
   type FileTypeResponse,
   type DecodeErrorResponse
 } from './worker-messages'
+
+// Service
+export { DecodeService, type IDecodeService } from './decode-service'
