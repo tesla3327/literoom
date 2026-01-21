@@ -6,3 +6,4 @@
  */
 
 export * from './filesystem'
+export * from './decode'

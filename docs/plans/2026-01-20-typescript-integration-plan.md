@@ -30,13 +30,13 @@ Create TypeScript services and Web Worker infrastructure to expose the WASM imag
 
 ## Implementation Phases
 
-### Phase 1: Core Types and Worker Messages ⬜
+### Phase 1: Core Types and Worker Messages ✅
 
 **Goal**: Define all TypeScript types needed for the decode pipeline.
 
 #### Tasks
 
-- [ ] 1.1. Create `packages/core/src/decode/types.ts`
+- [x] 1.1. Create `packages/core/src/decode/types.ts`
   - `DecodedImage` interface (width, height, pixels)
   - `ThumbnailOptions` interface (size, optional filter)
   - `PreviewOptions` interface (maxEdge, filter)
@@ -44,7 +44,7 @@ Create TypeScript services and Web Worker infrastructure to expose the WASM imag
   - `FileType` type ('jpeg' | 'raw' | 'unknown')
   - `DecodeServiceState` type for status tracking
 
-- [ ] 1.2. Create `packages/core/src/decode/worker-messages.ts`
+- [x] 1.2. Create `packages/core/src/decode/worker-messages.ts`
   - `DecodeRequest` discriminated union type
   - `DecodeResponse` discriminated union type
   - Request types: decode-jpeg, decode-raw-thumbnail, generate-thumbnail, generate-preview, detect-file-type

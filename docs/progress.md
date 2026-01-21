@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 21:48 EST
-**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Implementation Plan Created
+**Last Updated**: 2026-01-20 21:51 EST
+**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 1 Complete
 
 ## Project Structure
 
@@ -18,7 +18,9 @@ literoom/
 │   └── nuxt.config.ts
 ├── packages/
 │   ├── core/                    # Shared TypeScript logic
-│   │   └── src/filesystem/      # FS abstraction layer
+│   │   └── src/
+│   │       ├── filesystem/      # FS abstraction layer
+│   │       └── decode/          # Image decode types & services
 │   └── wasm/                    # WASM output (generated)
 ├── crates/
 │   ├── literoom-core/           # Rust image processing
@@ -34,6 +36,40 @@ literoom/
 ```
 
 ## Completed Work
+
+### 19: 2026-01-20 21:51 EST: TypeScript Integration - Phase 1 Complete (Core Types)
+
+**Objective**: Implement Phase 1 of the TypeScript Integration Plan - core types and worker messages.
+
+**Work Completed**:
+- Created `packages/core/src/decode/types.ts`:
+  - `DecodedImage` interface (width, height, pixels)
+  - `ThumbnailOptions` interface (size)
+  - `PreviewOptions` interface (maxEdge, filter)
+  - `FilterType` type ('nearest' | 'bilinear' | 'lanczos3')
+  - `FileType` type ('jpeg' | 'raw' | 'unknown')
+  - `ErrorCode` type (8 error codes)
+  - `DecodeError` class with code and cause
+  - `DecodeServiceState` interface for status tracking
+  - `filterToNumber()` helper function
+
+- Created `packages/core/src/decode/worker-messages.ts`:
+  - `DecodeRequest` discriminated union (5 request types)
+  - `DecodeResponse` discriminated union (3 response types)
+  - Individual request interfaces for type safety
+
+- Created `packages/core/src/decode/index.ts` (module exports)
+- Updated `packages/core/src/index.ts` to export decode module
+- Verified types compile successfully
+
+**Files Created**:
+- `packages/core/src/decode/types.ts`
+- `packages/core/src/decode/worker-messages.ts`
+- `packages/core/src/decode/index.ts`
+
+**Next Step**: Phase 2 - Implement decode worker (`decode-worker.ts`).
+
+---
 
 ### 18: 2026-01-20 21:48 EST: TypeScript Integration - Implementation Plan Created
 
