@@ -29,16 +29,18 @@ mod adjustments;
 mod curve;
 mod decode;
 mod histogram;
+mod transform;
 mod types;
 
 // Re-export public types
 pub use adjustments::{apply_adjustments, BasicAdjustments};
+pub use curve::{apply_tone_curve, JsToneCurveLut};
 pub use decode::{
     decode_jpeg, decode_raw_thumbnail, extract_raw_thumbnail_bytes, generate_thumbnail,
     is_raw_file, resize, resize_to_fit,
 };
-pub use curve::{apply_tone_curve, JsToneCurveLut};
 pub use histogram::{compute_histogram, JsHistogram};
+pub use transform::{apply_crop, apply_rotation};
 pub use types::JsDecodedImage;
 
 /// Initialize the WASM module (called automatically on load)

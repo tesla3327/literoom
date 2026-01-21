@@ -1,5 +1,44 @@
 # Iterations 61-70
 
+## 67: 2026-01-21 13:44 EST: Phase 12.4 Complete - WASM Transform Bindings
+
+**Objective**: Expose Rust transform functions (rotation and crop) to JavaScript via WASM bindings.
+
+**Work Completed**:
+
+**1. Created `crates/literoom-wasm/src/transform.rs`:**
+- `apply_rotation(image, angle_degrees, use_lanczos)` - Rotates image with bilinear (fast) or Lanczos3 (quality) interpolation
+- `apply_crop(image, left, top, width, height)` - Crops image using normalized (0-1) coordinates
+- 8 unit tests for WASM transform operations
+
+**2. Updated `crates/literoom-wasm/src/lib.rs`:**
+- Added `mod transform;` module declaration
+- Added `pub use transform::{apply_crop, apply_rotation};` re-exports
+
+**3. Rebuilt WASM package:**
+- Generated TypeScript types in `packages/wasm/literoom_wasm.d.ts`
+- TypeScript function signatures:
+  - `apply_rotation(image: JsDecodedImage, angle_degrees: number, use_lanczos: boolean): JsDecodedImage`
+  - `apply_crop(image: JsDecodedImage, left: number, top: number, width: number, height: number): JsDecodedImage`
+
+**Files Created/Modified**:
+- `crates/literoom-wasm/src/transform.rs` - NEW
+- `crates/literoom-wasm/src/lib.rs` - Updated
+- `packages/wasm/*` - Regenerated
+
+**Verification**:
+- All 38 literoom-wasm tests pass (8 new transform tests)
+- Clippy passes with no warnings
+- rustfmt check passes
+- WASM build successful
+- TypeScript types include both new functions
+
+**Status**: Complete
+
+**Next Step**: Phase 12.5 - Worker Integration (add message handlers and DecodeService methods)
+
+---
+
 ## 66: 2026-01-21 13:36 EST: Phase 12.3 Complete - Rust Transform Module
 
 **Objective**: Implement the Rust transform module for image rotation and cropping.

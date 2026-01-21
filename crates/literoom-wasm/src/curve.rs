@@ -63,7 +63,9 @@ impl JsToneCurveLut {
             .map(|p| CurvePoint::new(p.x, p.y))
             .collect();
 
-        let curve = ToneCurve { points: core_points };
+        let curve = ToneCurve {
+            points: core_points,
+        };
         let inner = ToneCurveLut::from_curve(&curve);
 
         Ok(JsToneCurveLut { inner })
