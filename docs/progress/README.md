@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 11:21 EST
+**Last Updated**: 2026-01-21 12:00 EST
 **Current Phase**: Phase 11 - Tone Curve (Phase 11.2 Complete - WASM Bindings, next: Phase 11.3)
 
 ## Project Structure
@@ -182,7 +182,8 @@ literoom/
 | [52](./iterations-51-60.md:87) | 2026-01-21 | Phase 10 Complete - Histogram Display Implementation |
 | [53](./iterations-51-60.md:53) | 2026-01-21 | Fix Complete - Edit View Preview Now Loads |
 | [54](./iterations-51-60.md:42) | 2026-01-21 | Phase 11.1 Complete - Rust Curve Module |
-| [55](./iterations-51-60.md:3) | 2026-01-21 | Phase 11.2 Complete - WASM Bindings for Tone Curve |
+| [55](./iterations-51-60.md:53) | 2026-01-21 | Phase 11.2 Complete - WASM Bindings for Tone Curve |
+| [56](./iterations-51-60.md:3) | 2026-01-21 | Fixed Preview Update Issue in Demo Mode |
 
 ---
 

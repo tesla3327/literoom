@@ -247,9 +247,114 @@ export class MockDecodeService implements IDecodeService {
       return this.options.onApplyAdjustments(pixels, width, height, adjustments)
     }
 
-    // Default: return a copy of the input (no actual adjustments applied)
+    // Apply simplified adjustments for demo mode
+    // This provides visual feedback without full color science accuracy
     const outputPixels = new Uint8Array(pixels.length)
-    outputPixels.set(pixels)
+
+    for (let i = 0; i < pixels.length; i += 3) {
+      let r = pixels[i]
+      let g = pixels[i + 1]
+      let b = pixels[i + 2]
+
+      // Apply exposure (multiply by 2^exposure)
+      if (adjustments.exposure !== 0) {
+        const multiplier = Math.pow(2, adjustments.exposure)
+        r = Math.min(255, Math.max(0, r * multiplier))
+        g = Math.min(255, Math.max(0, g * multiplier))
+        b = Math.min(255, Math.max(0, b * multiplier))
+      }
+
+      // Apply contrast (S-curve around midpoint)
+      if (adjustments.contrast !== 0) {
+        const factor = (adjustments.contrast / 100) + 1 // -1 to 2
+        r = Math.min(255, Math.max(0, ((r / 255 - 0.5) * factor + 0.5) * 255))
+        g = Math.min(255, Math.max(0, ((g / 255 - 0.5) * factor + 0.5) * 255))
+        b = Math.min(255, Math.max(0, ((b / 255 - 0.5) * factor + 0.5) * 255))
+      }
+
+      // Apply temperature (warm/cool tint)
+      if (adjustments.temperature !== 0) {
+        const tempFactor = adjustments.temperature / 100
+        r = Math.min(255, Math.max(0, r + tempFactor * 30))
+        b = Math.min(255, Math.max(0, b - tempFactor * 30))
+      }
+
+      // Apply tint (green/magenta shift)
+      if (adjustments.tint !== 0) {
+        const tintFactor = adjustments.tint / 100
+        g = Math.min(255, Math.max(0, g - tintFactor * 30))
+        r = Math.min(255, Math.max(0, r + tintFactor * 15))
+        b = Math.min(255, Math.max(0, b + tintFactor * 15))
+      }
+
+      // Apply saturation
+      if (adjustments.saturation !== 0) {
+        const sat = (adjustments.saturation / 100) + 1 // 0 to 2
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b
+        r = Math.min(255, Math.max(0, gray + (r - gray) * sat))
+        g = Math.min(255, Math.max(0, gray + (g - gray) * sat))
+        b = Math.min(255, Math.max(0, gray + (b - gray) * sat))
+      }
+
+      // Apply vibrance (saturation that protects skin tones)
+      if (adjustments.vibrance !== 0) {
+        const vib = (adjustments.vibrance / 100) + 1 // 0 to 2
+        const maxChannel = Math.max(r, g, b)
+        const minChannel = Math.min(r, g, b)
+        const currentSat = maxChannel === 0 ? 0 : (maxChannel - minChannel) / maxChannel
+        // Less effect on already-saturated colors
+        const adjustedVib = 1 + (vib - 1) * (1 - currentSat)
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b
+        r = Math.min(255, Math.max(0, gray + (r - gray) * adjustedVib))
+        g = Math.min(255, Math.max(0, gray + (g - gray) * adjustedVib))
+        b = Math.min(255, Math.max(0, gray + (b - gray) * adjustedVib))
+      }
+
+      // Apply highlights (affect bright areas)
+      if (adjustments.highlights !== 0) {
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        const highlightMask = Math.max(0, (luminance - 128) / 127)
+        const highlightFactor = (adjustments.highlights / 100) * highlightMask * 50
+        r = Math.min(255, Math.max(0, r + highlightFactor))
+        g = Math.min(255, Math.max(0, g + highlightFactor))
+        b = Math.min(255, Math.max(0, b + highlightFactor))
+      }
+
+      // Apply shadows (affect dark areas)
+      if (adjustments.shadows !== 0) {
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        const shadowMask = Math.max(0, 1 - luminance / 128)
+        const shadowFactor = (adjustments.shadows / 100) * shadowMask * 50
+        r = Math.min(255, Math.max(0, r + shadowFactor))
+        g = Math.min(255, Math.max(0, g + shadowFactor))
+        b = Math.min(255, Math.max(0, b + shadowFactor))
+      }
+
+      // Apply whites (adjust white point)
+      if (adjustments.whites !== 0) {
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        const whiteMask = Math.pow(Math.max(0, luminance / 255), 2)
+        const whiteFactor = (adjustments.whites / 100) * whiteMask * 40
+        r = Math.min(255, Math.max(0, r + whiteFactor))
+        g = Math.min(255, Math.max(0, g + whiteFactor))
+        b = Math.min(255, Math.max(0, b + whiteFactor))
+      }
+
+      // Apply blacks (adjust black point)
+      if (adjustments.blacks !== 0) {
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        const blackMask = Math.pow(Math.max(0, 1 - luminance / 255), 2)
+        const blackFactor = (adjustments.blacks / 100) * blackMask * 40
+        r = Math.min(255, Math.max(0, r + blackFactor))
+        g = Math.min(255, Math.max(0, g + blackFactor))
+        b = Math.min(255, Math.max(0, b + blackFactor))
+      }
+
+      outputPixels[i] = Math.round(r)
+      outputPixels[i + 1] = Math.round(g)
+      outputPixels[i + 2] = Math.round(b)
+    }
+
     return { width, height, pixels: outputPixels }
   }
 

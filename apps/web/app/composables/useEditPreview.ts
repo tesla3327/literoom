@@ -243,13 +243,15 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
    * @param quality - 'draft' for fast render during drag, 'full' for high quality
    */
   async function renderPreview(quality: 'draft' | 'full'): Promise<void> {
+    console.log('[useEditPreview] renderPreview called, quality:', quality)
     if (!sourceCache.value) {
-      // No source loaded yet
+      console.log('[useEditPreview] No source cache, returning early')
       return
     }
 
     // Don't re-render if still rendering
     if (isRendering.value) {
+      console.log('[useEditPreview] Already rendering, returning early')
       return
     }
 

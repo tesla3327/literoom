@@ -1,5 +1,55 @@
 # Iterations 51-60
 
+## 56: 2026-01-21 12:00 EST: Fixed Preview Update Issue in Demo Mode
+
+**Objective**: Fix critical issue where preview doesn't update when adjustments change.
+
+**Investigation Summary**:
+- Used browser automation to confirm the issue - slider values changed but preview remained visually identical
+- Added debug logging to trace the preview pipeline
+- Discovered that the preview mechanism was working correctly:
+  - Adjustment watcher was triggering
+  - `sourceCache` was populated with 256x256 pixel data
+  - `debouncedRender()` was being called
+  - Blob URLs were being generated and set as `previewUrl`
+  - The `<img>` element's `src` was correctly updating to the blob URL
+
+**Root Cause**:
+- `MockDecodeService.applyAdjustments()` was returning a copy of the input pixels without any modification
+- Even though the preview URL changed to a new blob, the pixel data was identical to the original
+- This meant the visual appearance remained the same despite the mechanism working correctly
+
+**Fix Applied**:
+- Implemented actual adjustment processing in `MockDecodeService` for all 10 basic adjustments:
+  - **Exposure**: Multiply by 2^exposure
+  - **Contrast**: S-curve around midpoint
+  - **Temperature**: Warm/cool tint (R/B shift)
+  - **Tint**: Green/magenta shift
+  - **Saturation**: Standard saturation adjustment
+  - **Vibrance**: Saturation that protects already-saturated colors
+  - **Highlights**: Affects bright areas only
+  - **Shadows**: Affects dark areas only
+  - **Whites**: Adjust white point
+  - **Blacks**: Adjust black point
+
+**Verification**:
+- Changing Exposure from 0 to +5 now produces a completely white/blown-out image (correct - 32x multiplier)
+- The preview visually updates in real-time when sliders are adjusted
+
+**Files Modified**:
+- `packages/core/src/decode/mock-decode-service.ts` - Implemented adjustment processing (~120 lines of pixel processing code)
+
+**Side Effects Fixed**:
+- Histogram now updates with adjustments (since it's computed from preview pixels)
+
+**Issues Marked as Fixed**:
+- "Preview not updating when adjustments change" (High)
+- "Histogram not updating with adjustments" (High)
+
+**Note**: This fix is for demo mode only. Real mode uses WASM `apply_adjustments` which already processes adjustments correctly
+
+---
+
 ## 55: 2026-01-21 11:21 EST: Phase 11.2 Complete - WASM Bindings for Tone Curve
 
 **Objective**: Create WASM bindings for the tone curve module (Phase 11.2 of the Tone Curve plan).
