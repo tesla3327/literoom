@@ -1,5 +1,38 @@
 # Iterations 71-80
 
+## 72: 2026-01-21 14:21 EST: Fixing Critical Filmstrip Navigation Bug - Research Complete
+
+**Objective**: Research and fix the critical filmstrip navigation bug that causes stuck loading states.
+
+**Background**: Rapidly clicking between thumbnails in the edit view filmstrip can cause both the preview and histogram to get stuck in a "Loading..." state. In severe cases, the entire edit view becomes broken with empty filmstrip and "0 / 0" position indicator.
+
+**Work Completed**:
+- Created research plan with 6 research areas
+- Launched 6 parallel research agents to investigate:
+  1. Readonly ref mutations
+  2. Async race conditions
+  3. Watcher error handling
+  4. ShallowRef reactivity
+  5. Filmstrip navigation flow
+  6. Histogram constants
+
+**Root Causes Identified**:
+1. **Race conditions** - Multiple async operations without proper cancellation, responses arrive out of order
+2. **Missing error handling** - Async watchers don't have try/catch, `isRendering` stays true on error
+3. **ShallowRef reactivity limitations** - Computed properties may miss updates
+4. **HMR constant initialization** - `SMOOTHING_KERNEL` initialized at module level
+
+**Solution**: Add render generation counters, wrap async watchers in try/catch, use lazy kernel initialization
+
+**Files Created**:
+- `docs/research/2026-01-21-filmstrip-nav-research-plan.md`
+- `docs/research/2026-01-21-filmstrip-nav-synthesis.md`
+- `docs/plans/2026-01-21-filmstrip-nav-fix-plan.md`
+
+**Status**: Research complete, plan created. Ready for implementation.
+
+---
+
 ## 71: 2026-01-21 14:22 EST: Phase 12.7 & 12.8 Complete - Crop Editor UI & Rotation Controls
 
 **Objective**: Implement the interactive crop editor UI components and rotation controls.
