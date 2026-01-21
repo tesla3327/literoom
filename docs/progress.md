@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 06:45 EST
-**Current Phase**: Phase 6.5 Research Complete - PermissionRecovery
+**Last Updated**: 2026-01-21 06:46 EST
+**Current Phase**: Phase 6.5 Complete - PermissionRecovery
 
 ## Project Structure
 
@@ -37,6 +37,46 @@ literoom/
 ```
 
 ## Completed Work
+
+### 36: 2026-01-21 06:46 EST: Phase 6.5 Complete - PermissionRecovery Store and Component
+
+**Objective**: Implement permission recovery UI for folder re-authorization when app is reopened.
+
+**Work Completed**:
+- Created `apps/web/app/stores/permissionRecovery.ts`:
+  - Pinia store following established patterns (Composition API, shallowRef)
+  - State: `showModal`, `folderIssues`, `isRechecking`, `error`
+  - Computed: `hasIssues`, `accessibleCount`, `issueCount`
+  - Actions: `checkFolderPermission`, `addFolderIssue`, `reauthorizeFolder`, `retryAll`, `clearIssues`
+  - Uses `BrowserFileSystemProvider` for permission checks
+  - Lazy provider initialization to avoid SSR issues
+
+- Created `apps/web/app/components/catalog/PermissionRecovery.vue`:
+  - Non-dismissible UModal for blocking permission recovery
+  - Lists folders with permission issues
+  - Shows folder name, path, and permission state badge
+  - Re-authorize button per folder (triggers user gesture for browser API)
+  - Error display for failed operations
+  - Footer actions: "Choose Different Folder", "Retry All", "Continue"
+  - Emits events: `selectNewFolder`, `continue`, `reauthorized`
+
+**Key Implementation Details**:
+- `FolderIssue` type: `folderId`, `folderName`, `folderPath`, `permissionState`, `error`
+- Permission states: `'prompt'` (needs permission) or `'denied'` (explicitly denied)
+- Nuxt UI 4 color mapping: prompt → warning, denied → error
+- `reauthorizeFolder()` must be called from button click (browser requirement)
+- Store automatically closes modal when all issues resolved
+
+**Files Created**:
+- `apps/web/app/stores/permissionRecovery.ts`
+- `apps/web/app/components/catalog/PermissionRecovery.vue`
+
+**Verification**:
+- No PermissionRecovery-specific type errors (pre-existing errors in packages/core are unrelated)
+
+**Next Step**: Phase 6.6 - Page Integration (wire all components together).
+
+---
 
 ### 35: 2026-01-21 06:45 EST: Phase 6.5 Research Complete - PermissionRecovery
 
