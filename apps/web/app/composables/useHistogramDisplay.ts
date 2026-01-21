@@ -42,6 +42,9 @@ const HISTOGRAM_HEIGHT = 192
 /** Debounce delay for histogram computation (longer than preview) */
 const HISTOGRAM_DEBOUNCE_MS = 500
 
+/** Smoothing kernel size (must be odd) - higher = smoother curves */
+const SMOOTHING_KERNEL_SIZE = 11
+
 /** Colors for histogram rendering */
 const COLORS = {
   background: '#1a1a1a',
@@ -51,6 +54,64 @@ const COLORS = {
   shadowClipping: '#3b82f6', // Blue
   highlightClipping: '#ef4444', // Red
 }
+
+// ============================================================================
+// Smoothing Utilities
+// ============================================================================
+
+/**
+ * Create a Gaussian kernel for smoothing.
+ * @param size - Kernel size (must be odd)
+ * @returns Normalized Gaussian kernel
+ */
+function createGaussianKernel(size: number): number[] {
+  const kernel: number[] = []
+  const sigma = size / 4 // Standard deviation
+  const center = Math.floor(size / 2)
+  let sum = 0
+
+  for (let i = 0; i < size; i++) {
+    const x = i - center
+    const value = Math.exp(-(x * x) / (2 * sigma * sigma))
+    kernel.push(value)
+    sum += value
+  }
+
+  // Normalize so kernel sums to 1
+  return kernel.map(v => v / sum)
+}
+
+/**
+ * Apply Gaussian smoothing to histogram data.
+ * @param data - Raw histogram data (256 bins)
+ * @param kernel - Gaussian kernel
+ * @returns Smoothed histogram data
+ */
+function smoothHistogram(data: Uint32Array, kernel: number[]): number[] {
+  const result: number[] = new Array(256)
+  const halfKernel = Math.floor(kernel.length / 2)
+
+  for (let i = 0; i < 256; i++) {
+    let sum = 0
+    let weightSum = 0
+
+    for (let k = 0; k < kernel.length; k++) {
+      const idx = i + k - halfKernel
+      if (idx >= 0 && idx < 256) {
+        sum += (data[idx] ?? 0) * kernel[k]!
+        weightSum += kernel[k]!
+      }
+    }
+
+    // Normalize by actual weights used (handles edges)
+    result[i] = weightSum > 0 ? sum / weightSum : 0
+  }
+
+  return result
+}
+
+/** Gaussian kernel for histogram smoothing (created after function definition) */
+const SMOOTHING_KERNEL = createGaussianKernel(SMOOTHING_KERNEL_SIZE)
 
 // ============================================================================
 // Debounce Utility
@@ -198,12 +259,17 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
     if (max === 0) return
 
+    // Smooth the histogram data for each channel
+    const smoothedRed = smoothHistogram(hist.red, SMOOTHING_KERNEL)
+    const smoothedGreen = smoothHistogram(hist.green, SMOOTHING_KERNEL)
+    const smoothedBlue = smoothHistogram(hist.blue, SMOOTHING_KERNEL)
+
     // Draw each channel as a filled path with proper colors
     // Order: Blue first (back), then Green, then Red (front) - matches Lightroom
-    const channels: Array<{ data: Uint32Array; color: string; fillColor: string }> = [
-      { data: hist.blue, color: COLORS.blue, fillColor: 'rgba(0, 100, 255, 0.4)' },
-      { data: hist.green, color: COLORS.green, fillColor: 'rgba(0, 200, 0, 0.4)' },
-      { data: hist.red, color: COLORS.red, fillColor: 'rgba(255, 50, 50, 0.4)' },
+    const channels: Array<{ data: number[]; color: string; fillColor: string }> = [
+      { data: smoothedBlue, color: COLORS.blue, fillColor: 'rgba(0, 100, 255, 0.4)' },
+      { data: smoothedGreen, color: COLORS.green, fillColor: 'rgba(0, 200, 0, 0.4)' },
+      { data: smoothedRed, color: COLORS.red, fillColor: 'rgba(255, 50, 50, 0.4)' },
     ]
 
     for (const channel of channels) {

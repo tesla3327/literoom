@@ -28,6 +28,12 @@ const selectionStore = useSelectionStore()
 const editStore = useEditStore()
 
 // ============================================================================
+// Histogram Mode Toggle
+// ============================================================================
+
+const useCanvasHistogram = ref(false)
+
+// ============================================================================
 // Computed
 // ============================================================================
 
@@ -176,8 +182,27 @@ onUnmounted(() => {
       <!-- Left panel: histogram -->
       <aside class="w-64 border-r border-gray-800 p-4 flex-shrink-0 overflow-y-auto">
         <div class="space-y-4">
+          <!-- Histogram Mode Toggle -->
+          <div class="flex gap-2 text-xs">
+            <button
+              class="px-2 py-1 rounded transition-colors"
+              :class="useCanvasHistogram ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'"
+              @click="useCanvasHistogram = true"
+            >
+              Canvas
+            </button>
+            <button
+              class="px-2 py-1 rounded transition-colors"
+              :class="!useCanvasHistogram ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'"
+              @click="useCanvasHistogram = false"
+            >
+              SVG
+            </button>
+          </div>
+
           <!-- Histogram Display -->
-          <EditHistogramDisplay :asset-id="assetId" />
+          <EditHistogramDisplay v-if="useCanvasHistogram" :asset-id="assetId" />
+          <EditHistogramDisplaySVG v-else :asset-id="assetId" />
 
           <!-- Quick info -->
           <div class="space-y-2 text-sm">
