@@ -1,5 +1,52 @@
 # Iterations 81-90
 
+## 90: 2026-01-21 16:42 EST: Copy/Paste Settings - Research Complete
+
+**Objective**: Research and plan the copy/paste settings feature for v1.
+
+**Background**: Per the v1 acceptance criteria (spec section 12), users need to be able to:
+- Copy settings from one photo
+- Paste selectively (checkbox groups) to one or many photos
+- Target options: current photo, selected photos in grid
+
+This is Phase 13 in the original edit view plan and is a core v1 requirement.
+
+**Research Completed** (4 parallel agents):
+1. **Edit State Architecture** - EditState with Adjustments + CropTransform, well-designed with partial update methods
+2. **Selection/Multi-Select** - Full multi-select support via `selectedIds` Set, batch operations already implemented for flagging
+3. **Lightroom UX Patterns** - Copy dialog with checkbox groups, Cmd+Shift+C/V shortcuts, safety features (crop excluded by default)
+4. **Existing Utilities** - VueUse `useClipboard()`, modal patterns, keyboard handler patterns all reusable
+
+**Key Findings**:
+- 90% of infrastructure already exists
+- Edit store has `setAdjustments()` for partial updates
+- Selection store tracks `selectedIds` for batch paste targets
+- VueUse provides native clipboard API wrapper
+- Modal pattern established in PermissionRecovery component
+
+**What Can Be Copied**:
+| Category | Include by Default |
+|----------|-------------------|
+| Basic Adjustments (10 sliders) | ✅ Yes |
+| Tone Curve | ✅ Yes |
+| Crop | ❌ No (safety) |
+| Rotation | ❌ No (safety) |
+
+**Implementation Approach** (6 phases):
+1. Create `editClipboard.ts` store
+2. Create `useCopyPasteSettings.ts` composable
+3. Create `EditCopySettingsModal.vue` component
+4. Implement paste logic with selection store integration
+5. Add keyboard shortcuts (Cmd+Shift+C/V)
+6. Add UI buttons and feedback
+
+**Files Created**:
+- `docs/research/2026-01-21-copy-paste-settings-synthesis.md`
+
+**Status**: Research complete. Ready to create implementation plan.
+
+---
+
 ## 89: 2026-01-21 16:36 EST: Crop Overlay on Preview Canvas - Verified Complete
 
 **Objective**: Verify that the crop overlay implementation is fully functional.

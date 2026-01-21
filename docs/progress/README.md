@@ -236,6 +236,7 @@ literoom/
 | [87](./iterations-81-90.md:3) | 2026-01-21 | Preview Generation - Implementation Complete |
 | [88](./iterations-81-90.md:3) | 2026-01-21 | Crop Overlay on Preview Canvas - Implementation Complete |
 | [89](./iterations-81-90.md:3) | 2026-01-21 | Crop Overlay on Preview Canvas - Verified Complete |
+| [90](./iterations-81-90.md:3) | 2026-01-21 | Copy/Paste Settings - Research Complete |
 
 ---
 
