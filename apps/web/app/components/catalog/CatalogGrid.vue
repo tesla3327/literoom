@@ -272,6 +272,7 @@ function handleContainerFocus() {
     tabindex="0"
     role="grid"
     aria-label="Photo grid"
+    data-testid="catalog-grid"
     @keydown="handleKeydown"
     @focus="handleContainerFocus"
   >

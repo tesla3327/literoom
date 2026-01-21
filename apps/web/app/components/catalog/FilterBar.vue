@@ -99,7 +99,7 @@ function setSort(field: SortField, direction: SortDirection): void {
 </script>
 
 <template>
-  <div class="filter-bar">
+  <div class="filter-bar" data-testid="filter-bar">
     <!-- Filter buttons -->
     <div class="filter-buttons">
       <UButton
@@ -107,6 +107,8 @@ function setSort(field: SortField, direction: SortDirection): void {
         :key="mode.value"
         :variant="catalogUIStore.filterMode === mode.value ? 'solid' : 'ghost'"
         size="sm"
+        :data-testid="`filter-${mode.value}`"
+        :data-active="catalogUIStore.filterMode === mode.value"
         @click="setFilterMode(mode.value)"
       >
         {{ mode.label }}
@@ -116,6 +118,7 @@ function setSort(field: SortField, direction: SortDirection): void {
             :color="catalogUIStore.filterMode === mode.value ? 'neutral' : 'neutral'"
             variant="subtle"
             :label="String(mode.count)"
+            :data-testid="`filter-${mode.value}-count`"
           />
         </template>
       </UButton>

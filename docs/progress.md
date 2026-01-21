@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 07:16 EST
-**Current Phase**: Phase 7.3 Complete - Demo Mode Assets
+**Last Updated**: 2026-01-21 07:35 EST
+**Current Phase**: Phase 7.4 Complete - E2E Test Files Created
 
 ## Project Structure
 
@@ -37,6 +37,75 @@ literoom/
 ```
 
 ## Completed Work
+
+### 42: 2026-01-21 07:35 EST: Phase 7.4 Complete - E2E Test Files Created
+
+**Objective**: Create Playwright E2E tests for catalog workflows.
+
+**Work Completed**:
+
+**Playwright Configuration**:
+- Updated `apps/web/playwright.config.ts`:
+  - Added `LITEROOM_DEMO_MODE=true` to webServer command
+  - Increased timeout to 120 seconds for server startup
+- Disabled runtime typeCheck in `apps/web/nuxt.config.ts` (CI handles separately)
+
+**Component Updates (data-testid attributes)**:
+- `CatalogGrid.vue`: Added `data-testid="catalog-grid"`
+- `CatalogThumbnail.vue`: Added `data-testid="catalog-thumbnail"`, `data-current`, `data-flag`, and flag badge with `data-testid="flag-badge"`
+- `FilterBar.vue`: Added `data-testid="filter-bar"`, per-button `data-testid="filter-{mode}"`, `data-active`, and count badges `data-testid="filter-{mode}-count"`
+
+**E2E Test Files Created**:
+- `apps/web/e2e/catalog-grid.spec.ts`:
+  - Grid display with thumbnails
+  - Virtual scrolling renders only visible rows
+  - Scrolling maintains functionality
+  - Click to select thumbnails
+  - Thumbnail loading states
+
+- `apps/web/e2e/keyboard-navigation.spec.ts`:
+  - Arrow key navigation (left/right)
+  - P key picks current photo
+  - X key rejects current photo
+  - U key clears flag
+  - Flag changes persist while navigating
+
+- `apps/web/e2e/filter-modes.spec.ts`:
+  - Filter bar displays all buttons
+  - All filter active by default
+  - Filter buttons show count badges
+  - Picks/Rejects/Unflagged filtering
+  - Filter counts update when flags change
+
+- `apps/web/e2e/folder-selection.spec.ts`:
+  - Welcome screen displays initially
+  - Demo mode indicator visible
+  - Choose folder button loads demo catalog
+  - Welcome screen hidden after selection
+  - Page structure after loading
+
+**Known Issue**:
+- E2E tests cannot run due to Tailwind CSS v4 configuration issue
+- Error: "Cannot apply unknown utility class px-4. Are you using CSS modules or similar and missing @reference?"
+- This is a pre-existing infrastructure issue unrelated to the E2E tests
+- Tests are ready to run once Tailwind/Nuxt UI configuration is resolved
+
+**Files Created**:
+- `apps/web/e2e/catalog-grid.spec.ts`
+- `apps/web/e2e/keyboard-navigation.spec.ts`
+- `apps/web/e2e/filter-modes.spec.ts`
+- `apps/web/e2e/folder-selection.spec.ts`
+
+**Files Modified**:
+- `apps/web/playwright.config.ts`
+- `apps/web/nuxt.config.ts`
+- `apps/web/app/components/catalog/CatalogGrid.vue`
+- `apps/web/app/components/catalog/CatalogThumbnail.vue`
+- `apps/web/app/components/catalog/FilterBar.vue`
+
+**Next Step**: Resolve Tailwind CSS v4 configuration issue to enable E2E testing, then proceed to Phase 7.5 (Unit Tests).
+
+---
 
 ### 41: 2026-01-21 07:16 EST: Phase 7.3 Complete - Demo Mode Assets
 

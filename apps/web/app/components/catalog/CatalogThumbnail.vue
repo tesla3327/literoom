@@ -38,15 +38,18 @@ const containerClasses = computed(() => [
 <template>
   <div
     :class="containerClasses"
+    data-testid="catalog-thumbnail"
     :data-asset-id="asset.id"
     :data-index="index"
+    :data-current="isCurrent"
+    :data-flag="asset.flag"
     :tabindex="isCurrent ? 0 : -1"
     role="gridcell"
     :aria-selected="isSelected"
     @click="$emit('click', $event)"
   >
     <!-- Flag badge (top-left) -->
-    <div v-if="asset.flag !== 'none'" class="flag-badge">
+    <div v-if="asset.flag !== 'none'" class="flag-badge" data-testid="flag-badge" :data-flag="asset.flag">
       <UIcon
         v-if="asset.flag === 'pick'"
         name="i-heroicons-check-circle-solid"
