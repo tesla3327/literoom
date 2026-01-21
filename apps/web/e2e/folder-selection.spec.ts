@@ -92,7 +92,7 @@ test.describe('Folder Selection (Demo Mode)', () => {
 
     // Header should show folder name
     // In demo mode, the folder path might be "Demo Photos" or similar
-    const header = page.locator('.catalog-header')
+    const header = page.locator('header')
     await expect(header).toBeVisible()
 
     // Filter bar

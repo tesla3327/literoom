@@ -8,6 +8,13 @@ export default defineNuxtConfig({
     compatibilityVersion: 4,
   },
 
+  components: [
+    {
+      path: '~/components',
+      pathPrefix: false,
+    },
+  ],
+
   runtimeConfig: {
     public: {
       demoMode: process.env.LITEROOM_DEMO_MODE === 'true',

@@ -112,17 +112,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="catalog-page" data-testid="catalog-page">
+  <div class="h-screen flex flex-col bg-gray-950" data-testid="catalog-page">
     <!-- Permission recovery modal -->
-    <CatalogPermissionRecovery
+    <PermissionRecovery
       @select-new-folder="handleSelectFolder"
       @continue="handleContinue"
       @reauthorized="handleReauthorized"
     />
 
     <!-- Welcome screen (no folder selected) -->
-    <div v-if="!hasFolder && !isLoading" class="welcome-screen" data-testid="welcome-screen">
-      <div class="welcome-content">
+    <div v-if="!hasFolder && !isLoading" class="flex-1 flex items-center justify-center p-8" data-testid="welcome-screen">
+      <div class="max-w-md text-center">
         <h1 class="text-4xl font-bold">
           Literoom
         </h1>
@@ -163,8 +163,8 @@ onMounted(() => {
     </div>
 
     <!-- Loading state during initial scan -->
-    <div v-else-if="isLoading && !hasAssets" class="loading-screen">
-      <div class="loading-content">
+    <div v-else-if="isLoading && !hasAssets" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
         <UIcon name="i-heroicons-folder-open" class="w-12 h-12 text-gray-600 mb-4" />
         <p class="text-gray-400 mb-2">Scanning folder...</p>
         <p v-if="catalogStore.scanProgress" class="text-sm text-gray-500">
@@ -174,9 +174,9 @@ onMounted(() => {
     </div>
 
     <!-- Main catalog view -->
-    <div v-else-if="hasFolder" class="catalog-main">
+    <div v-else-if="hasFolder" class="flex-1 flex flex-col min-h-0">
       <!-- Header -->
-      <header class="catalog-header">
+      <header class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
         <div class="flex items-center gap-3">
           <UButton
             variant="ghost"
@@ -195,18 +195,18 @@ onMounted(() => {
         </div>
 
         <!-- Selection info -->
-        <div v-if="selectionStore.selectionCount > 0" class="selection-info">
+        <div v-if="selectionStore.selectionCount > 0" class="text-sm text-gray-400">
           {{ selectionStore.selectionCount }} selected
         </div>
       </header>
 
       <!-- Filter bar -->
-      <CatalogFilterBar />
+      <FilterBar />
 
       <!-- Grid or empty state -->
-      <div class="catalog-content">
-        <CatalogCatalogGrid v-if="hasAssets" data-testid="catalog-grid" />
-        <div v-else class="empty-state">
+      <div class="flex-1 min-h-0">
+        <CatalogGrid v-if="hasAssets" />
+        <div v-else class="h-full flex flex-col items-center justify-center text-center">
           <UIcon name="i-heroicons-photo" class="w-16 h-16 text-gray-600 mb-4" />
           <p class="text-gray-500">No supported images found</p>
           <p class="text-sm text-gray-600 mt-2">
@@ -218,48 +218,3 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.catalog-page {
-  @apply h-screen flex flex-col bg-gray-950;
-}
-
-/* Welcome screen */
-.welcome-screen {
-  @apply flex-1 flex items-center justify-center p-8;
-}
-
-.welcome-content {
-  @apply max-w-md text-center;
-}
-
-/* Loading screen */
-.loading-screen {
-  @apply flex-1 flex items-center justify-center;
-}
-
-.loading-content {
-  @apply text-center;
-}
-
-/* Main catalog layout */
-.catalog-main {
-  @apply flex-1 flex flex-col min-h-0;
-}
-
-.catalog-header {
-  @apply flex items-center justify-between px-4 py-2 border-b border-gray-800;
-}
-
-.selection-info {
-  @apply text-sm text-gray-400;
-}
-
-.catalog-content {
-  @apply flex-1 min-h-0;
-}
-
-/* Empty state */
-.empty-state {
-  @apply h-full flex flex-col items-center justify-center text-center;
-}
-</style>

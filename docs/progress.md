@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 07:35 EST
-**Current Phase**: Phase 7.4 Complete - E2E Test Files Created
+**Last Updated**: 2026-01-21 09:05 EST
+**Current Phase**: E2E Infrastructure Fixed - 17 of 28 Tests Passing
 
 ## Project Structure
 
@@ -37,6 +37,57 @@ literoom/
 ```
 
 ## Completed Work
+
+### 43: 2026-01-21 09:05 EST: E2E Infrastructure Fixed - Tailwind CSS v4 and Plugin Issues Resolved
+
+**Objective**: Fix E2E test infrastructure issues that were blocking test execution.
+
+**Issues Resolved**:
+
+1. **Tailwind CSS v4 `@apply` in scoped styles** - Components using `@apply` in Vue scoped style blocks failed with "Cannot apply unknown utility class" error
+   - **Solution**: Refactored all components to use inline Tailwind utility classes instead of `@apply` in scoped styles (recommended approach for Tailwind v4)
+   - Components updated: `FilterBar.vue`, `CatalogGrid.vue`, `CatalogThumbnail.vue`, `index.vue`
+   - Kept minimal scoped styles only for CSS animations (shimmer) and pseudo-selectors (hover state)
+
+2. **Nuxt component auto-import naming** - Components in `components/catalog/` weren't resolving correctly
+   - **Solution**: Added `pathPrefix: false` to `components` config in `nuxt.config.ts`
+   - Updated component references in templates (e.g., `CatalogCatalogGrid` → `CatalogGrid`)
+
+3. **Duplicate plugin conflict** - Two plugins were both providing `$decodeService`, causing "Cannot redefine property" error
+   - **Solution**: Removed duplicate `decode.client.ts` plugin (functionality already included in `catalog.client.ts`)
+
+4. **Test selector update** - Test used `.catalog-header` class that was replaced with inline utilities
+   - **Solution**: Updated test to use `header` element selector instead
+
+**E2E Test Results**:
+- **17 tests passing** (up from 4 initially passing)
+- **11 tests failing** - These failures reveal actual implementation gaps:
+  - Virtual scrolling not working (all 50 items render)
+  - Filter modes not filtering results
+  - Keyboard navigation not working (arrow keys, flag shortcuts)
+- All folder-selection tests now pass (6/6)
+- All example tests pass (2/2)
+- Basic catalog-grid tests pass (4/5)
+- Basic filter-modes tests pass (5/9)
+
+**Files Modified**:
+- `apps/web/nuxt.config.ts` (added `components.pathPrefix: false`)
+- `apps/web/app/pages/index.vue` (inline utility classes, component names)
+- `apps/web/app/components/catalog/FilterBar.vue` (inline utility classes)
+- `apps/web/app/components/catalog/CatalogGrid.vue` (inline utility classes)
+- `apps/web/app/components/catalog/CatalogThumbnail.vue` (inline utility classes)
+- `apps/web/app/plugins/catalog.client.ts` (no changes needed, already complete)
+- `apps/web/e2e/folder-selection.spec.ts` (updated header selector)
+
+**Files Deleted**:
+- `apps/web/app/plugins/decode.client.ts` (duplicate functionality)
+
+**Next Steps**: The remaining 11 failing tests reveal implementation gaps:
+1. Fix virtual scrolling (currently renders all 50 items)
+2. Implement filter mode functionality (clicking filters should filter assets)
+3. Implement keyboard navigation (arrow keys, P/X/U flag shortcuts)
+
+---
 
 ### 42: 2026-01-21 07:35 EST: Phase 7.4 Complete - E2E Test Files Created
 

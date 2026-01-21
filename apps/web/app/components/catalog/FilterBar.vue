@@ -99,9 +99,9 @@ function setSort(field: SortField, direction: SortDirection): void {
 </script>
 
 <template>
-  <div class="filter-bar" data-testid="filter-bar">
+  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950" data-testid="filter-bar">
     <!-- Filter buttons -->
-    <div class="filter-buttons">
+    <div class="flex gap-1">
       <UButton
         v-for="mode in filterModes"
         :key="mode.value"
@@ -133,14 +133,3 @@ function setSort(field: SortField, direction: SortDirection): void {
   </div>
 </template>
 
-<style scoped>
-.filter-bar {
-  @apply flex items-center justify-between;
-  @apply px-4 py-2 border-b border-gray-800;
-  @apply bg-gray-950;
-}
-
-.filter-buttons {
-  @apply flex gap-1;
-}
-</style>

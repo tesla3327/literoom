@@ -268,7 +268,7 @@ function handleContainerFocus() {
 <template>
   <div
     ref="scrollContainerRef"
-    class="grid-scroll-container"
+    class="h-full overflow-y-auto overflow-x-hidden focus:outline-none bg-gray-950"
     tabindex="0"
     role="grid"
     aria-label="Photo grid"
@@ -278,14 +278,14 @@ function handleContainerFocus() {
   >
     <!-- Virtual scroller spacer -->
     <div
-      class="grid-spacer"
+      class="relative w-full"
       :style="{ height: `${virtualizer.getTotalSize()}px` }"
     >
       <!-- Virtual rows -->
       <div
         v-for="virtualRow in virtualizer.getVirtualItems()"
         :key="virtualRow.index"
-        class="grid-row"
+        class="grid gap-2 px-2"
         role="row"
         :style="{
           position: 'absolute',
@@ -294,6 +294,7 @@ function handleContainerFocus() {
           width: '100%',
           height: `${virtualRow.size}px`,
           transform: `translateY(${virtualRow.start}px)`,
+          gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
         }"
       >
         <!-- Items in this row -->
@@ -310,47 +311,12 @@ function handleContainerFocus() {
     </div>
 
     <!-- Empty state (shown when no items) -->
-    <div v-if="sortedAssetIds.length === 0" class="empty-state">
-      <UIcon name="i-heroicons-photo" class="empty-icon" />
-      <p class="empty-text">No photos to display</p>
-      <p v-if="catalogUIStore.filterMode !== 'all'" class="empty-hint">
+    <div v-if="sortedAssetIds.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+      <UIcon name="i-heroicons-photo" class="w-16 h-16 mb-4 text-gray-600" />
+      <p class="text-lg font-medium">No photos to display</p>
+      <p v-if="catalogUIStore.filterMode !== 'all'" class="text-sm mt-2 text-gray-600">
         Try changing the filter or selecting a different folder
       </p>
     </div>
   </div>
 </template>
-
-<style scoped>
-.grid-scroll-container {
-  @apply h-full overflow-y-auto overflow-x-hidden;
-  @apply focus:outline-none;
-  @apply bg-gray-950;
-}
-
-.grid-spacer {
-  @apply relative w-full;
-}
-
-.grid-row {
-  @apply grid gap-2 px-2;
-  grid-template-columns: repeat(v-bind(columnsCount), 1fr);
-}
-
-/* Empty state */
-.empty-state {
-  @apply absolute inset-0 flex flex-col items-center justify-center;
-  @apply text-gray-500;
-}
-
-.empty-icon {
-  @apply w-16 h-16 mb-4 text-gray-600;
-}
-
-.empty-text {
-  @apply text-lg font-medium;
-}
-
-.empty-hint {
-  @apply text-sm mt-2 text-gray-600;
-}
-</style>
