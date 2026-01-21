@@ -45,6 +45,9 @@ export {
   getFilenameWithoutExtension,
 } from './types'
 
+// Services
+export { ScanService, createScanService } from './scan-service'
+
 // Database
 export type { AssetRecord, FolderRecord, EditRecord, CacheMetadataRecord } from './db'
 

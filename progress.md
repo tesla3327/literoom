@@ -2,46 +2,51 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:21 EST
+**Last Updated**: 2026-01-20 22:25 EST
 
-### Catalog Service Implementation - Phase 1 Complete ✅
+### Catalog Service Implementation - Phase 2 Complete ✅
 
-Implemented core types and database schema for the Catalog Service.
+Implemented the Scan Service for folder scanning with async generator pattern.
 
 **Files Created**:
-- `packages/core/src/catalog/types.ts` - Core TypeScript types including:
-  - `Asset` interface for photo metadata
-  - `FlagStatus`, `ThumbnailStatus`, `FilterMode`, `SortField`, `ViewMode` types
-  - `CatalogServiceState` and `ScanProgress` for service state
-  - `IScanService`, `IThumbnailService`, `ICatalogService` interfaces
-  - `CatalogError` class with typed error codes
-  - `ThumbnailPriority` enum for viewport-aware generation
-  - Utility functions: `isSupportedExtension`, `getExtension`, `getFilenameWithoutExtension`
+- `packages/core/src/catalog/scan-service.ts` - ScanService class:
+  - Async generator pattern for progressive UI updates
+  - Batched yielding (50 files per batch) for responsive performance
+  - AbortController support for cancellation
+  - Recursive subdirectory traversal (configurable)
+  - Extension-based file filtering (ARW, JPG, JPEG)
+  - Error handling with typed CatalogError codes
 
-- `packages/core/src/catalog/db.ts` - Dexie.js database schema:
-  - `AssetRecord`, `FolderRecord`, `EditRecord`, `CacheMetadataRecord` types
-  - `LiteroomDB` class with compound indexes for efficient queries
-  - Helper functions: `clearDatabase`, `getAssetCountsByFlag`, `getAssetsByFlag`, etc.
+- `packages/core/src/catalog/scan-service.test.ts` - Comprehensive unit tests:
+  - JPEG/ARW file detection
+  - Unsupported file type filtering
+  - File metadata extraction
+  - Recursive subdirectory scanning
+  - Non-recursive mode
+  - Deeply nested directories
+  - Empty directories
+  - Batch yielding verification
+  - AbortController cancellation
+  - Inaccessible file handling
+  - Permission error handling
+  - Edge cases (no extension, multiple dots)
 
-- `packages/core/src/catalog/index.ts` - Public exports
-
-**Dependencies Added**:
-- `dexie` to `@literoom/core`
+**Files Modified**:
+- `packages/core/src/catalog/index.ts` - Added ScanService exports
 
 **Verification**:
-- ✅ TypeScript compiles without catalog-specific errors
-- ✅ Core package unit tests pass (29/29)
-- ✅ Types exportable from `@literoom/core`
+- ✅ All unit tests pass (45/45)
+- ✅ Types integrate with existing IScanService interface
+- ⚠️ TypeScript has pre-existing FileSystem API type issues (not introduced by this change)
 
 ---
 
 ## Next Steps
 
-Continue with **Catalog Service Phase 2: Scan Service**:
-- Implement `packages/core/src/catalog/scan-service.ts`
-- Async generator pattern with batched yielding
-- AbortController for cancellation
-- Progress reporting
+Continue with **Catalog Service Phase 3: Thumbnail Service**:
+- Implement `packages/core/src/catalog/thumbnail-queue.ts` - Priority queue
+- Implement `packages/core/src/catalog/thumbnail-cache.ts` - LRU + OPFS caching
+- Implement `packages/core/src/catalog/thumbnail-service.ts` - Main service
 
 ---
 
@@ -70,3 +75,9 @@ Continue with **Catalog Service Phase 2: Scan Service**:
 - Core types and interfaces
 - Dexie database schema
 - Public exports
+
+### Catalog Service Phase 2 ✅
+- ScanService with async generator pattern
+- Batched yielding for UI responsiveness
+- AbortController cancellation support
+- Comprehensive unit tests (16 tests)
