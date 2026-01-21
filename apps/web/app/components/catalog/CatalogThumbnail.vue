@@ -4,6 +4,7 @@
  *
  * Displays a single photo thumbnail in the catalog grid.
  * Handles loading states, selection, and flag badges.
+ * Double-click navigates to edit view.
  */
 import type { Asset, ThumbnailStatus } from '@literoom/core/catalog'
 
@@ -24,6 +25,19 @@ defineEmits<{
   /** Emitted when the thumbnail is clicked */
   click: [event: MouseEvent]
 }>()
+
+// ============================================================================
+// Double-click navigation
+// ============================================================================
+
+const router = useRouter()
+
+/**
+ * Navigate to edit view on double-click.
+ */
+function handleDoubleClick() {
+  router.push(`/edit/${props.asset.id}`)
+}
 
 // Computed classes for the container
 const containerClasses = computed(() => {
@@ -53,6 +67,7 @@ const containerClasses = computed(() => {
     role="gridcell"
     :aria-selected="isSelected"
     @click="$emit('click', $event)"
+    @dblclick="handleDoubleClick"
   >
     <!-- Flag badge (top-left) -->
     <div

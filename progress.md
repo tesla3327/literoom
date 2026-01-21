@@ -2,29 +2,35 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 09:29 EST
+**Last Updated**: 2026-01-21 09:34 EST
 
-### Phase 8: Edit View - Research Complete ✅
+### Phase 8: Edit View - Phase 8.1 Complete ✅
 
-Research and planning completed for the Edit View phase.
+Completed Phase 8.1: Edit Page Shell with three-panel layout.
 
-**Documents Created:**
-- `docs/research/2026-01-21-edit-view-research-plan.md` - Research areas
-- `docs/research/2026-01-21-edit-view-synthesis.md` - Consolidated findings
-- `docs/plans/2026-01-21-edit-view-plan.md` - Implementation plan
+**Files Created:**
+- `apps/web/app/pages/edit/[id].vue` - Edit page route
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Preview display
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Controls panel (placeholder)
+- `apps/web/app/components/edit/EditFilmstrip.vue` - Navigation filmstrip
 
-**Key Findings:**
-- BasicAdjustments fully exposed to TypeScript (10 sliders ready)
-- ToneCurve and Histogram exist in Rust but NOT exposed to WASM
-- No `apply_adjustments()` function yet - edits can't be applied to pixels
-- No crop/transform types implemented
+**Features Implemented:**
+- Three-panel layout (histogram | preview | controls)
+- Header with filename, back button, and navigation arrows
+- Preview canvas showing thumbnail (placeholder for full preview)
+- Filmstrip for quick navigation between photos
+- Double-click thumbnail to open edit view
+- Keyboard shortcuts: Escape (back), Left/Right arrows (prev/next), G (grid)
+- All E2E tests still passing (28 tests)
 
-**Implementation Plan Summary:**
-- Phase 8.1: Edit page shell (`/edit/[id]` route)
-- Phase 8.2: Edit state store (Pinia)
-- Phase 8.3: Basic adjustments UI (10 sliders)
-- Phase 8.4: Preview with edits (debounced rendering)
-- Phase 8.5: Keyboard shortcuts
+**Next Task**: Phase 8.2 - Edit State Store (Pinia)
+
+**Implementation Plan Progress:**
+- ✅ Phase 8.1: Edit page shell (`/edit/[id]` route)
+- ⏳ Phase 8.2: Edit state store (Pinia)
+- ⏳ Phase 8.3: Basic adjustments UI (10 sliders)
+- ⏳ Phase 8.4: Preview with edits (debounced rendering)
+- ⏳ Phase 8.5: Keyboard shortcuts for flagging
 
 **V1 Acceptance Criteria Progress:**
 | Feature | Status |
@@ -32,7 +38,7 @@ Research and planning completed for the Edit View phase.
 | 1. Folder selection & persistence | ✅ Complete |
 | 2. Scanning & grid display | ✅ Complete |
 | 3. Pick/reject/filter | ✅ Complete |
-| 4. Edit view with sliders + tone curve + crop | 🔄 Research done |
+| 4. Edit view with sliders + tone curve + crop | 🔄 Shell complete |
 | 5. Histogram with clipping | ❌ Not started |
 | 6. Copy/paste settings | ❌ Not started |
 | 7. Export dialog | ❌ Not started |

@@ -1,0 +1,199 @@
+<script setup lang="ts">
+/**
+ * Edit Page
+ *
+ * Single photo editing view with:
+ * - Left panel: histogram (placeholder)
+ * - Center: preview canvas
+ * - Right panel: edit controls
+ * - Bottom: filmstrip navigation
+ */
+
+// ============================================================================
+// Stores and Composables
+// ============================================================================
+
+const route = useRoute()
+const router = useRouter()
+const catalogStore = useCatalogStore()
+const uiStore = useCatalogUIStore()
+const selectionStore = useSelectionStore()
+
+// ============================================================================
+// Computed
+// ============================================================================
+
+const assetId = computed(() => route.params.id as string)
+const asset = computed(() => catalogStore.assets.get(assetId.value))
+const filteredIds = computed(() => uiStore.filteredAssetIds)
+
+// Current position in filtered list
+const currentIndex = computed(() => {
+  return filteredIds.value.indexOf(assetId.value)
+})
+
+const hasPrev = computed(() => currentIndex.value > 0)
+const hasNext = computed(() => currentIndex.value < filteredIds.value.length - 1)
+
+// ============================================================================
+// Navigation
+// ============================================================================
+
+/**
+ * Navigate back to grid view.
+ */
+function goBack() {
+  router.push('/')
+}
+
+/**
+ * Navigate to previous photo.
+ */
+function navigatePrev() {
+  if (hasPrev.value) {
+    router.push(`/edit/${filteredIds.value[currentIndex.value - 1]}`)
+  }
+}
+
+/**
+ * Navigate to next photo.
+ */
+function navigateNext() {
+  if (hasNext.value) {
+    router.push(`/edit/${filteredIds.value[currentIndex.value + 1]}`)
+  }
+}
+
+// ============================================================================
+// Keyboard Shortcuts
+// ============================================================================
+
+/**
+ * Handle keyboard navigation.
+ */
+function handleKeydown(e: KeyboardEvent) {
+  // Ignore when typing in inputs
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    return
+  }
+
+  switch (e.key) {
+    case 'Escape':
+      goBack()
+      break
+    case 'ArrowLeft':
+      navigatePrev()
+      break
+    case 'ArrowRight':
+      navigateNext()
+      break
+    case 'g':
+    case 'G':
+      // G = return to Grid
+      goBack()
+      break
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
+</script>
+
+<template>
+  <div class="h-screen flex flex-col bg-gray-950" data-testid="edit-page">
+    <!-- Header -->
+    <header class="h-12 border-b border-gray-800 flex items-center px-4 gap-4 flex-shrink-0">
+      <UButton
+        variant="ghost"
+        icon="i-heroicons-arrow-left"
+        size="sm"
+        data-testid="back-button"
+        @click="goBack"
+      />
+
+      <span class="text-sm text-gray-400">
+        {{ asset?.filename }}.{{ asset?.extension }}
+      </span>
+
+      <!-- Navigation arrows -->
+      <div class="flex items-center gap-1 ml-auto">
+        <UButton
+          variant="ghost"
+          icon="i-heroicons-chevron-left"
+          size="sm"
+          :disabled="!hasPrev"
+          data-testid="prev-button"
+          @click="navigatePrev"
+        />
+        <span class="text-sm text-gray-500">
+          {{ currentIndex + 1 }} / {{ filteredIds.length }}
+        </span>
+        <UButton
+          variant="ghost"
+          icon="i-heroicons-chevron-right"
+          size="sm"
+          :disabled="!hasNext"
+          data-testid="next-button"
+          @click="navigateNext"
+        />
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <div class="flex-1 flex overflow-hidden">
+      <!-- Left panel: histogram (placeholder) -->
+      <aside class="w-64 border-r border-gray-800 p-4 flex-shrink-0 overflow-y-auto">
+        <div class="space-y-4">
+          <h3 class="text-sm font-medium text-gray-400">Histogram</h3>
+          <div class="aspect-[4/3] bg-gray-900 rounded flex items-center justify-center">
+            <span class="text-xs text-gray-600">Coming soon</span>
+          </div>
+
+          <!-- Quick info -->
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-500">Format</span>
+              <span class="text-gray-300">{{ asset?.extension?.toUpperCase() }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Size</span>
+              <span class="text-gray-300">{{ asset?.fileSize ? formatFileSize(asset.fileSize) : '-' }}</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: preview canvas -->
+      <main class="flex-1 relative min-w-0">
+        <EditPreviewCanvas :asset-id="assetId" />
+      </main>
+
+      <!-- Right panel: edit controls -->
+      <aside class="w-80 border-l border-gray-800 overflow-y-auto flex-shrink-0">
+        <EditControlsPanel :asset-id="assetId" />
+      </aside>
+    </div>
+
+    <!-- Bottom: filmstrip -->
+    <EditFilmstrip
+      class="h-24 border-t border-gray-800 flex-shrink-0"
+      :current-asset-id="assetId"
+    />
+  </div>
+</template>
+
+<script lang="ts">
+/**
+ * Format file size in human readable format.
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+</script>
