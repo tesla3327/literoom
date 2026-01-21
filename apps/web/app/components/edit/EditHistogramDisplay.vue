@@ -15,12 +15,12 @@ const {
   histogram,
   isComputing,
   error,
-  showHighlightClipping,
-  showShadowClipping,
-  toggleClippingOverlays,
-  toggleShadowClipping,
-  toggleHighlightClipping,
 } = useHistogramDisplay(toRef(props, 'assetId'))
+
+// Use shared UI store for clipping overlay state
+const editUIStore = useEditUIStore()
+const { showHighlightClipping, showShadowClipping } = storeToRefs(editUIStore)
+const { toggleClippingOverlays, toggleShadowClipping, toggleHighlightClipping } = editUIStore
 
 // ============================================================================
 // Keyboard Shortcut (J key)

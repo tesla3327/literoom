@@ -1,5 +1,71 @@
 # Iterations 71-80
 
+## 77: 2026-01-21 15:14 EST: Clipping Overlay Implementation - Complete
+
+**Objective**: Implement the clipping overlay feature to show clipped pixels on the preview canvas.
+
+**Implementation Completed**:
+
+**Phase 1: State Management**
+1. Created `apps/web/app/stores/editUI.ts` - New Pinia store for edit UI state
+   - `showHighlightClipping` and `showShadowClipping` refs
+   - `toggleClippingOverlays()`, `toggleShadowClipping()`, `toggleHighlightClipping()` methods
+   - `resetClippingOverlays()` for cleanup
+
+2. Updated histogram composables to use store instead of local state:
+   - `useHistogramDisplay.ts` - Removed clipping refs and toggle methods
+   - `useHistogramDisplaySVG.ts` - Removed clipping refs and toggle methods
+   - `EditHistogramDisplay.vue` - Uses `useEditUIStore()` with `storeToRefs()`
+   - `EditHistogramDisplaySVG.vue` - Uses `useEditUIStore()` with `storeToRefs()`
+
+**Phase 2: Clipping Detection**
+- Added `ClippingMap` interface to `useEditPreview.ts`
+- Added `detectClippedPixels()` function (shadow: channel=0, highlight: channel=255)
+- Added `clippingMap` and `previewDimensions` refs to composable return
+- Clipping detection runs after all transforms in render pipeline
+
+**Phase 3: Overlay Rendering**
+- Created `apps/web/app/composables/useClippingOverlay.ts`
+- Uses canvas overlay positioned over preview image
+- Colors: Blue (#3b82f6) for shadows, Red (#ef4444) for highlights, Purple (#a855f7) for both
+- 40% opacity for semi-transparent overlay
+- Re-renders on toggle changes, clipping map updates, and dimension changes
+
+**Phase 4: Component Integration**
+- Updated `apps/web/app/components/edit/EditPreviewCanvas.vue`
+- Added overlay canvas element with `pointer-events-none`
+- Added ResizeObserver to track actual rendered dimensions
+- Integrated `useClippingOverlay` composable
+
+**Files Created**:
+- `apps/web/app/stores/editUI.ts`
+- `apps/web/app/composables/useClippingOverlay.ts`
+
+**Files Modified**:
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useHistogramDisplay.ts`
+- `apps/web/app/composables/useHistogramDisplaySVG.ts`
+- `apps/web/app/components/edit/EditHistogramDisplay.vue`
+- `apps/web/app/components/edit/EditHistogramDisplaySVG.vue`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+
+**Verification** (browser automation):
+- Toggle buttons work correctly (opacity changes)
+- Shadow clipping overlay (blue) appears when Blacks = -100
+- Highlight clipping overlay (red) appears when Exposure +1, Whites +100
+- J key toggles both overlays on/off
+- Overlay updates when adjustments change
+
+**Screenshots Captured**:
+- `docs/screenshots/clipping-06-low-blacks.png` - Blue shadow clipping overlay
+- `docs/screenshots/clipping-08-high-exposure.png` - Red highlight clipping overlay
+- `docs/screenshots/clipping-09-j-key-off.png` - Both overlays off
+- `docs/screenshots/clipping-10-j-key-on.png` - Both overlays on
+
+**Status**: Complete. Clipping overlay feature fully implemented and verified.
+
+---
+
 ## 76: 2026-01-21 14:53 EST: Clipping Overlay Implementation - Research Complete
 
 **Objective**: Implement the clipping overlay feature to show clipped pixels on the preview canvas.

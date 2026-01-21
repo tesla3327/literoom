@@ -18,16 +18,6 @@ export interface UseHistogramDisplaySVGReturn {
   isComputing: Ref<boolean>
   /** Error message if computation failed */
   error: Ref<string | null>
-  /** Toggle for highlight clipping overlay */
-  showHighlightClipping: Ref<boolean>
-  /** Toggle for shadow clipping overlay */
-  showShadowClipping: Ref<boolean>
-  /** Toggle both clipping overlays (J key behavior) */
-  toggleClippingOverlays: () => void
-  /** Toggle shadow clipping overlay only */
-  toggleShadowClipping: () => void
-  /** Toggle highlight clipping overlay only */
-  toggleHighlightClipping: () => void
   /** SVG path data for red channel */
   redPath: ComputedRef<string>
   /** SVG path data for green channel */
@@ -265,8 +255,6 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
   const histogram = ref<HistogramData | null>(null)
   const isComputing = ref(false)
   const error = ref<string | null>(null)
-  const showHighlightClipping = ref(false)
-  const showShadowClipping = ref(false)
 
   const sourceCache = ref<{
     assetId: string
@@ -332,8 +320,21 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
       await computeHistogram()
     }
     catch (e) {
-      error.value = 'Failed to load source for histogram'
       console.error('Histogram source load error:', e)
+
+      // If the blob URL failed (likely revoked due to LRU eviction),
+      // re-request the thumbnail from the service which will re-create it from OPFS
+      if (url.startsWith('blob:') && import.meta.client && catalog) {
+        console.log('[useHistogramDisplaySVG] Blob URL revoked, re-requesting thumbnail for:', id)
+        // Clear the stale URL from store to prevent retry loops
+        catalogStore.updateThumbnail(id, 'pending', null)
+        // Request fresh thumbnail (will be loaded from OPFS cache)
+        catalog.requestThumbnail(id, 0)
+        // The sourceUrl watcher will pick up the new URL when it's ready
+        return
+      }
+
+      error.value = 'Failed to load source for histogram'
     }
   }
 
@@ -379,29 +380,6 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
   const debouncedCompute = debounce(() => {
     computeHistogram()
   }, HISTOGRAM_DEBOUNCE_MS)
-
-  // ============================================================================
-  // Clipping Overlay Toggle
-  // ============================================================================
-
-  function toggleClippingOverlays(): void {
-    if (showHighlightClipping.value || showShadowClipping.value) {
-      showHighlightClipping.value = false
-      showShadowClipping.value = false
-    }
-    else {
-      showHighlightClipping.value = true
-      showShadowClipping.value = true
-    }
-  }
-
-  function toggleShadowClipping(): void {
-    showShadowClipping.value = !showShadowClipping.value
-  }
-
-  function toggleHighlightClipping(): void {
-    showHighlightClipping.value = !showHighlightClipping.value
-  }
 
   // ============================================================================
   // Watchers
@@ -495,11 +473,6 @@ export function useHistogramDisplaySVG(assetId: Ref<string>): UseHistogramDispla
     histogram,
     isComputing,
     error,
-    showHighlightClipping,
-    showShadowClipping,
-    toggleClippingOverlays,
-    toggleShadowClipping,
-    toggleHighlightClipping,
     redPath,
     greenPath,
     bluePath,

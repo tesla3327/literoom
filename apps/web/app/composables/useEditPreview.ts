@@ -23,6 +23,27 @@ import {
 // Types
 // ============================================================================
 
+/**
+ * Clipping map data for overlay rendering.
+ * Each pixel is encoded as a bit field:
+ * - 0 = no clipping
+ * - 1 = shadow clipping (any channel at 0)
+ * - 2 = highlight clipping (any channel at 255)
+ * - 3 = both shadow and highlight clipping
+ */
+export interface ClippingMap {
+  /** Clipping data for each pixel (0=none, 1=shadow, 2=highlight, 3=both) */
+  data: Uint8Array
+  /** Width of the image */
+  width: number
+  /** Height of the image */
+  height: number
+  /** Whether any shadow clipping exists */
+  hasShadowClipping: boolean
+  /** Whether any highlight clipping exists */
+  hasHighlightClipping: boolean
+}
+
 export interface UseEditPreviewReturn {
   /** URL of the current preview (with edits applied when available) */
   previewUrl: Ref<string | null>
@@ -32,6 +53,10 @@ export interface UseEditPreviewReturn {
   renderQuality: Ref<'draft' | 'full'>
   /** Error message if render failed */
   error: Ref<string | null>
+  /** Clipping map for overlay rendering */
+  clippingMap: Ref<ClippingMap | null>
+  /** Dimensions of the current preview image */
+  previewDimensions: Ref<{ width: number; height: number } | null>
 }
 
 // ============================================================================
@@ -159,6 +184,56 @@ async function loadImagePixels(
   return { pixels: rgb, width: img.width, height: img.height }
 }
 
+/**
+ * Detect clipped pixels in an RGB image.
+ * Shadow clipping: any channel at 0
+ * Highlight clipping: any channel at 255
+ *
+ * @param pixels - RGB pixel data (3 bytes per pixel)
+ * @param width - Image width
+ * @param height - Image height
+ * @returns ClippingMap with per-pixel clipping info
+ */
+function detectClippedPixels(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): ClippingMap {
+  const pixelCount = width * height
+  const data = new Uint8Array(pixelCount)
+  let hasShadow = false
+  let hasHighlight = false
+
+  for (let i = 0, idx = 0; i < pixels.length; i += 3, idx++) {
+    const r = pixels[i]!
+    const g = pixels[i + 1]!
+    const b = pixels[i + 2]!
+    let clipType = 0
+
+    // Shadow clipping: any channel at minimum
+    if (r === 0 || g === 0 || b === 0) {
+      clipType |= 1
+      hasShadow = true
+    }
+
+    // Highlight clipping: any channel at maximum
+    if (r === 255 || g === 255 || b === 255) {
+      clipType |= 2
+      hasHighlight = true
+    }
+
+    data[idx] = clipType
+  }
+
+  return {
+    data,
+    width,
+    height,
+    hasShadowClipping: hasShadow,
+    hasHighlightClipping: hasHighlight,
+  }
+}
+
 // ============================================================================
 // Composable
 // ============================================================================
@@ -193,6 +268,12 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /** Error message if render failed */
   const error = ref<string | null>(null)
 
+  /** Clipping map for overlay rendering */
+  const clippingMap = ref<ClippingMap | null>(null)
+
+  /** Dimensions of the current preview image */
+  const previewDimensions = ref<{ width: number; height: number } | null>(null)
+
   /** Cached source pixels to avoid re-loading on every adjustment */
   const sourceCache = ref<{
     assetId: string
@@ -203,6 +284,13 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /** Generation counter to detect stale renders during rapid navigation */
   const renderGeneration = ref(0)
+
+  /**
+   * Whether the current previewUrl is locally owned (created by renderPreview)
+   * vs borrowed from the store (the source thumbnail URL).
+   * Only owned URLs should be revoked on unmount.
+   */
+  const isPreviewUrlOwned = ref(false)
 
   // ============================================================================
   // Computed
@@ -224,6 +312,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /**
    * Load source pixels for an asset.
+   * If a blob URL has been revoked (LRU eviction), re-request the thumbnail.
    */
   async function loadSource(id: string): Promise<void> {
     const asset = catalogStore.assets.get(id)
@@ -239,14 +328,29 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       const { pixels, width, height } = await loadImagePixels(url)
       sourceCache.value = { assetId: id, pixels, width, height }
 
-      // Show initial preview immediately
+      // Show initial preview immediately (borrowed URL from store)
       previewUrl.value = url
+      isPreviewUrlOwned.value = false
     }
     catch (e) {
       console.error('Failed to load source pixels:', e)
       sourceCache.value = null
-      // Still show the thumbnail as fallback
+
+      // If the blob URL failed (likely revoked due to LRU eviction),
+      // re-request the thumbnail from the service which will re-create it from OPFS
+      if (url.startsWith('blob:') && import.meta.client && catalog) {
+        console.log('[useEditPreview] Blob URL revoked, re-requesting thumbnail for:', id)
+        // Clear the stale URL from store to prevent retry loops
+        catalogStore.updateThumbnail(id, 'pending', null)
+        // Request fresh thumbnail (will be loaded from OPFS cache)
+        catalog.requestThumbnail(id, 0)
+        // The sourceUrl watcher will pick up the new URL when it's ready
+        return
+      }
+
+      // Still show the thumbnail as fallback for non-blob URLs
       previewUrl.value = url
+      isPreviewUrlOwned.value = false
     }
   }
 
@@ -308,8 +412,13 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       let resultUrl: string
 
       if (!hasAdjustments && !hasTransforms) {
-        // No adjustments or transforms, use source directly
+        // No adjustments or transforms, use source directly (borrowed URL)
         resultUrl = sourceUrl.value!
+        isPreviewUrlOwned.value = false
+
+        // Still compute clipping from source pixels
+        clippingMap.value = detectClippedPixels(pixels, width, height)
+        previewDimensions.value = { width, height }
       }
       else {
         // Apply transforms and adjustments via WASM
@@ -374,13 +483,20 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           currentHeight = curveResult.height
         }
 
+        // ===== STEP 5: Detect clipping for overlay =====
+        clippingMap.value = detectClippedPixels(currentPixels, currentWidth, currentHeight)
+        previewDimensions.value = { width: currentWidth, height: currentHeight }
+
         // Convert result to blob URL
         resultUrl = await pixelsToUrl(currentPixels, currentWidth, currentHeight)
 
-        // Revoke old URL if it was a blob URL
-        if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+        // Revoke old URL if it was owned (created by us, not borrowed from store)
+        if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
           URL.revokeObjectURL(previewUrl.value)
         }
+
+        // Mark this new URL as owned
+        isPreviewUrlOwned.value = true
       }
 
       // Check again if asset or generation changed (stale render protection)
@@ -468,6 +584,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
       if (!id) {
         previewUrl.value = null
+        isPreviewUrlOwned.value = false
         return
       }
 
@@ -478,9 +595,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         catalog.requestThumbnail(id, 0)
       }
 
-      // Show thumbnail immediately while loading pixels
+      // Show thumbnail immediately while loading pixels (borrowed URL from store)
       const asset = catalogStore.assets.get(id)
       previewUrl.value = asset?.thumbnailUrl ?? null
+      isPreviewUrlOwned.value = false
 
       // Early return if no thumbnail URL yet - the sourceUrl watcher will pick up when it's ready
       if (!asset?.thumbnailUrl) {
@@ -554,8 +672,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   onUnmounted(() => {
     debouncedRender.cancel()
-    // Revoke blob URL if any
-    if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+    // Only revoke blob URL if we created it (owned), not if it's borrowed from the store
+    if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
       URL.revokeObjectURL(previewUrl.value)
     }
   })
@@ -565,5 +683,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     isRendering,
     renderQuality,
     error,
+    clippingMap,
+    previewDimensions,
   }
 }

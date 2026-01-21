@@ -4,11 +4,13 @@
  *
  * Displays the photo preview in the edit view with:
  * - Source image display
+ * - Clipping overlay (shadow/highlight clipping indicators)
  * - Rendering indicator during edit updates
  * - Quality indicator (draft/full)
  * - Error handling
  *
- * Uses the useEditPreview composable for preview management.
+ * Uses the useEditPreview composable for preview management and
+ * useClippingOverlay for rendering clipping indicators.
  */
 
 interface Props {
@@ -33,7 +35,19 @@ const {
   isRendering,
   renderQuality,
   error,
+  clippingMap,
+  previewDimensions,
 } = useEditPreview(toRef(props, 'assetId'))
+
+// ============================================================================
+// Template Refs
+// ============================================================================
+
+/** Reference to the preview image element */
+const previewImageRef = ref<HTMLImageElement | null>(null)
+
+/** Reference to the clipping overlay canvas */
+const clippingCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 // ============================================================================
 // Computed
@@ -45,6 +59,64 @@ const asset = computed(() => catalogStore.assets.get(props.assetId))
  * Whether we're in an initial loading state (no preview yet).
  */
 const isInitialLoading = computed(() => !previewUrl.value && !error.value)
+
+/**
+ * Actual rendered dimensions of the preview image.
+ * Used to size the clipping overlay canvas.
+ */
+const renderedDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 })
+
+/**
+ * Update rendered dimensions when the image loads.
+ */
+function onImageLoad(event: Event) {
+  const img = event.target as HTMLImageElement
+  if (img) {
+    renderedDimensions.value = {
+      width: img.clientWidth,
+      height: img.clientHeight,
+    }
+  }
+}
+
+// ============================================================================
+// Clipping Overlay
+// ============================================================================
+
+/**
+ * Watch for image dimension changes via ResizeObserver.
+ */
+onMounted(() => {
+  if (!previewImageRef.value) return
+
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      renderedDimensions.value = {
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      }
+    }
+  })
+
+  if (previewImageRef.value) {
+    observer.observe(previewImageRef.value)
+  }
+
+  onUnmounted(() => {
+    observer.disconnect()
+  })
+})
+
+/**
+ * Clipping overlay composable.
+ * Renders the clipping indicators on a canvas over the preview.
+ */
+useClippingOverlay({
+  canvasRef: clippingCanvasRef,
+  clippingMap,
+  displayWidth: computed(() => renderedDimensions.value.width),
+  displayHeight: computed(() => renderedDimensions.value.height),
+})
 </script>
 
 <template>
@@ -84,14 +156,33 @@ const isInitialLoading = computed(() => !previewUrl.value && !error.value)
       <span class="text-sm">Loading preview...</span>
     </div>
 
-    <!-- Preview image -->
-    <img
+    <!-- Preview image with clipping overlay -->
+    <div
       v-else-if="previewUrl"
-      :src="previewUrl"
-      :alt="asset?.filename"
-      class="max-w-full max-h-full object-contain"
-      data-testid="preview-image"
+      class="relative max-w-full max-h-full"
     >
+      <img
+        ref="previewImageRef"
+        :src="previewUrl"
+        :alt="asset?.filename"
+        class="max-w-full max-h-full object-contain"
+        data-testid="preview-image"
+        @load="onImageLoad"
+      >
+
+      <!-- Clipping overlay canvas - positioned over the image -->
+      <canvas
+        ref="clippingCanvasRef"
+        class="absolute top-0 left-0 pointer-events-none"
+        :width="renderedDimensions.width"
+        :height="renderedDimensions.height"
+        :style="{
+          width: renderedDimensions.width + 'px',
+          height: renderedDimensions.height + 'px',
+        }"
+        data-testid="clipping-overlay-canvas"
+      />
+    </div>
 
     <!-- Error state -->
     <div

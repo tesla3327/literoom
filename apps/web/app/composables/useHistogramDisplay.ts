@@ -23,16 +23,6 @@ export interface UseHistogramDisplayReturn {
   isComputing: Ref<boolean>
   /** Error message if computation failed */
   error: Ref<string | null>
-  /** Toggle for highlight clipping overlay */
-  showHighlightClipping: Ref<boolean>
-  /** Toggle for shadow clipping overlay */
-  showShadowClipping: Ref<boolean>
-  /** Toggle both clipping overlays (J key behavior) */
-  toggleClippingOverlays: () => void
-  /** Toggle shadow clipping overlay only */
-  toggleShadowClipping: () => void
-  /** Toggle highlight clipping overlay only */
-  toggleHighlightClipping: () => void
 }
 
 // ============================================================================
@@ -235,10 +225,6 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
 
   /** Error message if computation failed */
   const error = ref<string | null>(null)
-
-  /** Clipping overlay toggles */
-  const showHighlightClipping = ref(false)
-  const showShadowClipping = ref(false)
 
   /** Cached source pixels to avoid re-loading */
   const sourceCache = ref<{
@@ -456,41 +442,6 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
   }, HISTOGRAM_DEBOUNCE_MS)
 
   // ============================================================================
-  // Clipping Overlay Toggle
-  // ============================================================================
-
-  /**
-   * Toggle both clipping overlays (J key behavior).
-   * If any overlay is on, turn both off. Otherwise, turn both on.
-   */
-  function toggleClippingOverlays(): void {
-    if (showHighlightClipping.value || showShadowClipping.value) {
-      showHighlightClipping.value = false
-      showShadowClipping.value = false
-    }
-    else {
-      showHighlightClipping.value = true
-      showShadowClipping.value = true
-    }
-  }
-
-  /**
-   * Toggle shadow clipping overlay only.
-   * Used by UI buttons instead of direct ref mutation.
-   */
-  function toggleShadowClipping(): void {
-    showShadowClipping.value = !showShadowClipping.value
-  }
-
-  /**
-   * Toggle highlight clipping overlay only.
-   * Used by UI buttons instead of direct ref mutation.
-   */
-  function toggleHighlightClipping(): void {
-    showHighlightClipping.value = !showHighlightClipping.value
-  }
-
-  // ============================================================================
   // Watchers
   // ============================================================================
 
@@ -640,10 +591,5 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
     histogram,
     isComputing,
     error,
-    showHighlightClipping,
-    showShadowClipping,
-    toggleClippingOverlays,
-    toggleShadowClipping,
-    toggleHighlightClipping,
   }
 }
