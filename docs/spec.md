@@ -559,7 +559,52 @@ Worker/WASM can be mocked for v1 e2e; this is explicitly acceptable.
 
 ---
 
-# 9) CI requirements (hosted project)
+# 9) Development environment requirements
+
+Local development must match CI to ensure consistent behavior.
+
+## 9.1 Node.js
+
+- **Required version:** Node.js 22+ (LTS)
+- Nuxt 4 tooling (ESLint, Vitest, build tools) requires modern JS features only available in Node 22+
+- Use `nvm` to manage Node versions:
+  ```bash
+  nvm install 22
+  nvm use 22
+  ```
+
+## 9.2 Package manager
+
+- **Required:** pnpm 9+
+- Install via corepack or standalone installer:
+  ```bash
+  corepack enable
+  corepack prepare pnpm@latest --activate
+  ```
+
+## 9.3 Rust toolchain
+
+- **Required:** Rust stable (latest) via rustup
+- The `rust-toolchain.toml` file specifies the exact toolchain
+- Ensure rustup-managed toolchain is used (not system Rust):
+  ```bash
+  # Verify rustup is managing your Rust installation
+  which rustc  # Should be ~/.cargo/bin/rustc
+  rustc --version  # Should be 1.80+ (stable)
+  ```
+- Required components: `rustfmt`, `clippy`
+- Required target: `wasm32-unknown-unknown`
+
+## 9.4 Additional tools
+
+- **wasm-pack:** Required for building WASM modules
+  ```bash
+  cargo install wasm-pack
+  ```
+
+---
+
+# 10) CI/CD requirements (hosted project)
 
 CI must run on every PR:
 
@@ -578,9 +623,9 @@ CI must run on every PR:
 
 ---
 
-# 10) Feature flags and dev modes
+# 11) Feature flags and dev modes
 
-## 10.1 Demo Catalog mode (required)
+## 11.1 Demo Catalog mode (required)
 
 Purpose: deterministic local dev + CI e2e.
 
@@ -591,7 +636,7 @@ Purpose: deterministic local dev + CI e2e.
   - mock render/histogram responses
   - mock export writes
 
-## 10.2 Capability flags
+## 11.2 Capability flags
 
 - FS Access supported/unsupported
 - WebGPU available/unavailable
@@ -599,7 +644,7 @@ Purpose: deterministic local dev + CI e2e.
 
 ---
 
-# 11) Acceptance criteria checklist (v1)
+# 12) Acceptance criteria checklist (v1)
 
 A v1 build is “done” when:
 
