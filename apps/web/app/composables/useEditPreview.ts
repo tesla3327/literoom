@@ -10,7 +10,7 @@
  */
 import type { Ref } from 'vue'
 import type { Adjustments } from '@literoom/core/catalog'
-import { hasModifiedAdjustments } from '@literoom/core/catalog'
+import { hasModifiedAdjustments, isModifiedToneCurve } from '@literoom/core/catalog'
 
 // ============================================================================
 // Types
@@ -293,16 +293,37 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         resultUrl = sourceUrl.value!
       }
       else {
-        // Apply adjustments via WASM
+        // Apply basic adjustments via WASM
+        let currentPixels = pixels
+        let currentWidth = width
+        let currentHeight = height
+
+        // Apply basic adjustments (exposure, contrast, etc.)
         const result = await $decodeService.applyAdjustments(
-          pixels,
-          width,
-          height,
+          currentPixels,
+          currentWidth,
+          currentHeight,
           adjustments,
         )
+        currentPixels = result.pixels
+        currentWidth = result.width
+        currentHeight = result.height
+
+        // Apply tone curve if it differs from linear
+        if (isModifiedToneCurve(adjustments.toneCurve)) {
+          const curveResult = await $decodeService.applyToneCurve(
+            currentPixels,
+            currentWidth,
+            currentHeight,
+            adjustments.toneCurve.points,
+          )
+          currentPixels = curveResult.pixels
+          currentWidth = curveResult.width
+          currentHeight = curveResult.height
+        }
 
         // Convert result to blob URL
-        resultUrl = await pixelsToUrl(result.pixels, result.width, result.height)
+        resultUrl = await pixelsToUrl(currentPixels, currentWidth, currentHeight)
 
         // Revoke old URL if it was a blob URL
         if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
