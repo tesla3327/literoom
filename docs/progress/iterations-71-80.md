@@ -1,5 +1,71 @@
 # Iterations 71-80
 
+## 76: 2026-01-21 14:53 EST: Clipping Overlay Implementation - Research Complete
+
+**Objective**: Implement the clipping overlay feature to show clipped pixels on the preview canvas.
+
+**Background**: The J key and Shadows/Highlights buttons toggle clipping state correctly, but no visual overlay appears on the preview image. Per the v1 acceptance criteria, "Histogram renders and shows highlight/shadow clipping indicators; overlay toggles work."
+
+**Research Completed**:
+- Created research plan with 5 areas
+- Launched 5 parallel research agents
+- Synthesized findings into comprehensive research document
+
+**Key Decisions**:
+1. **State Management**: Use new `editUI` Pinia store to share clipping toggles between histogram and preview
+2. **Overlay Rendering**: Separate canvas layer positioned over preview (Option B - instant toggle)
+3. **Clipping Detection**: JavaScript post-processing after WASM pixel operations (~1-3ms)
+4. **Thresholds**: 0 for shadow clipping, 255 for highlight clipping (industry standard)
+5. **Colors**: Blue (#3b82f6) for shadows, Red (#ef4444) for highlights at 40% opacity
+
+**Files Created**:
+- `docs/research/2026-01-21-clipping-overlay-research-plan.md`
+- `docs/research/2026-01-21-clipping-overlay-synthesis.md`
+- `docs/plans/2026-01-21-clipping-overlay-plan.md`
+
+**Implementation Plan Summary**:
+1. Phase 1: Create `editUI` store with clipping state
+2. Phase 2: Add clipping detection to `useEditPreview`
+3. Phase 3: Create `useClippingOverlay` composable
+4. Phase 4: Integrate overlay canvas into `EditPreviewCanvas`
+5. Phase 5: Verification and testing
+
+**Status**: Research complete, plan created. Ready for implementation.
+
+---
+
+## 75: 2026-01-21 14:38 EST: Verify Filmstrip Navigation Fix
+
+**Objective**: Verify that the filmstrip navigation bug fix from iteration #73 is working correctly.
+
+**Verification Method**: Used browser automation to test rapid filmstrip navigation in demo mode.
+
+**Test Cases**:
+1. ✅ Initial edit view entry - Works correctly (IMG_0008.arw, "8 / 50")
+2. ✅ Rapid navigation through 6 thumbnails - Works correctly (IMG_0019.jpg, "19 / 50")
+3. ✅ Rapid clicks with 100ms intervals (4+ clicks) - Works correctly (IMG_0025.jpg, "25 / 50")
+4. ✅ Back and forth clicking between distant thumbnails - Works correctly (IMG_0030.jpg, "30 / 50")
+
+**Verification Results**:
+- ✅ Preview loads correctly after rapid navigation (not stuck on "Loading...")
+- ✅ Histogram displays with RGB channels (not stuck on "Loading...")
+- ✅ Header shows correct position (e.g., "30 / 50", not "0 / 0")
+- ✅ Filmstrip remains fully populated with thumbnails
+- ✅ Format and file size metadata display correctly
+
+**Screenshots Captured**:
+- `docs/screenshots/verify-filmstrip-04-demo-catalog.png` - Demo catalog loaded
+- `docs/screenshots/verify-filmstrip-05-edit-view.png` - Initial edit view entry
+- `docs/screenshots/verify-filmstrip-06-after-rapid-nav.png` - After 6 rapid clicks
+- `docs/screenshots/verify-filmstrip-10-rapid-test.png` - After stress test
+- `docs/screenshots/verify-filmstrip-11-final.png` - Final state after back-and-forth
+
+**Conclusion**: Filmstrip navigation bug fix is **verified working**. The generation counter pattern and error handling in `useEditPreview.ts` and `useHistogramDisplay.ts` successfully prevent race conditions during rapid navigation.
+
+**Status**: Complete
+
+---
+
 ## 74: 2026-01-21 14:36 EST: Keyboard Navigation Fixes
 
 **Objective**: Fix two medium-severity keyboard navigation issues.
