@@ -1,48 +1,5 @@
 # Iterations 71-80
 
-## 81: 2026-01-21 15:24 EST: Histogram Not Updating - Research Complete
-
-**Objective**: Research the high-severity issue where histogram doesn't update when edits are made.
-
-**Background**: Per `docs/issues.md`, the histogram remains static and does not respond to adjustment changes. The histogram should reflect the current state of the edited image in real-time.
-
-**Research Completed**:
-- Launched 3 parallel research agents to investigate:
-  1. Histogram computation flow and triggers
-  2. Adjustment data flow through preview pipeline
-  3. Edit page initialization and histogram lifecycle
-
-**Root Cause**:
-The histogram is computed from **source (thumbnail) pixels**, not from **adjusted pixels**. This is an intentional MVP design decision, documented in the code at `useHistogramDisplay.ts:545-548`:
-```typescript
-/**
- * Note: For a more accurate histogram, we should compute from adjusted pixels,
- * but for now we compute from source pixels (faster, good enough for MVP).
- */
-```
-
-**Key Findings**:
-1. **Watchers work correctly** - Both `useEditPreview` and `useHistogramDisplay` have deep watchers on `editStore.adjustments` that trigger correctly
-2. **Preview applies adjustments** - `useEditPreview` calls `$decodeService.applyAdjustments()` to transform pixels
-3. **Histogram skips adjustments** - `useHistogramDisplay` computes histogram from original source pixels, not adjusted pixels
-4. **Result** - Histogram data never changes because source pixels never change
-
-**Data Flow Comparison**:
-- Preview: `sourcePixels → applyAdjustments() → adjustedPixels → display` ✓
-- Histogram: `sourcePixels → computeHistogram() → same data every time` ✗
-
-**Recommended Solution**: Option A - Share adjusted pixels from useEditPreview
-- Preview already computes adjusted pixels
-- Histogram should watch and use those adjusted pixels
-- No duplicate computation, stays in sync with preview
-
-**Files Created**:
-- `docs/research/2026-01-21-histogram-update-synthesis.md`
-
-**Status**: Research complete. Ready to create implementation plan.
-
----
-
 ## 80: 2026-01-21 15:19 EST: Crop Overlay on Preview Canvas - Research Complete
 
 **Objective**: Research and plan the implementation of crop controls overlaid on the main preview canvas.

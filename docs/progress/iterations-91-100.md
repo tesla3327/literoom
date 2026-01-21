@@ -379,3 +379,67 @@ encodeJpeg(
 **Status**: Phase 2 complete. Ready for Phase 3 (Filename Template Parser).
 
 ---
+
+## 98: 2026-01-21 18:57 EST: Export Workflow - Phase 3 (Filename Template Parser)
+
+**Objective**: Create a filename template parser for export with support for `{orig}`, `{seq:N}`, and `{date}` tokens.
+
+**Background**: Phase 2 completed worker integration for JPEG encoding. This phase creates the filename template parser that allows users to specify custom output filenames using tokens like `{orig}_{seq:4}`.
+
+**Implementation Summary**:
+
+1. **Created `packages/core/src/export/filename-template.ts`**
+   - `renderTemplate(template, context)` - Replaces tokens with actual values
+   - `validateTemplate(template)` - Returns array of validation errors
+   - `extractOriginalFilename(path)` - Extracts base filename from full path
+   - `formatDateForTemplate(date)` - Formats Date as YYYY-MM-DD
+   - TypeScript interfaces: `TemplateContext`, `TemplateError`
+
+2. **Created `packages/core/src/export/filename-template.test.ts`**
+   - 40 comprehensive unit tests covering:
+     - Basic token replacement ({orig}, {seq}, {date})
+     - Zero-padded sequences ({seq:N})
+     - Validation (empty, unmatched braces, unknown tokens, invalid padding)
+     - Path handling (Unix/Windows paths, hidden files)
+     - Integration scenarios (typical workflows)
+
+3. **Created `packages/core/src/export/index.ts`**
+   - Exports all template functions and types
+
+4. **Updated `packages/core/src/index.ts`**
+   - Added `export * from './export'`
+
+**Supported Tokens**:
+- `{orig}` - Original filename without extension
+- `{seq}` - Sequence number (no padding)
+- `{seq:N}` - Sequence number with N-digit zero padding (1-10)
+- `{date}` - Capture date in YYYY-MM-DD format
+
+**Example Usage**:
+```typescript
+import { renderTemplate, validateTemplate } from '@literoom/core'
+
+const errors = validateTemplate('{orig}_{seq:4}')
+// []
+
+const filename = renderTemplate('{orig}_{seq:4}', {
+  orig: 'DSC1234',
+  seq: 1,
+  date: '2026-01-21'
+})
+// 'DSC1234_0001'
+```
+
+**Files Created** (3 files):
+- `packages/core/src/export/filename-template.ts`
+- `packages/core/src/export/filename-template.test.ts`
+- `packages/core/src/export/index.ts`
+
+**Files Modified** (1 file):
+- `packages/core/src/index.ts`
+
+**Tests**: 297 tests passing (40 new filename template tests)
+
+**Status**: Phase 3 complete. Ready for Phase 4 (Export Service).
+
+---

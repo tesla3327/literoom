@@ -8,3 +8,4 @@
 export * from './filesystem'
 export * from './decode'
 export * from './catalog'
+export * from './export'
