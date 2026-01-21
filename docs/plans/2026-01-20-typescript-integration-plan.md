@@ -434,27 +434,27 @@ export class DecodeService implements IDecodeService {
 
 ---
 
-### Phase 4: Nuxt Integration ⬜
+### Phase 4: Nuxt Integration ✅
 
 **Goal**: Configure Vite for workers and create Nuxt plugin/composable.
 
 #### Tasks
 
-- [ ] 4.1. Update `apps/web/nuxt.config.ts`
+- [x] 4.1. Update `apps/web/nuxt.config.ts`
   - Add `worker.plugins` configuration
   - Ensure WASM works in workers
 
-- [ ] 4.2. Create `apps/web/app/plugins/decode.client.ts`
+- [x] 4.2. Create `apps/web/app/plugins/decode.client.ts`
   - Create DecodeService instance
   - Provide to Nuxt app
   - Handle cleanup on unload
 
-- [ ] 4.3. Create `packages/core/src/decode/use-decode.ts` (Vue composable)
-  - Expose service methods
-  - Add computed `isReady` state
+- [x] 4.3. Create `apps/web/app/composables/useDecode.ts` (Vue composable)
+  - Expose service methods via `useDecode()` function
+  - Note: Placed in web app (not packages/core) since it depends on Nuxt-specific APIs
 
-- [ ] 4.4. Create `packages/core/src/decode/index.ts`
-  - Export all public types and classes
+- [x] 4.4. Verify `packages/core/src/decode/index.ts` exports
+  - All types and classes already exported
 
 #### Configuration Changes
 

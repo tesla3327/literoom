@@ -20,6 +20,9 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [wasm(), topLevelAwait()],
+    worker: {
+      plugins: () => [wasm(), topLevelAwait()],
+    },
   },
 
   eslint: {

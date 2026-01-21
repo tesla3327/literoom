@@ -70,9 +70,9 @@ export class DecodeError extends Error {
   constructor(
     message: string,
     public readonly code: ErrorCode,
-    public readonly cause?: Error
+    override readonly cause?: Error
   ) {
-    super(message)
+    super(message, { cause })
   }
 }
 

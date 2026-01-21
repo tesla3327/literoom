@@ -179,9 +179,9 @@ export class FileSystemError extends Error {
       | 'ABORTED'
       | 'INVALID_STATE'
       | 'UNKNOWN',
-    public readonly cause?: Error
+    override readonly cause?: Error
   ) {
-    super(message)
+    super(message, { cause })
     this.name = 'FileSystemError'
   }
 }

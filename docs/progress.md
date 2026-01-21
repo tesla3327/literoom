@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 21:57 EST
-**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 3 Complete
+**Last Updated**: 2026-01-20 22:00 EST
+**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 4 Complete
 
 ## Project Structure
 
@@ -36,6 +36,43 @@ literoom/
 ```
 
 ## Completed Work
+
+### 22: 2026-01-20 22:00 EST: TypeScript Integration - Phase 4 Complete (Nuxt Integration)
+
+**Objective**: Implement Phase 4 of the TypeScript Integration Plan - Nuxt configuration and composable.
+
+**Work Completed**:
+- Updated `apps/web/nuxt.config.ts`:
+  - Added `worker.plugins` configuration with wasm and topLevelAwait plugins
+  - Enables WASM loading within Web Workers
+
+- Created `apps/web/app/plugins/decode.client.ts`:
+  - Client-only plugin that creates DecodeService instance
+  - Provides `$decodeService` to Nuxt app
+  - Handles cleanup on page unload (terminates worker)
+
+- Created `apps/web/app/composables/useDecode.ts`:
+  - Vue composable for accessing the decode service
+  - Returns `IDecodeService` interface for type-safe access
+  - Note: Placed in web app (not packages/core) since it depends on Nuxt-specific APIs
+
+- Fixed TypeScript errors:
+  - Added `override` modifier to `DecodeError.cause` property in types.ts
+  - Fixed same issue in `FileSystemError` (filesystem/types.ts)
+  - Both now properly use `{ cause }` in super() call for ES2022 compatibility
+
+**Files Created**:
+- `apps/web/app/plugins/decode.client.ts`
+- `apps/web/app/composables/useDecode.ts`
+
+**Files Modified**:
+- `apps/web/nuxt.config.ts`
+- `packages/core/src/decode/types.ts`
+- `packages/core/src/filesystem/types.ts`
+
+**Next Step**: Phase 5 - Testing (mock implementation, unit tests for DecodeService).
+
+---
 
 ### 21: 2026-01-20 21:57 EST: TypeScript Integration - Phase 3 Complete (DecodeService)
 
