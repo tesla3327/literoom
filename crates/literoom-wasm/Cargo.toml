@@ -1,0 +1,20 @@
+[package]
+name = "literoom-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WASM bindings for Literoom image processing"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+literoom-core = { path = "../literoom-core" }
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true }
+serde = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
