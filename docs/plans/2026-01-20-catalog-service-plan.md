@@ -175,7 +175,7 @@ Export all public types.
 
 ---
 
-### Phase 2: Scan Service ⬜
+### Phase 2: Scan Service ✅
 
 **Goal**: Implement folder scanning with async generator pattern.
 
@@ -251,7 +251,7 @@ async function* scanDirectory(
 
 ---
 
-### Phase 3: Thumbnail Service ⬜
+### Phase 3: Thumbnail Service ✅
 
 **Goal**: Priority-based thumbnail generation with caching.
 

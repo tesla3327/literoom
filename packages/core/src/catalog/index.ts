@@ -47,6 +47,21 @@ export {
 
 // Services
 export { ScanService, createScanService } from './scan-service'
+export { ThumbnailQueue, createThumbnailQueue } from './thumbnail-queue'
+export {
+  MemoryThumbnailCache,
+  OPFSThumbnailCache,
+  ThumbnailCache,
+  createMemoryCache,
+  createOPFSCache,
+  createThumbnailCache,
+  type IThumbnailCache,
+} from './thumbnail-cache'
+export {
+  ThumbnailService,
+  createThumbnailService,
+  type ThumbnailServiceOptions,
+} from './thumbnail-service'
 
 // Database
 export type { AssetRecord, FolderRecord, EditRecord, CacheMetadataRecord } from './db'

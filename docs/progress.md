@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:17 EST
-**Current Phase**: Catalog Service - Implementation Plan Created
+**Last Updated**: 2026-01-20 22:32 EST
+**Current Phase**: Catalog Service - Phase 3 Complete (Thumbnail Service)
 
 ## Project Structure
 
@@ -20,7 +20,8 @@ literoom/
 │   ├── core/                    # Shared TypeScript logic
 │   │   └── src/
 │   │       ├── filesystem/      # FS abstraction layer
-│   │       └── decode/          # Image decode types & services
+│   │       ├── decode/          # Image decode types & services
+│   │       └── catalog/         # Catalog service (scan, thumbnails, db)
 │   └── wasm/                    # WASM output (generated)
 ├── crates/
 │   ├── literoom-core/           # Rust image processing
@@ -36,6 +37,51 @@ literoom/
 ```
 
 ## Completed Work
+
+### 26: 2026-01-20 22:32 EST: Catalog Service - Phase 3 Complete (Thumbnail Service)
+
+**Objective**: Implement the Thumbnail Service with priority queue, LRU cache, and OPFS storage.
+
+**Work Completed**:
+- Created `packages/core/src/catalog/thumbnail-queue.ts`:
+  - Min-heap based priority queue for viewport-aware thumbnail generation
+  - O(log n) enqueue/dequeue, O(n) priority update and removal
+  - Maximum size limit with eviction of lowest priority items
+  - FIFO ordering within same priority level
+  - 25 unit tests
+
+- Created `packages/core/src/catalog/thumbnail-cache.ts`:
+  - `MemoryThumbnailCache`: LRU cache with Object URL management
+  - `OPFSThumbnailCache`: Persistent storage via Origin Private File System
+  - `ThumbnailCache`: Combined two-tier caching (memory + OPFS)
+  - Automatic Object URL revocation on eviction
+  - 17 unit tests
+
+- Created `packages/core/src/catalog/thumbnail-service.ts`:
+  - Coordinates queue, cache, and DecodeService
+  - Single-threaded processing to avoid overwhelming decoder
+  - Callback-based notification for ready/error
+  - RGB to RGBA conversion using OffscreenCanvas
+  - JPEG blob encoding for efficient storage
+
+- Updated `packages/core/src/catalog/index.ts`:
+  - Exported all new thumbnail components
+
+**Test Summary**:
+- `packages/core`: 87 tests (all passing)
+- Thumbnail Queue: 25 tests
+- Thumbnail Cache: 17 tests
+
+**Files Created**:
+- `packages/core/src/catalog/thumbnail-queue.ts`
+- `packages/core/src/catalog/thumbnail-cache.ts`
+- `packages/core/src/catalog/thumbnail-service.ts`
+- `packages/core/src/catalog/thumbnail-queue.test.ts`
+- `packages/core/src/catalog/thumbnail-cache.test.ts`
+
+**Next Step**: Phase 4 - Catalog Service (main service composing scan + thumbnail services).
+
+---
 
 ### 25: 2026-01-20 22:17 EST: Catalog Service Implementation Plan Created
 
