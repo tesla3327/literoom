@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 10:03 EST
-**Current Phase**: Phase 9 Research Complete - WASM Edit Pipeline
+**Last Updated**: 2026-01-21 10:08 EST
+**Current Phase**: Phase 9.1 Complete - Rust Adjustment Module
 
 ## Project Structure
 
@@ -37,6 +37,51 @@ literoom/
 ```
 
 ## Completed Work
+
+### 48: 2026-01-21 10:08 EST: Phase 9.1 Complete - Rust Adjustment Module
+
+**Objective**: Implement core adjustment algorithms in Rust for applying the 10 basic adjustments to image pixels.
+
+**Work Completed**:
+
+**Created `crates/literoom-core/src/adjustments.rs`**:
+- `apply_all_adjustments(pixels, adjustments)` - Main function to apply all adjustments in a single pass
+- Individual adjustment functions:
+  - `apply_exposure` - Exposure in stops (-5 to +5), using `2^exposure` multiplier
+  - `apply_contrast` - Contrast adjustment (-100 to +100), pivot around midpoint
+  - `apply_temperature` - White balance warm/cool (-100 to +100)
+  - `apply_tint` - Green/magenta tint (-100 to +100)
+  - `apply_highlights` - Affects bright areas only (luminance > 0.5)
+  - `apply_shadows` - Affects dark areas only (luminance < 0.5)
+  - `apply_whites` - Affects brightest pixels (max channel > 0.9)
+  - `apply_blacks` - Affects darkest pixels (min channel < 0.1)
+  - `apply_saturation` - Global saturation adjustment
+  - `apply_vibrance` - Smart saturation protecting skin tones and already-saturated colors
+- Helper functions: `calculate_luminance`, `smoothstep`
+- Early exit optimization when all adjustments are at default values
+- Single-pass pixel processing for cache efficiency
+
+**Unit Tests** (26 new tests):
+- Identity tests (no change with default adjustments)
+- Individual adjustment tests (exposure, contrast, temperature, tint, etc.)
+- Boundary tests (extreme values don't crash)
+- Multi-pixel tests
+- Edge case tests (empty pixels, incomplete pixel data)
+
+**Test Results**:
+- `literoom-core`: 76 tests passing (26 new adjustment tests + 50 existing)
+- Clippy: No warnings
+- Formatting: Passes
+
+**Files Created**:
+- `crates/literoom-core/src/adjustments.rs`
+
+**Files Modified**:
+- `crates/literoom-core/src/lib.rs` (added `pub mod adjustments`)
+
+**Next Step**: Phase 9.2 - WASM bindings for `apply_adjustments()` function.
+
+---
 
 ### 47: 2026-01-21 10:03 EST: Phase 9 Research Complete - WASM Edit Pipeline
 

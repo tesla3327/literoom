@@ -3,6 +3,7 @@
 //! This crate provides the core image processing functionality for Literoom,
 //! including RAW decoding, edit pipeline, histogram computation, and more.
 
+pub mod adjustments;
 pub mod decode;
 
 /// Basic adjustments for image editing
