@@ -20,6 +20,8 @@ import init, {
   is_raw_file,
   apply_adjustments,
   apply_tone_curve,
+  apply_rotation,
+  apply_crop,
   compute_histogram,
   BasicAdjustments,
   JsDecodedImage,
@@ -312,6 +314,72 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
         const response: ToneCurveResponse = {
           id,
           type: 'tone-curve-result',
+          pixels: outputPixels,
+          width: outputWidth,
+          height: outputHeight
+        }
+
+        // Transfer pixel buffer to avoid copying
+        self.postMessage(response, [outputPixels.buffer])
+
+        // Free output image WASM memory
+        outputImage.free()
+        break
+      }
+
+      case 'apply-rotation': {
+        const { pixels, width, height, angleDegrees, useLanczos } = request
+
+        // Create image wrapper
+        const inputImage = new JsDecodedImage(width, height, pixels)
+
+        // Apply rotation
+        const outputImage = apply_rotation(inputImage, angleDegrees, useLanczos)
+
+        // Extract result
+        const outputPixels = outputImage.pixels()
+        const outputWidth = outputImage.width
+        const outputHeight = outputImage.height
+
+        // Free WASM memory
+        inputImage.free()
+
+        const response: DecodeSuccessResponse = {
+          id,
+          type: 'success',
+          pixels: outputPixels,
+          width: outputWidth,
+          height: outputHeight
+        }
+
+        // Transfer pixel buffer to avoid copying
+        self.postMessage(response, [outputPixels.buffer])
+
+        // Free output image WASM memory
+        outputImage.free()
+        break
+      }
+
+      case 'apply-crop': {
+        const { pixels, width, height, left, top, cropWidth, cropHeight } = request
+
+        // Create image wrapper
+        const inputImage = new JsDecodedImage(width, height, pixels)
+
+        // Apply crop using normalized coordinates
+        const outputImage = apply_crop(inputImage, left, top, cropWidth, cropHeight)
+
+        // Extract result
+        const outputPixels = outputImage.pixels()
+        const outputWidth = outputImage.width
+        const outputHeight = outputImage.height
+
+        // Free WASM memory
+        inputImage.free()
+
+        const response: DecodeSuccessResponse = {
+          id,
+          type: 'success',
           pixels: outputPixels,
           width: outputWidth,
           height: outputHeight

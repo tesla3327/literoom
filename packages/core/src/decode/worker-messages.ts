@@ -19,6 +19,8 @@ export type DecodeRequest =
   | ApplyAdjustmentsRequest
   | ComputeHistogramRequest
   | ApplyToneCurveRequest
+  | ApplyRotationRequest
+  | ApplyCropRequest
 
 /**
  * Decode a JPEG file to raw RGB pixels.
@@ -115,6 +117,46 @@ export interface ApplyToneCurveRequest {
   height: number
   /** Tone curve control points */
   points: Array<{ x: number; y: number }>
+}
+
+/**
+ * Apply rotation to image pixels.
+ */
+export interface ApplyRotationRequest {
+  id: string
+  type: 'apply-rotation'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+  /** Rotation angle in degrees (positive = counter-clockwise) */
+  angleDegrees: number
+  /** Use high-quality Lanczos3 filter (slower) instead of bilinear */
+  useLanczos: boolean
+}
+
+/**
+ * Apply crop to image pixels.
+ */
+export interface ApplyCropRequest {
+  id: string
+  type: 'apply-crop'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+  /** Left edge position (0-1 normalized) */
+  left: number
+  /** Top edge position (0-1 normalized) */
+  top: number
+  /** Crop width (0-1 normalized) */
+  cropWidth: number
+  /** Crop height (0-1 normalized) */
+  cropHeight: number
 }
 
 /**

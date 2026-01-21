@@ -1,5 +1,49 @@
 # Iterations 61-70
 
+## 69: 2026-01-21 14:02 EST: Phase 12.5 Complete - Worker Integration for Transforms
+
+**Objective**: Add worker message handlers and DecodeService methods for rotation and crop operations.
+
+**Work Completed**:
+
+**1. Added message types to `packages/core/src/decode/worker-messages.ts`:**
+- `ApplyRotationRequest` - Request to apply rotation with angle and interpolation type
+- `ApplyCropRequest` - Request to apply crop with normalized (0-1) coordinates
+- Updated `DecodeRequest` union type to include new request types
+
+**2. Added worker handlers to `packages/core/src/decode/decode-worker.ts`:**
+- Imported `apply_rotation` and `apply_crop` from WASM
+- Added `case 'apply-rotation'` handler that creates JsDecodedImage, calls WASM apply_rotation, and transfers result
+- Added `case 'apply-crop'` handler that creates JsDecodedImage, calls WASM apply_crop, and transfers result
+- Both handlers properly free WASM memory and use Transferable for zero-copy pixel transfer
+
+**3. Added methods to `packages/core/src/decode/decode-service.ts`:**
+- Extended `IDecodeService` interface with `applyRotation()` and `applyCrop()` methods
+- Implemented `applyRotation(pixels, width, height, angleDegrees, useLanczos?)` in DecodeService
+- Implemented `applyCrop(pixels, width, height, crop)` in DecodeService where crop uses normalized coordinates
+
+**4. Added mock implementations to `packages/core/src/decode/mock-decode-service.ts`:**
+- `applyRotation()` - Computes rotated bounding box and performs nearest-neighbor sampling for demo mode
+- `applyCrop()` - Extracts cropped region using normalized to pixel coordinate conversion
+
+**Files Modified**:
+- `packages/core/src/decode/worker-messages.ts` - Added message types
+- `packages/core/src/decode/decode-worker.ts` - Added WASM function imports and handlers
+- `packages/core/src/decode/decode-service.ts` - Added interface methods and implementations
+- `packages/core/src/decode/mock-decode-service.ts` - Added mock implementations
+
+**Verification**:
+- All 257 packages/core tests pass
+- All 38 literoom-wasm tests pass
+- Clippy passes with no warnings
+- TypeScript type check passes
+
+**Status**: Complete
+
+**Next Step**: Phase 12.6 - Preview Pipeline Integration (integrate transforms into useEditPreview.ts)
+
+---
+
 ## 68: 2026-01-21 14:05 EST: Fix Histogram RGB Channel Rendering
 
 **Objective**: Fix the critical histogram rendering issue where RGB channels appeared as a single gray shape instead of separate colored curves.

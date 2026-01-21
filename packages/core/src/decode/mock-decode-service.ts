@@ -459,6 +459,110 @@ export class MockDecodeService implements IDecodeService {
     return { width, height, pixels: outputPixels }
   }
 
+  async applyRotation(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    angleDegrees: number,
+    useLanczos = false
+  ): Promise<DecodedImage> {
+    await this.simulateOperation()
+
+    // Fast path: no rotation needed
+    if (Math.abs(angleDegrees) < 0.001) {
+      return { width, height, pixels: new Uint8Array(pixels) }
+    }
+
+    // For mock, compute approximate new dimensions for rotated image
+    const angleRad = Math.abs(angleDegrees * Math.PI / 180)
+    const cos = Math.abs(Math.cos(angleRad))
+    const sin = Math.abs(Math.sin(angleRad))
+
+    // Compute rotated bounding box
+    const newWidth = Math.ceil(width * cos + height * sin)
+    const newHeight = Math.ceil(width * sin + height * cos)
+
+    // For demo mode, return a pixel buffer of the new dimensions
+    // (simplified - just copy pixels to new size, real WASM does actual rotation)
+    const outputPixels = new Uint8Array(newWidth * newHeight * 3)
+
+    // Simple nearest-neighbor sampling (mock quality, not production)
+    const srcCx = width / 2
+    const srcCy = height / 2
+    const dstCx = newWidth / 2
+    const dstCy = newHeight / 2
+    const cosR = Math.cos(-angleDegrees * Math.PI / 180)
+    const sinR = Math.sin(-angleDegrees * Math.PI / 180)
+
+    for (let dy = 0; dy < newHeight; dy++) {
+      for (let dx = 0; dx < newWidth; dx++) {
+        // Translate to center, inverse rotate, translate back
+        const relX = dx - dstCx
+        const relY = dy - dstCy
+        const srcX = Math.round(relX * cosR - relY * sinR + srcCx)
+        const srcY = Math.round(relX * sinR + relY * cosR + srcCy)
+
+        const dstIdx = (dy * newWidth + dx) * 3
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const srcIdx = (srcY * width + srcX) * 3
+          outputPixels[dstIdx] = pixels[srcIdx] ?? 0
+          outputPixels[dstIdx + 1] = pixels[srcIdx + 1] ?? 0
+          outputPixels[dstIdx + 2] = pixels[srcIdx + 2] ?? 0
+        }
+        // Out of bounds pixels remain black (0)
+      }
+    }
+
+    return { width: newWidth, height: newHeight, pixels: outputPixels }
+  }
+
+  async applyCrop(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    crop: { left: number; top: number; width: number; height: number }
+  ): Promise<DecodedImage> {
+    await this.simulateOperation()
+
+    // Fast path: full image (no crop)
+    if (crop.left === 0 && crop.top === 0 && crop.width === 1 && crop.height === 1) {
+      return { width, height, pixels: new Uint8Array(pixels) }
+    }
+
+    // Convert normalized coordinates to pixel coordinates
+    const pxLeft = Math.round(crop.left * width)
+    const pxTop = Math.round(crop.top * height)
+    const pxWidth = Math.max(1, Math.round(crop.width * width))
+    const pxHeight = Math.max(1, Math.round(crop.height * height))
+
+    // Clamp to bounds
+    const clampedLeft = Math.min(pxLeft, width - 1)
+    const clampedTop = Math.min(pxTop, height - 1)
+    const clampedRight = Math.min(clampedLeft + pxWidth, width)
+    const clampedBottom = Math.min(clampedTop + pxHeight, height)
+    const outWidth = Math.max(1, clampedRight - clampedLeft)
+    const outHeight = Math.max(1, clampedBottom - clampedTop)
+
+    // Copy cropped region
+    const outputPixels = new Uint8Array(outWidth * outHeight * 3)
+
+    for (let y = 0; y < outHeight; y++) {
+      const srcY = clampedTop + y
+      for (let x = 0; x < outWidth; x++) {
+        const srcX = clampedLeft + x
+        const srcIdx = (srcY * width + srcX) * 3
+        const dstIdx = (y * outWidth + x) * 3
+
+        outputPixels[dstIdx] = pixels[srcIdx] ?? 0
+        outputPixels[dstIdx + 1] = pixels[srcIdx + 1] ?? 0
+        outputPixels[dstIdx + 2] = pixels[srcIdx + 2] ?? 0
+      }
+    }
+
+    return { width: outWidth, height: outHeight, pixels: outputPixels }
+  }
+
   destroy(): void {
     this._state = { status: 'error', error: 'Service destroyed' }
   }

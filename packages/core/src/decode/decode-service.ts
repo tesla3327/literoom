@@ -67,6 +67,21 @@ export interface IDecodeService {
     height: number,
     points: Array<{ x: number; y: number }>
   ): Promise<DecodedImage>
+  /** Apply rotation to image pixel data */
+  applyRotation(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    angleDegrees: number,
+    useLanczos?: boolean
+  ): Promise<DecodedImage>
+  /** Apply crop to image pixel data using normalized coordinates */
+  applyCrop(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    crop: { left: number; top: number; width: number; height: number }
+  ): Promise<DecodedImage>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -355,6 +370,62 @@ export class DecodeService implements IDecodeService {
       width,
       height,
       points
+    })
+  }
+
+  /**
+   * Apply rotation to image pixel data.
+   * Returns a new image with the rotation applied.
+   *
+   * @param pixels - RGB pixel data (3 bytes per pixel)
+   * @param width - Image width
+   * @param height - Image height
+   * @param angleDegrees - Rotation angle (positive = counter-clockwise)
+   * @param useLanczos - Use high-quality Lanczos3 filter (default: false for bilinear)
+   */
+  async applyRotation(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    angleDegrees: number,
+    useLanczos = false
+  ): Promise<DecodedImage> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'apply-rotation',
+      pixels,
+      width,
+      height,
+      angleDegrees,
+      useLanczos
+    })
+  }
+
+  /**
+   * Apply crop to image pixel data using normalized coordinates.
+   * Returns a new image with the crop applied.
+   *
+   * @param pixels - RGB pixel data (3 bytes per pixel)
+   * @param width - Image width
+   * @param height - Image height
+   * @param crop - Crop rectangle in normalized coordinates (0-1)
+   */
+  async applyCrop(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    crop: { left: number; top: number; width: number; height: number }
+  ): Promise<DecodedImage> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'apply-crop',
+      pixels,
+      width,
+      height,
+      left: crop.left,
+      top: crop.top,
+      cropWidth: crop.width,
+      cropHeight: crop.height
     })
   }
 
