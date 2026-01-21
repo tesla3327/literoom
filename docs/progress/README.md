@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 15:19 EST
-**Current Phase**: Crop Overlay on Preview Canvas - Research
+**Last Updated**: 2026-01-21 15:24 EST
+**Current Phase**: Histogram Not Updating - Research
 
 ## Project Structure
 
@@ -222,6 +222,7 @@ literoom/
 | [78](./iterations-71-80.md:3) | 2026-01-21 | Direct URL Navigation Fix - Research |
 | [79](./iterations-71-80.md:3) | 2026-01-21 | Direct URL Navigation Fix - Complete |
 | [80](./iterations-71-80.md:3) | 2026-01-21 | Crop Overlay on Preview Canvas - Research |
+| [81](./iterations-71-80.md:3) | 2026-01-21 | Histogram Not Updating - Research Complete |
 
 ---
 
