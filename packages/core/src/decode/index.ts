@@ -14,6 +14,7 @@ export {
   type FileType,
   type ErrorCode,
   type DecodeServiceState,
+  type HistogramData,
   DecodeError,
   filterToNumber
 } from './types'
@@ -27,9 +28,11 @@ export {
   type GeneratePreviewRequest,
   type DetectFileTypeRequest,
   type ApplyAdjustmentsRequest,
+  type ComputeHistogramRequest,
   type DecodeResponse,
   type DecodeSuccessResponse,
   type FileTypeResponse,
+  type HistogramResponse,
   type DecodeErrorResponse
 } from './worker-messages'
 

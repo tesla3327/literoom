@@ -3,7 +3,7 @@
  * Edit Page
  *
  * Single photo editing view with:
- * - Left panel: histogram (placeholder)
+ * - Left panel: histogram
  * - Center: preview canvas
  * - Right panel: edit controls
  * - Bottom: filmstrip navigation
@@ -122,7 +122,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-gray-950" data-testid="edit-page">
+  <div
+    class="h-screen flex flex-col bg-gray-950"
+    data-testid="edit-page"
+  >
     <!-- Header -->
     <header class="h-12 border-b border-gray-800 flex items-center px-4 gap-4 flex-shrink-0">
       <UButton
@@ -163,13 +166,11 @@ onUnmounted(() => {
 
     <!-- Main content -->
     <div class="flex-1 flex overflow-hidden">
-      <!-- Left panel: histogram (placeholder) -->
+      <!-- Left panel: histogram -->
       <aside class="w-64 border-r border-gray-800 p-4 flex-shrink-0 overflow-y-auto">
         <div class="space-y-4">
-          <h3 class="text-sm font-medium text-gray-400">Histogram</h3>
-          <div class="aspect-[4/3] bg-gray-900 rounded flex items-center justify-center">
-            <span class="text-xs text-gray-600">Coming soon</span>
-          </div>
+          <!-- Histogram Display -->
+          <EditHistogramDisplay :asset-id="assetId" />
 
           <!-- Quick info -->
           <div class="space-y-2 text-sm">

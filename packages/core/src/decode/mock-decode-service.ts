@@ -17,7 +17,8 @@ import type {
   ThumbnailOptions,
   PreviewOptions,
   FileType,
-  Adjustments
+  Adjustments,
+  HistogramData
 } from './types'
 import { DecodeError } from './types'
 
@@ -54,6 +55,12 @@ export interface MockDecodeServiceOptions {
     height: number,
     adjustments: Adjustments
   ) => Promise<DecodedImage>
+  /** Custom handler for computeHistogram */
+  onComputeHistogram?: (
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ) => Promise<HistogramData>
 }
 
 /**
@@ -244,6 +251,52 @@ export class MockDecodeService implements IDecodeService {
     const outputPixels = new Uint8Array(pixels.length)
     outputPixels.set(pixels)
     return { width, height, pixels: outputPixels }
+  }
+
+  async computeHistogram(
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ): Promise<HistogramData> {
+    await this.simulateOperation()
+
+    if (this.options.onComputeHistogram) {
+      return this.options.onComputeHistogram(pixels, width, height)
+    }
+
+    // Default: return a mock bell-curve histogram centered at 128
+    const red = new Uint32Array(256)
+    const green = new Uint32Array(256)
+    const blue = new Uint32Array(256)
+    const luminance = new Uint32Array(256)
+
+    // Generate bell-curve-like distribution
+    const totalPixels = width * height
+    for (let i = 0; i < 256; i++) {
+      const value = Math.floor(
+        (totalPixels / 256) * Math.exp(-Math.pow(i - 128, 2) / 5000)
+      )
+      red[i] = value
+      green[i] = value
+      blue[i] = value
+      luminance[i] = value
+    }
+
+    // Find max value
+    let maxValue = 0
+    for (let i = 0; i < 256; i++) {
+      maxValue = Math.max(maxValue, red[i], green[i], blue[i])
+    }
+
+    return {
+      red,
+      green,
+      blue,
+      luminance,
+      maxValue,
+      hasHighlightClipping: false,
+      hasShadowClipping: false
+    }
   }
 
   destroy(): void {

@@ -17,6 +17,7 @@ export type DecodeRequest =
   | GeneratePreviewRequest
   | DetectFileTypeRequest
   | ApplyAdjustmentsRequest
+  | ComputeHistogramRequest
 
 /**
  * Decode a JPEG file to raw RGB pixels.
@@ -86,11 +87,26 @@ export interface ApplyAdjustmentsRequest {
 }
 
 /**
+ * Compute histogram from image pixels.
+ */
+export interface ComputeHistogramRequest {
+  id: string
+  type: 'compute-histogram'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+}
+
+/**
  * Response message sent from decode worker to main thread.
  */
 export type DecodeResponse =
   | DecodeSuccessResponse
   | FileTypeResponse
+  | HistogramResponse
   | DecodeErrorResponse
 
 /**
@@ -122,4 +138,26 @@ export interface DecodeErrorResponse {
   type: 'error'
   message: string
   code: ErrorCode
+}
+
+/**
+ * Histogram computation response.
+ */
+export interface HistogramResponse {
+  id: string
+  type: 'histogram'
+  /** Red channel histogram (256 bins) */
+  red: Uint32Array
+  /** Green channel histogram (256 bins) */
+  green: Uint32Array
+  /** Blue channel histogram (256 bins) */
+  blue: Uint32Array
+  /** Luminance histogram (256 bins) */
+  luminance: Uint32Array
+  /** Maximum bin value across RGB channels */
+  maxValue: number
+  /** True if any channel has pixels at 255 */
+  hasHighlightClipping: boolean
+  /** True if any channel has pixels at 0 */
+  hasShadowClipping: boolean
 }

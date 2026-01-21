@@ -27,6 +27,7 @@ use wasm_bindgen::prelude::*;
 
 mod adjustments;
 mod decode;
+mod histogram;
 mod types;
 
 // Re-export public types
@@ -35,6 +36,7 @@ pub use decode::{
     decode_jpeg, decode_raw_thumbnail, extract_raw_thumbnail_bytes, generate_thumbnail,
     is_raw_file, resize, resize_to_fit,
 };
+pub use histogram::{compute_histogram, JsHistogram};
 pub use types::JsDecodedImage;
 
 /// Initialize the WASM module (called automatically on load)

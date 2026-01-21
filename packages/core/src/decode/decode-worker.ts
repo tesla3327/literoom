@@ -19,6 +19,7 @@ import init, {
   resize_to_fit,
   is_raw_file,
   apply_adjustments,
+  compute_histogram,
   BasicAdjustments,
   JsDecodedImage
 } from 'literoom-wasm'
@@ -27,7 +28,8 @@ import type {
   DecodeRequest,
   DecodeResponse,
   DecodeSuccessResponse,
-  DecodeErrorResponse
+  DecodeErrorResponse,
+  HistogramResponse
 } from './worker-messages'
 import type { ErrorCode } from './types'
 
@@ -240,6 +242,46 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
         // Free output image WASM memory
         outputImage.free()
+        break
+      }
+
+      case 'compute-histogram': {
+        const { pixels, width, height } = request
+
+        // Compute histogram via WASM
+        const histogram = compute_histogram(pixels, width, height)
+
+        // Extract data from WASM histogram
+        const red = new Uint32Array(histogram.red())
+        const green = new Uint32Array(histogram.green())
+        const blue = new Uint32Array(histogram.blue())
+        const luminance = new Uint32Array(histogram.luminance())
+        const maxValue = histogram.max_value
+        const hasHighlightClipping = histogram.has_highlight_clipping
+        const hasShadowClipping = histogram.has_shadow_clipping
+
+        // Free WASM memory
+        histogram.free()
+
+        const response: HistogramResponse = {
+          id,
+          type: 'histogram',
+          red,
+          green,
+          blue,
+          luminance,
+          maxValue,
+          hasHighlightClipping,
+          hasShadowClipping
+        }
+
+        // Transfer buffers to avoid copying
+        self.postMessage(response, [
+          red.buffer,
+          green.buffer,
+          blue.buffer,
+          luminance.buffer
+        ])
         break
       }
 

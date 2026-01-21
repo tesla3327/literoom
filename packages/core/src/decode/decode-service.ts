@@ -14,7 +14,8 @@ import type {
   PreviewOptions,
   FileType,
   ErrorCode,
-  Adjustments
+  Adjustments,
+  HistogramData
 } from './types'
 import { DecodeError, filterToNumber } from './types'
 
@@ -53,6 +54,12 @@ export interface IDecodeService {
     height: number,
     adjustments: Adjustments
   ): Promise<DecodedImage>
+  /** Compute histogram from image pixel data */
+  computeHistogram(
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ): Promise<HistogramData>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -61,7 +68,7 @@ export interface IDecodeService {
  * Pending request waiting for a response from the worker.
  */
 interface PendingRequest {
-  resolve: (value: DecodedImage | FileType) => void
+  resolve: (value: DecodedImage | FileType | HistogramData) => void
   reject: (error: Error) => void
   timeoutId: ReturnType<typeof setTimeout>
 }
@@ -172,13 +179,24 @@ export class DecodeService implements IDecodeService {
           pixels: response.pixels
         })
         break
+      case 'histogram':
+        pending.resolve({
+          red: response.red,
+          green: response.green,
+          blue: response.blue,
+          luminance: response.luminance,
+          maxValue: response.maxValue,
+          hasHighlightClipping: response.hasHighlightClipping,
+          hasShadowClipping: response.hasShadowClipping
+        })
+        break
     }
   }
 
   /**
    * Send a request to the worker and wait for a response.
    */
-  private sendRequest<T extends DecodedImage | FileType>(
+  private sendRequest<T extends DecodedImage | FileType | HistogramData>(
     request: DecodeRequest
   ): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -193,7 +211,7 @@ export class DecodeService implements IDecodeService {
       }, DEFAULT_TIMEOUT)
 
       this.pending.set(request.id, {
-        resolve: resolve as (value: DecodedImage | FileType) => void,
+        resolve: resolve as (value: DecodedImage | FileType | HistogramData) => void,
         reject,
         timeoutId
       })
@@ -285,6 +303,24 @@ export class DecodeService implements IDecodeService {
       width,
       height,
       adjustments
+    })
+  }
+
+  /**
+   * Compute histogram from image pixel data.
+   * Returns histogram data for all channels.
+   */
+  async computeHistogram(
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ): Promise<HistogramData> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'compute-histogram',
+      pixels,
+      width,
+      height
     })
   }
 

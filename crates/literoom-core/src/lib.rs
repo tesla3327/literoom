@@ -5,6 +5,7 @@
 
 pub mod adjustments;
 pub mod decode;
+pub mod histogram;
 
 /// Basic adjustments for image editing
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]

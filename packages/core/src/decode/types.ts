@@ -115,6 +115,29 @@ export interface Adjustments {
 }
 
 /**
+ * Histogram data for an image.
+ *
+ * Contains 256-bin histograms for RGB and luminance channels,
+ * plus clipping indicators.
+ */
+export interface HistogramData {
+  /** Red channel histogram (256 bins) */
+  red: Uint32Array
+  /** Green channel histogram (256 bins) */
+  green: Uint32Array
+  /** Blue channel histogram (256 bins) */
+  blue: Uint32Array
+  /** Luminance histogram (256 bins) */
+  luminance: Uint32Array
+  /** Maximum bin value across RGB channels (for normalization) */
+  maxValue: number
+  /** True if any channel has pixels at value 255 */
+  hasHighlightClipping: boolean
+  /** True if any channel has pixels at value 0 */
+  hasShadowClipping: boolean
+}
+
+/**
  * Convert filter type string to numeric value for WASM.
  */
 export function filterToNumber(filter: FilterType | undefined): number {
