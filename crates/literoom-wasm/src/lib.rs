@@ -30,7 +30,7 @@ mod decode;
 mod types;
 
 // Re-export public types
-pub use adjustments::BasicAdjustments;
+pub use adjustments::{apply_adjustments, BasicAdjustments};
 pub use decode::{
     decode_jpeg, decode_raw_thumbnail, extract_raw_thumbnail_bytes, generate_thumbnail,
     is_raw_file, resize, resize_to_fit,

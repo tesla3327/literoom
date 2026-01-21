@@ -28,6 +28,21 @@ pub struct JsDecodedImage {
 
 #[wasm_bindgen]
 impl JsDecodedImage {
+    /// Create a new JsDecodedImage from dimensions and pixel data.
+    ///
+    /// # Arguments
+    /// * `width` - Image width in pixels
+    /// * `height` - Image height in pixels
+    /// * `pixels` - RGB pixel data (3 bytes per pixel, row-major order)
+    #[wasm_bindgen(constructor)]
+    pub fn new(width: u32, height: u32, pixels: Vec<u8>) -> JsDecodedImage {
+        JsDecodedImage {
+            width,
+            height,
+            pixels,
+        }
+    }
+
     /// Get the image width in pixels
     #[wasm_bindgen(getter)]
     pub fn width(&self) -> u32 {

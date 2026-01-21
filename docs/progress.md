@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 10:08 EST
-**Current Phase**: Phase 9.1 Complete - Rust Adjustment Module
+**Last Updated**: 2026-01-21 10:09 EST
+**Current Phase**: Phase 9.2 Complete - WASM Bindings for apply_adjustments()
 
 ## Project Structure
 
@@ -37,6 +37,61 @@ literoom/
 ```
 
 ## Completed Work
+
+### 49: 2026-01-21 10:09 EST: Phase 9.2 Complete - WASM Bindings for apply_adjustments()
+
+**Objective**: Expose the `apply_adjustments()` function to JavaScript via WASM bindings.
+
+**Work Completed**:
+
+**Updated `crates/literoom-wasm/src/types.rs`**:
+- Added `JsDecodedImage::new(width, height, pixels)` constructor for creating images from JavaScript
+
+**Updated `crates/literoom-wasm/src/adjustments.rs`**:
+- Added `apply_adjustments(image, adjustments)` WASM-bound function
+- Takes a `JsDecodedImage` and `BasicAdjustments`, returns a new adjusted image
+- Clones input pixels to avoid modifying the original image
+- Added `inner()` method to `BasicAdjustments` to access core type
+
+**Updated `crates/literoom-wasm/src/lib.rs`**:
+- Exported `apply_adjustments` function
+
+**Unit Tests** (5 new tests in literoom-wasm):
+- Identity test (default adjustments = no change)
+- Exposure test (+1 stop = 2x brightness)
+- Contrast test (dark pixel gets darker)
+- Non-destructive test (original image unchanged)
+
+**Test Results**:
+- `literoom-core`: 76 tests passing
+- `literoom-wasm`: 19 tests passing (5 new apply_adjustments tests)
+- Clippy: No warnings
+- Formatting: Passes
+- WASM build: Succeeds (447KB)
+
+**TypeScript API**:
+```typescript
+// Create image from pixels
+const image = new JsDecodedImage(width, height, pixels);
+
+// Set up adjustments
+const adj = new BasicAdjustments();
+adj.exposure = 1.0;  // +1 stop
+adj.contrast = 20;   // +20 contrast
+
+// Apply adjustments (returns new image)
+const adjusted = apply_adjustments(image, adj);
+const outputPixels = adjusted.pixels();
+```
+
+**Files Modified**:
+- `crates/literoom-wasm/src/types.rs` (added constructor)
+- `crates/literoom-wasm/src/adjustments.rs` (added apply_adjustments + tests)
+- `crates/literoom-wasm/src/lib.rs` (added export)
+
+**Next Step**: Phase 9.3 - Worker Message Types for apply-adjustments requests.
+
+---
 
 ### 48: 2026-01-21 10:08 EST: Phase 9.1 Complete - Rust Adjustment Module
 

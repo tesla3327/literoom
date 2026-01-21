@@ -3,6 +3,8 @@
 //! This module provides JavaScript bindings for the BasicAdjustments type,
 //! allowing photo editing parameters to be manipulated from TypeScript.
 
+use crate::types::JsDecodedImage;
+use literoom_core::adjustments::apply_all_adjustments;
 use wasm_bindgen::prelude::*;
 
 /// Basic adjustments wrapper for JavaScript
@@ -165,6 +167,46 @@ impl Default for BasicAdjustments {
     }
 }
 
+impl BasicAdjustments {
+    /// Get a reference to the inner BasicAdjustments for use in apply_adjustments
+    pub(crate) fn inner(&self) -> &literoom_core::BasicAdjustments {
+        &self.inner
+    }
+}
+
+/// Apply all adjustments to an image.
+///
+/// Takes an image and adjustments, returning a new adjusted image.
+/// The original image's pixel data is cloned and modified.
+///
+/// # Arguments
+/// * `image` - The source image to apply adjustments to
+/// * `adjustments` - The adjustment values to apply
+///
+/// # Returns
+/// A new JsDecodedImage with the adjustments applied
+///
+/// # Example (TypeScript)
+/// ```typescript
+/// const adj = new BasicAdjustments();
+/// adj.exposure = 1.0;  // +1 stop
+/// adj.contrast = 20;   // +20 contrast
+///
+/// const adjusted = apply_adjustments(sourceImage, adj);
+/// const pixels = adjusted.pixels();
+/// ```
+#[wasm_bindgen]
+pub fn apply_adjustments(image: &JsDecodedImage, adjustments: &BasicAdjustments) -> JsDecodedImage {
+    // Clone the pixel data so we don't modify the original
+    let mut pixels = image.pixels();
+
+    // Apply all adjustments
+    apply_all_adjustments(&mut pixels, adjustments.inner());
+
+    // Return a new image with the adjusted pixels
+    JsDecodedImage::new(image.width(), image.height(), pixels)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,5 +251,65 @@ mod tests {
 
         adj.set_blacks(-0.05);
         assert_eq!(adj.blacks(), -0.05);
+    }
+
+    #[test]
+    fn test_apply_adjustments_identity() {
+        // Create a simple 2x1 image with two gray pixels
+        let pixels = vec![128, 128, 128, 64, 64, 64];
+        let image = JsDecodedImage::new(2, 1, pixels.clone());
+        let adj = BasicAdjustments::new();
+
+        let result = apply_adjustments(&image, &adj);
+
+        assert_eq!(result.width(), 2);
+        assert_eq!(result.height(), 1);
+        assert_eq!(result.pixels(), pixels);
+    }
+
+    #[test]
+    fn test_apply_adjustments_exposure() {
+        // Create a 1x1 gray pixel
+        let pixels = vec![64, 64, 64];
+        let image = JsDecodedImage::new(1, 1, pixels);
+
+        let mut adj = BasicAdjustments::new();
+        adj.set_exposure(1.0); // +1 stop = 2x brightness
+
+        let result = apply_adjustments(&image, &adj);
+        let result_pixels = result.pixels();
+
+        // 64 * 2 = 128
+        assert_eq!(result_pixels, vec![128, 128, 128]);
+    }
+
+    #[test]
+    fn test_apply_adjustments_does_not_modify_original() {
+        let pixels = vec![100, 100, 100];
+        let image = JsDecodedImage::new(1, 1, pixels.clone());
+
+        let mut adj = BasicAdjustments::new();
+        adj.set_exposure(2.0);
+
+        let _result = apply_adjustments(&image, &adj);
+
+        // Original image should be unchanged
+        assert_eq!(image.pixels(), pixels);
+    }
+
+    #[test]
+    fn test_apply_adjustments_contrast() {
+        // Dark pixel
+        let pixels = vec![64, 64, 64];
+        let image = JsDecodedImage::new(1, 1, pixels);
+
+        let mut adj = BasicAdjustments::new();
+        adj.set_contrast(100.0); // Double contrast
+
+        let result = apply_adjustments(&image, &adj);
+        let result_pixels = result.pixels();
+
+        // Dark pixel should get darker with increased contrast
+        assert!(result_pixels[0] < 64, "Dark pixel should get darker");
     }
 }
