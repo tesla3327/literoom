@@ -18,6 +18,7 @@ import type {
   HistogramData
 } from './types'
 import { DecodeError, filterToNumber } from './types'
+import { DecodeWorkerPool, type PoolOptions } from './decode-worker-pool'
 
 const DEFAULT_TIMEOUT = 30_000
 
@@ -82,6 +83,13 @@ export interface IDecodeService {
     height: number,
     crop: { left: number; top: number; width: number; height: number }
   ): Promise<DecodedImage>
+  /** Encode image pixel data to JPEG bytes */
+  encodeJpeg(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    quality?: number
+  ): Promise<Uint8Array>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -90,7 +98,7 @@ export interface IDecodeService {
  * Pending request waiting for a response from the worker.
  */
 interface PendingRequest {
-  resolve: (value: DecodedImage | FileType | HistogramData) => void
+  resolve: (value: DecodedImage | FileType | HistogramData | Uint8Array) => void
   reject: (error: Error) => void
   timeoutId: ReturnType<typeof setTimeout>
 }
@@ -126,6 +134,28 @@ export class DecodeService implements IDecodeService {
     const service = new DecodeService()
     await service.initialize()
     return service
+  }
+
+  /**
+   * Create a pooled DecodeService with multiple workers for parallel processing.
+   *
+   * This factory returns a DecodeWorkerPool that implements IDecodeService,
+   * enabling parallel thumbnail generation across CPU cores.
+   *
+   * @param options - Pool configuration options
+   * @returns A pooled decode service implementing IDecodeService
+   *
+   * @example
+   * ```typescript
+   * // Create with default worker count (navigator.hardwareConcurrency)
+   * const service = await DecodeService.createPooled()
+   *
+   * // Create with specific worker count
+   * const service = await DecodeService.createPooled({ workerCount: 4 })
+   * ```
+   */
+  static async createPooled(options?: PoolOptions): Promise<IDecodeService> {
+    return DecodeWorkerPool.create(options)
   }
 
   /**
@@ -219,13 +249,18 @@ export class DecodeService implements IDecodeService {
           pixels: response.pixels
         })
         break
+      case 'encode-jpeg-result':
+        // For encode-jpeg, we return the raw JPEG bytes directly
+        // The resolve type is DecodedImage | FileType | HistogramData | Uint8Array
+        (pending.resolve as (value: Uint8Array) => void)(response.bytes)
+        break
     }
   }
 
   /**
    * Send a request to the worker and wait for a response.
    */
-  private sendRequest<T extends DecodedImage | FileType | HistogramData>(
+  private sendRequest<T extends DecodedImage | FileType | HistogramData | Uint8Array>(
     request: DecodeRequest
   ): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -240,7 +275,7 @@ export class DecodeService implements IDecodeService {
       }, DEFAULT_TIMEOUT)
 
       this.pending.set(request.id, {
-        resolve: resolve as (value: DecodedImage | FileType | HistogramData) => void,
+        resolve: resolve as (value: DecodedImage | FileType | HistogramData | Uint8Array) => void,
         reject,
         timeoutId
       })
@@ -426,6 +461,31 @@ export class DecodeService implements IDecodeService {
       top: crop.top,
       cropWidth: crop.width,
       cropHeight: crop.height
+    })
+  }
+
+  /**
+   * Encode image pixel data to JPEG bytes.
+   *
+   * @param pixels - RGB pixel data (3 bytes per pixel)
+   * @param width - Image width
+   * @param height - Image height
+   * @param quality - JPEG quality 1-100 (default: 90)
+   * @returns JPEG-encoded bytes
+   */
+  async encodeJpeg(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    quality = 90
+  ): Promise<Uint8Array> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'encode-jpeg',
+      pixels,
+      width,
+      height,
+      quality
     })
   }
 

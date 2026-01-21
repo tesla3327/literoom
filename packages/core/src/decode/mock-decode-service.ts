@@ -563,6 +563,43 @@ export class MockDecodeService implements IDecodeService {
     return { width: outWidth, height: outHeight, pixels: outputPixels }
   }
 
+  async encodeJpeg(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    quality = 90
+  ): Promise<Uint8Array> {
+    await this.simulateOperation()
+
+    // For demo mode, return mock JPEG bytes
+    // A minimal valid JPEG consists of SOI (0xFF 0xD8) and EOI (0xFF 0xD9) markers
+    // with required segments in between. For mock purposes, we return a simple
+    // structure that looks like a JPEG but contains our pixel data info.
+
+    // Create a minimal "mock JPEG" buffer
+    // In real usage, this would be actual JPEG encoding
+    const mockJpegHeader = new Uint8Array([
+      0xFF, 0xD8, // SOI (Start Of Image)
+      0xFF, 0xE0, // APP0 marker
+      0x00, 0x10, // APP0 length (16 bytes)
+      0x4A, 0x46, 0x49, 0x46, 0x00, // "JFIF\0"
+      0x01, 0x01, // Version 1.1
+      0x00, // Aspect ratio units (0 = no units)
+      0x00, 0x01, // X density
+      0x00, 0x01, // Y density
+      0x00, 0x00, // No thumbnail
+    ])
+
+    // For mock, we'll just return the header followed by EOI
+    // Real JPEG would have compressed image data here
+    const mockJpeg = new Uint8Array(mockJpegHeader.length + 2)
+    mockJpeg.set(mockJpegHeader)
+    mockJpeg[mockJpegHeader.length] = 0xFF
+    mockJpeg[mockJpegHeader.length + 1] = 0xD9 // EOI (End Of Image)
+
+    return mockJpeg
+  }
+
   destroy(): void {
     this._state = { status: 'error', error: 'Service destroyed' }
   }

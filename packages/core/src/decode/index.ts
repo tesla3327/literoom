@@ -33,16 +33,21 @@ export {
   type ApplyAdjustmentsRequest,
   type ComputeHistogramRequest,
   type ApplyToneCurveRequest,
+  type EncodeJpegRequest,
   type DecodeResponse,
   type DecodeSuccessResponse,
   type FileTypeResponse,
   type HistogramResponse,
   type ToneCurveResponse,
+  type EncodeJpegResponse,
   type DecodeErrorResponse
 } from './worker-messages'
 
 // Service
 export { DecodeService, type IDecodeService } from './decode-service'
+
+// Worker Pool
+export { DecodeWorkerPool, type PoolOptions } from './decode-worker-pool'
 
 // Mock service for testing
 export {

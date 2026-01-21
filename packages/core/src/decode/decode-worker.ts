@@ -23,6 +23,7 @@ import init, {
   apply_rotation,
   apply_crop,
   compute_histogram,
+  encode_jpeg,
   BasicAdjustments,
   JsDecodedImage,
   JsToneCurveLut
@@ -34,7 +35,8 @@ import type {
   DecodeSuccessResponse,
   DecodeErrorResponse,
   HistogramResponse,
-  ToneCurveResponse
+  ToneCurveResponse,
+  EncodeJpegResponse
 } from './worker-messages'
 import type { ErrorCode } from './types'
 
@@ -390,6 +392,23 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
         // Free output image WASM memory
         outputImage.free()
+        break
+      }
+
+      case 'encode-jpeg': {
+        const { pixels, width, height, quality } = request
+
+        // Encode pixels to JPEG bytes
+        const jpegBytes = encode_jpeg(pixels, width, height, quality)
+
+        const response: EncodeJpegResponse = {
+          id,
+          type: 'encode-jpeg-result',
+          bytes: jpegBytes
+        }
+
+        // Transfer the JPEG buffer to avoid copying
+        self.postMessage(response, [jpegBytes.buffer])
         break
       }
 

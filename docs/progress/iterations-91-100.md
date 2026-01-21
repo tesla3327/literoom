@@ -316,3 +316,66 @@ All 6 phases completed:
 **Status**: Phase 1 complete. Ready for Phase 2 (Worker Integration).
 
 ---
+
+## 97: 2026-01-21 18:50 EST: Export Workflow - Phase 2 (Worker Integration)
+
+**Objective**: Expose JPEG encoding through the decode worker and service layer.
+
+**Background**: Phase 1 added JPEG encoding to the Rust/WASM layer. This phase integrates it into the TypeScript worker and service classes so the frontend can use it.
+
+**Implementation Summary**:
+
+1. **Updated `packages/core/src/decode/worker-messages.ts`**
+   - Already had `EncodeJpegRequest` and `EncodeJpegResponse` types (added in Phase 1)
+
+2. **Updated `packages/core/src/decode/decode-worker.ts`**
+   - Added handler for `'encode-jpeg'` case
+   - Calls `encode_jpeg(pixels, width, height, quality)` WASM function
+   - Returns `EncodeJpegResponse` with JPEG bytes
+   - Transfers buffer to avoid copying
+
+3. **Updated `packages/core/src/decode/decode-service.ts`**
+   - Added `encodeJpeg` method to `IDecodeService` interface
+   - Implemented `encodeJpeg(pixels, width, height, quality)` method
+   - Updated `handleResponse` to handle `'encode-jpeg-result'`
+   - Updated `PendingRequest` and `sendRequest` types for `Uint8Array` return
+
+4. **Updated `packages/core/src/decode/decode-worker-pool.ts`**
+   - Added `encodeJpeg` method matching the interface
+   - Updated response handling for `'encode-jpeg-result'`
+   - Updated type signatures for `Uint8Array` return
+
+5. **Updated `packages/core/src/decode/mock-decode-service.ts`**
+   - Added `encodeJpeg` method returning mock JPEG bytes
+   - Returns minimal valid JPEG structure (SOI, APP0, EOI markers)
+
+6. **Updated `packages/core/src/decode/index.ts`**
+   - Added `EncodeJpegRequest` and `EncodeJpegResponse` type exports
+
+**Files Modified** (6 files):
+- `packages/core/src/decode/decode-worker.ts`
+- `packages/core/src/decode/decode-service.ts`
+- `packages/core/src/decode/decode-worker-pool.ts`
+- `packages/core/src/decode/mock-decode-service.ts`
+- `packages/core/src/decode/index.ts`
+- `packages/wasm/*` (rebuilt TypeScript bindings)
+
+**Tests**:
+- 257 TypeScript tests passing
+- 181 Rust tests passing (142 + 39)
+- TypeScript type checking passes
+
+**API Added**:
+```typescript
+// IDecodeService interface
+encodeJpeg(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  quality?: number  // Default: 90
+): Promise<Uint8Array>
+```
+
+**Status**: Phase 2 complete. Ready for Phase 3 (Filename Template Parser).
+
+---
