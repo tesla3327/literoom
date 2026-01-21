@@ -165,6 +165,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
   const { $decodeService } = useNuxtApp()
+  const { requestThumbnail } = useCatalog()
 
   // ============================================================================
   // State
@@ -362,6 +363,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       error.value = null
       sourceCache.value = null
 
+      // Request thumbnail generation (priority 0 = highest for edit view)
+      // This ensures the thumbnail is generated even if we navigate directly to edit view
+      requestThumbnail(id, 0)
+
       // Show thumbnail immediately while loading pixels
       const asset = catalogStore.assets.get(id)
       previewUrl.value = asset?.thumbnailUrl ?? null
@@ -378,13 +383,18 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   )
 
   /**
-   * Watch for source URL changes (e.g., when thumbnail loads).
+   * Watch for source URL changes (e.g., when thumbnail loads after request).
+   * This handles the case where we navigate to edit view before thumbnail is ready.
    */
   watch(
     sourceUrl,
     async (url) => {
       if (url && !sourceCache.value) {
         await loadSource(assetId.value)
+        // Render with current adjustments after loading
+        if (sourceCache.value) {
+          renderPreview('full')
+        }
       }
     },
   )

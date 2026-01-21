@@ -140,6 +140,7 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
   const { $decodeService } = useNuxtApp()
+  const { requestThumbnail } = useCatalog()
 
   // ============================================================================
   // State
@@ -362,6 +363,14 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
   // ============================================================================
 
   /**
+   * Computed source URL - watches for thumbnail URL changes.
+   */
+  const sourceUrl = computed(() => {
+    const asset = catalogStore.assets.get(assetId.value)
+    return asset?.thumbnailUrl ?? null
+  })
+
+  /**
    * Watch for asset changes and load new source.
    */
   watch(
@@ -372,10 +381,27 @@ export function useHistogramDisplay(assetId: Ref<string>): UseHistogramDisplayRe
       sourceCache.value = null
       histogram.value = null
 
+      // Request thumbnail generation (priority 0 = highest for edit view)
+      // This ensures the thumbnail is generated even if we navigate directly to edit view
+      requestThumbnail(id, 0)
+
       // Load source pixels and compute histogram
       await loadSource(id)
     },
     { immediate: true },
+  )
+
+  /**
+   * Watch for source URL changes (e.g., when thumbnail loads after request).
+   * This handles the case where we navigate to edit view before thumbnail is ready.
+   */
+  watch(
+    sourceUrl,
+    async (url) => {
+      if (url && !sourceCache.value) {
+        await loadSource(assetId.value)
+      }
+    },
   )
 
   /**

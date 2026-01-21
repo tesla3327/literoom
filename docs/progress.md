@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 10:40 EST
-**Current Phase**: Phase 10 Complete - Histogram Display Implemented
+**Last Updated**: 2026-01-21 10:48 EST
+**Current Phase**: Fix Complete - Edit View Preview Now Loads
 
 ## Project Structure
 
@@ -37,6 +37,40 @@ literoom/
 ```
 
 ## Completed Work
+
+### 53: 2026-01-21 10:48 EST: Fix Complete - Edit View Preview Now Loads
+
+**Objective**: Fix critical bug where edit view preview shows "Loading preview..." indefinitely.
+
+**Root Cause Analysis**:
+- The edit view (`useEditPreview` and `useHistogramDisplay` composables) never requested thumbnail generation
+- When navigating to edit view directly (or before thumbnails were ready), `thumbnailUrl` was `null`
+- The composables checked for `thumbnailUrl` and exited early if it was `null`, leaving `previewUrl` as `null` forever
+- This caused `isInitialLoading = true` indefinitely, showing "Loading preview..." forever
+
+**Fix Implemented**:
+1. Added `requestThumbnail()` call in `useEditPreview.ts` asset watcher
+2. Added `requestThumbnail()` call in `useHistogramDisplay.ts` asset watcher
+3. Both use priority 0 (highest) for edit view
+4. Added `sourceUrl` computed property in histogram composable to watch for thumbnail URL changes
+5. Updated watchers to load and render when thumbnail URL becomes available
+
+**Files Modified**:
+- `apps/web/app/composables/useEditPreview.ts` - Added thumbnail request and improved sourceUrl watcher
+- `apps/web/app/composables/useHistogramDisplay.ts` - Added thumbnail request and sourceUrl watcher
+
+**Research Documents Created**:
+- `docs/research/2026-01-21-edit-view-preview-fix-research-plan.md`
+- `docs/research/2026-01-21-edit-view-preview-fix-synthesis.md`
+
+**Test Results**:
+- 226 core tests passing
+- 1 web unit test passing
+- Build succeeds (verified)
+
+**Next Step**: Verify fix in browser using /agent-browser skill, then proceed to next spec requirement.
+
+---
 
 ### 52: 2026-01-21 10:40 EST: Phase 10 Complete - Histogram Display Implementation
 
