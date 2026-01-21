@@ -144,16 +144,13 @@ function handleReset() {
         </div>
       </template>
 
-      <!-- Tone Curve Section (Placeholder) -->
+      <!-- Tone Curve Section -->
       <template #tonecurve-body>
-        <div class="py-4 text-center">
-          <UIcon
-            name="i-heroicons-chart-bar"
-            class="w-8 h-8 text-gray-600 mx-auto mb-2"
+        <div class="pt-2">
+          <EditToneCurveEditor
+            :asset-id="assetId"
+            data-testid="tone-curve-section"
           />
-          <p class="text-sm text-gray-500">
-            Tone curve coming in Phase 11
-          </p>
         </div>
       </template>
 

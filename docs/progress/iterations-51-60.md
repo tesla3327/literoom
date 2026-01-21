@@ -1,5 +1,41 @@
 # Iterations 51-60
 
+## 60: 2026-01-21 12:15 EST: Phase 11.7 Complete - ToneCurveEditor Component
+
+**Objective**: Create the Vue component for the tone curve editor UI.
+
+**Work Completed**:
+
+**Component Created** (`apps/web/app/components/edit/EditToneCurveEditor.vue`):
+- Uses `useToneCurve` composable for all interaction logic
+- Accepts `assetId` and optional `histogram` props
+- Computes `hasModifications` to show/hide reset button
+- Visual elements:
+  - Header with "Tone Curve" label
+  - "Adjusting..." indicator during drag
+  - "Reset" button when curve is modified
+  - Canvas container with aspect-square and rounded corners
+  - Instructions text for user guidance
+
+**Integration** (`apps/web/app/components/edit/EditControlsPanel.vue`):
+- Replaced placeholder in `#tonecurve-body` template slot
+- Component now renders in the Tone Curve accordion section
+
+**Files Created**:
+- `apps/web/app/components/edit/EditToneCurveEditor.vue`
+
+**Files Modified**:
+- `apps/web/app/components/edit/EditControlsPanel.vue`
+
+**Verification**:
+- Build passes (client and server)
+- All 237 packages/core tests pass
+- No TypeScript errors
+
+**Next Step**: Phase 11.8 - Preview Integration (wire tone curve into preview rendering pipeline)
+
+---
+
 ## 59: 2026-01-21 12:14 EST: Phase 11.6 Complete - useToneCurve Composable
 
 **Objective**: Implement the useToneCurve composable for interactive tone curve editing with canvas rendering and point interactions.
