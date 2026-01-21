@@ -1,5 +1,75 @@
 # Iterations 61-70
 
+## 64: 2026-01-21 13:26 EST: Phase 12 - Crop/Rotate/Straighten - Implementation Plan Created
+
+**Objective**: Create a detailed implementation plan for crop, rotate, and straighten functionality.
+
+**Context**:
+- Phase 12 research is complete
+- Research synthesis provides architecture decisions and implementation strategy
+- Ready to begin implementation
+
+**Plan Structure**:
+The implementation plan breaks down the work into 9 phases:
+
+1. **Phase 12.1: TypeScript Types and Utilities**
+   - CropRectangle, RotationParameters, CropTransform types
+   - Utility functions: isModifiedCropTransform, validateCropRectangle
+   - Extend EditState with cropTransform field
+
+2. **Phase 12.2: Edit Store Extensions**
+   - Add cropTransform ref to store
+   - Actions: setCropTransform, setCrop, setRotation, setRotationAngle, setStraightenAngle
+   - Update hasModifications computed
+
+3. **Phase 12.3: Rust Transform Module**
+   - `crates/literoom-core/src/transform/rotation.rs` - Bilinear and Lanczos3 interpolation
+   - `crates/literoom-core/src/transform/crop.rs` - Normalized coordinate cropping
+   - compute_rotated_bounds for canvas sizing
+
+4. **Phase 12.4: WASM Bindings**
+   - apply_rotation(image, angleDegrees, useLanczos)
+   - apply_crop(image, left, top, width, height)
+
+5. **Phase 12.5: Worker Integration**
+   - ApplyRotationRequest/ApplyCropRequest message types
+   - Worker handlers for transform operations
+   - DecodeService methods
+
+6. **Phase 12.6: Preview Pipeline Integration**
+   - Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+   - Watch cropTransform for re-renders
+
+7. **Phase 12.7: Crop Editor UI**
+   - useCropEditor composable
+   - EditCropEditor component with aspect ratio presets
+
+8. **Phase 12.8: Rotation Controls UI**
+   - EditRotationControls component (90-degree buttons, slider)
+   - EditStraightenTool component (draw-to-straighten)
+
+9. **Phase 12.9: Controls Panel Integration**
+   - Wire components into EditControlsPanel
+   - Transform accordion section
+
+**Key Architecture Decisions**:
+- Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+- Crop coordinates: Normalized (0-1) for image-size independence
+- Rotation interpolation: Bilinear for preview, Lanczos3 for export
+- Crop=null means full image (no crop)
+
+**Performance Targets**:
+- Rotation (preview): <200ms
+- Rotation (export): <600ms
+- Crop: <10ms
+- Full preview with transforms: <500ms
+
+**Plan Location**: `docs/plans/2026-01-21-crop-rotate-plan.md`
+
+**Status**: Complete - Ready to begin implementation
+
+---
+
 ## 63: 2026-01-21 12:32 EST: Phase 12 - Crop/Rotate/Straighten - Research Complete
 
 **Objective**: Research the implementation approach for crop, rotate, and straighten functionality.
