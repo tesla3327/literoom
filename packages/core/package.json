@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "dexie": "^4.2.1",
     "literoom-wasm": "workspace:*"
   },
   "devDependencies": {
