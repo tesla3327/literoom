@@ -115,13 +115,13 @@ export type DecodeResponse =
 
 ---
 
-### Phase 2: Decode Worker ⬜
+### Phase 2: Decode Worker ✅
 
 **Goal**: Create Web Worker that loads WASM and handles decode requests.
 
 #### Tasks
 
-- [ ] 2.1. Create `packages/core/src/decode/decode-worker.ts`
+- [x] 2.1. Create `packages/core/src/decode/decode-worker.ts`
   - Import WASM module
   - Implement lazy initialization
   - Handle all message types

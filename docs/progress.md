@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 21:51 EST
-**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 1 Complete
+**Last Updated**: 2026-01-20 21:54 EST
+**Current Phase**: Image Decoding - Phase 7 (TypeScript Integration) - Phase 2 Complete
 
 ## Project Structure
 
@@ -36,6 +36,36 @@ literoom/
 ```
 
 ## Completed Work
+
+### 20: 2026-01-20 21:54 EST: TypeScript Integration - Phase 2 Complete (Decode Worker)
+
+**Objective**: Implement Phase 2 of the TypeScript Integration Plan - decode worker.
+
+**Work Completed**:
+- Created `packages/core/src/decode/decode-worker.ts`:
+  - Lazy WASM initialization on first request
+  - Handles 5 message types: decode-jpeg, decode-raw-thumbnail, generate-thumbnail, generate-preview, detect-file-type
+  - Uses Transferable for output pixels (avoids copying large buffers)
+  - Error classification (INVALID_FORMAT, CORRUPTED_FILE, OUT_OF_MEMORY, etc.)
+  - Automatic file type detection for RAW vs JPEG
+  - Proper memory management with `image.free()` calls
+
+- Updated `packages/core/package.json`:
+  - Added `literoom-wasm` workspace dependency
+  - Added `./decode` export path
+
+- Updated `packages/core/tsconfig.json`:
+  - Added `WebWorker` lib for worker types
+
+**Key Implementation Details**:
+- Worker auto-detects file type in generate-thumbnail/preview requests
+- RAW files use embedded thumbnail extraction (fast path)
+- Uses `DedicatedWorkerGlobalScope` for proper TypeScript typing
+- Sends `{ type: 'ready' }` message on startup
+
+**Next Step**: Phase 3 - Implement DecodeService class (`decode-service.ts`).
+
+---
 
 ### 19: 2026-01-20 21:51 EST: TypeScript Integration - Phase 1 Complete (Core Types)
 
