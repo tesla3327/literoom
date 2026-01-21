@@ -1,5 +1,60 @@
 # Iterations 61-70
 
+## 65: 2026-01-21 13:31 EST: Phase 12.1 Complete - TypeScript Types and Utilities
+
+**Objective**: Implement the TypeScript types and utility functions for crop/transform state.
+
+**Work Completed**:
+
+**1. Added crop/transform types to `packages/core/src/catalog/types.ts`:**
+- `CropRectangle` - Normalized (0-1) crop region coordinates
+- `RotationParameters` - Main angle and straighten angle
+- `CropTransform` - Combined crop and rotation state
+- `DEFAULT_ROTATION` - Default rotation (0, 0)
+- `DEFAULT_CROP_TRANSFORM` - Default transform (no crop, no rotation)
+- `isModifiedCropTransform()` - Check if transform differs from default
+- `getTotalRotation()` - Get combined rotation angle
+- `validateCropRectangle()` - Validate crop bounds
+- `cloneCropTransform()` - Deep copy helper
+
+**2. Updated `EditState` interface:**
+- Bumped `EDIT_SCHEMA_VERSION` from 2 to 3
+- Added `cropTransform: CropTransform` field
+- Updated `createDefaultEditState()` to include default cropTransform
+
+**3. Updated `packages/core/src/catalog/index.ts`:**
+- Exported new types: `CropRectangle`, `RotationParameters`, `CropTransform`
+- Exported new utilities: `DEFAULT_ROTATION`, `DEFAULT_CROP_TRANSFORM`, `isModifiedCropTransform`, `getTotalRotation`, `validateCropRectangle`, `cloneCropTransform`
+
+**4. Updated `apps/web/app/stores/edit.ts`:**
+- Added `cropTransform` ref state
+- Added `hasCropTransformModifications` computed property
+- Updated `hasModifications` to include cropTransform
+- Updated `loadForAsset()`, `reset()`, `clear()` to handle cropTransform
+- Added crop/transform actions: `setCropTransform`, `setCrop`, `setRotation`, `setRotationAngle`, `setStraightenAngle`, `resetCropTransform`
+
+**5. Updated tests in `packages/core/src/catalog/edit-types.test.ts`:**
+- Updated version check from 2 to 3
+- Updated EditState tests to include cropTransform
+- Added tests for: `DEFAULT_CROP_TRANSFORM`, `isModifiedCropTransform`, `getTotalRotation`, `validateCropRectangle`, `cloneCropTransform`
+- Total tests: 257 passing (20 new tests added)
+
+**Files Modified**:
+- `packages/core/src/catalog/types.ts` - Added types and utilities
+- `packages/core/src/catalog/index.ts` - Added exports
+- `packages/core/src/catalog/edit-types.test.ts` - Added tests
+- `apps/web/app/stores/edit.ts` - Added state and actions
+
+**Verification**:
+- All 257 packages/core tests pass
+- TypeScript types properly exported
+
+**Status**: Complete
+
+**Next Step**: Phase 12.2 is already partially complete (edit store extensions done). Proceed to Phase 12.3 (Rust Transform Module).
+
+---
+
 ## 64: 2026-01-21 13:26 EST: Phase 12 - Crop/Rotate/Straighten - Implementation Plan Created
 
 **Objective**: Create a detailed implementation plan for crop, rotate, and straighten functionality.

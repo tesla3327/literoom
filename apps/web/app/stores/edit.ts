@@ -5,17 +5,21 @@
  * - Current asset being edited
  * - Adjustment values (temperature, exposure, etc.)
  * - Tone curve control points
+ * - Crop and rotation settings
  * - Dirty flag tracking
  * - Load/reset/save operations
  *
  * Edit state is persisted per-asset in the database.
  */
-import type { Adjustments, EditState } from '@literoom/core/catalog'
+import type { Adjustments, CropRectangle, CropTransform, EditState, RotationParameters } from '@literoom/core/catalog'
 import {
   DEFAULT_ADJUSTMENTS,
+  DEFAULT_CROP_TRANSFORM,
   EDIT_SCHEMA_VERSION,
+  cloneCropTransform,
   createDefaultEditState,
   hasModifiedAdjustments,
+  isModifiedCropTransform,
   isModifiedToneCurve,
 } from '@literoom/core/catalog'
 import type { CurvePoint, ToneCurve } from '@literoom/core/decode'
@@ -35,6 +39,11 @@ export const useEditStore = defineStore('edit', () => {
    * Current adjustment values.
    */
   const adjustments = ref<Adjustments>({ ...DEFAULT_ADJUSTMENTS })
+
+  /**
+   * Current crop and rotation settings.
+   */
+  const cropTransform = ref<CropTransform>(cloneCropTransform(DEFAULT_CROP_TRANSFORM))
 
   /**
    * Whether the edit state has been modified since loading.
@@ -58,7 +67,9 @@ export const useEditStore = defineStore('edit', () => {
   /**
    * Whether any adjustments have been modified from defaults.
    */
-  const hasModifications = computed(() => hasModifiedAdjustments(adjustments.value))
+  const hasModifications = computed(
+    () => hasModifiedAdjustments(adjustments.value) || isModifiedCropTransform(cropTransform.value),
+  )
 
   /**
    * Whether the tone curve has been modified from the default linear curve.
@@ -66,11 +77,17 @@ export const useEditStore = defineStore('edit', () => {
   const hasCurveModifications = computed(() => isModifiedToneCurve(adjustments.value.toneCurve))
 
   /**
+   * Whether the crop/transform has been modified from defaults.
+   */
+  const hasCropTransformModifications = computed(() => isModifiedCropTransform(cropTransform.value))
+
+  /**
    * Get the full edit state object.
    */
   const editState = computed<EditState>(() => ({
     version: EDIT_SCHEMA_VERSION,
     adjustments: { ...adjustments.value },
+    cropTransform: cloneCropTransform(cropTransform.value),
   }))
 
   // ============================================================================
@@ -93,6 +110,7 @@ export const useEditStore = defineStore('edit', () => {
     // TODO: Load from database once persistence is implemented
     // For now, initialize with defaults
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
+    cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
     isDirty.value = false
   }
 
@@ -127,6 +145,7 @@ export const useEditStore = defineStore('edit', () => {
    */
   function reset(): void {
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
+    cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
     isDirty.value = true
     error.value = null
   }
@@ -162,6 +181,7 @@ export const useEditStore = defineStore('edit', () => {
   function clear(): void {
     currentAssetId.value = null
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
+    cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
     isDirty.value = false
     isSaving.value = false
     error.value = null
@@ -226,10 +246,87 @@ export const useEditStore = defineStore('edit', () => {
     setToneCurve({ points: [...DEFAULT_TONE_CURVE.points] })
   }
 
+  // ============================================================================
+  // Crop/Transform Actions
+  // ============================================================================
+
+  /**
+   * Set complete crop transform.
+   */
+  function setCropTransform(transform: CropTransform): void {
+    cropTransform.value = cloneCropTransform(transform)
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Set crop rectangle only.
+   */
+  function setCrop(crop: CropRectangle | null): void {
+    cropTransform.value = {
+      ...cropTransform.value,
+      crop: crop ? { ...crop } : null,
+    }
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Set rotation parameters only.
+   */
+  function setRotation(rotation: RotationParameters): void {
+    cropTransform.value = {
+      ...cropTransform.value,
+      rotation: { ...rotation },
+    }
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Set main rotation angle (preserving straighten).
+   */
+  function setRotationAngle(angle: number): void {
+    cropTransform.value = {
+      ...cropTransform.value,
+      rotation: {
+        ...cropTransform.value.rotation,
+        angle,
+      },
+    }
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Set straighten angle (preserving main rotation).
+   */
+  function setStraightenAngle(straighten: number): void {
+    cropTransform.value = {
+      ...cropTransform.value,
+      rotation: {
+        ...cropTransform.value.rotation,
+        straighten,
+      },
+    }
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Reset crop transform to default.
+   */
+  function resetCropTransform(): void {
+    cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
+    isDirty.value = true
+    error.value = null
+  }
+
   return {
     // State
     currentAssetId,
     adjustments,
+    cropTransform: readonly(cropTransform),
     isDirty,
     isSaving,
     error,
@@ -237,6 +334,7 @@ export const useEditStore = defineStore('edit', () => {
     // Computed
     hasModifications,
     hasCurveModifications,
+    hasCropTransformModifications,
     editState,
 
     // Actions
@@ -253,5 +351,13 @@ export const useEditStore = defineStore('edit', () => {
     updateCurvePoint,
     deleteCurvePoint,
     resetToneCurve,
+
+    // Crop/Transform Actions
+    setCropTransform,
+    setCrop,
+    setRotation,
+    setRotationAngle,
+    setStraightenAngle,
+    resetCropTransform,
   }
 })

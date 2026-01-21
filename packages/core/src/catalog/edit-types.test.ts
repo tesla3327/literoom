@@ -2,11 +2,18 @@ import { describe, expect, it } from 'vitest'
 import {
   EDIT_SCHEMA_VERSION,
   DEFAULT_ADJUSTMENTS,
+  DEFAULT_CROP_TRANSFORM,
   createDefaultEditState,
   hasModifiedAdjustments,
   isModifiedToneCurve,
+  isModifiedCropTransform,
+  getTotalRotation,
+  validateCropRectangle,
+  cloneCropTransform,
   type Adjustments,
   type EditState,
+  type CropRectangle,
+  type CropTransform,
 } from './types'
 import { DEFAULT_TONE_CURVE } from '../decode/types'
 
@@ -16,8 +23,8 @@ describe('EDIT_SCHEMA_VERSION', () => {
     expect(Number.isInteger(EDIT_SCHEMA_VERSION)).toBe(true)
   })
 
-  it('is currently version 2', () => {
-    expect(EDIT_SCHEMA_VERSION).toBe(2)
+  it('is currently version 3', () => {
+    expect(EDIT_SCHEMA_VERSION).toBe(3)
   })
 })
 
@@ -89,6 +96,14 @@ describe('createDefaultEditState', () => {
     expect(state.adjustments).toEqual(DEFAULT_ADJUSTMENTS)
   })
 
+  it('creates edit state with default crop transform', () => {
+    const state = createDefaultEditState()
+
+    expect(state.cropTransform.crop).toBeNull()
+    expect(state.cropTransform.rotation.angle).toBe(0)
+    expect(state.cropTransform.rotation.straighten).toBe(0)
+  })
+
   it('creates a new copy of adjustments each time', () => {
     const state1 = createDefaultEditState()
     const state2 = createDefaultEditState()
@@ -98,11 +113,26 @@ describe('createDefaultEditState', () => {
     expect(state1.adjustments).not.toBe(state2.adjustments)
   })
 
+  it('creates a new copy of cropTransform each time', () => {
+    const state1 = createDefaultEditState()
+    const state2 = createDefaultEditState()
+
+    expect(state1.cropTransform).toEqual(state2.cropTransform)
+    expect(state1.cropTransform).not.toBe(state2.cropTransform)
+  })
+
   it('creates adjustments that can be modified', () => {
     const state = createDefaultEditState()
     state.adjustments.exposure = 1.5
 
     expect(state.adjustments.exposure).toBe(1.5)
+  })
+
+  it('creates cropTransform that can be modified', () => {
+    const state = createDefaultEditState()
+    state.cropTransform.rotation.angle = 45
+
+    expect(state.cropTransform.rotation.angle).toBe(45)
   })
 })
 
@@ -304,10 +334,13 @@ describe('EditState interface', () => {
     const state: EditState = {
       version: EDIT_SCHEMA_VERSION,
       adjustments: { ...DEFAULT_ADJUSTMENTS },
+      cropTransform: cloneCropTransform(DEFAULT_CROP_TRANSFORM),
     }
 
-    expect(state.version).toBe(2)
+    expect(state.version).toBe(3)
     expect(state.adjustments.exposure).toBe(0)
+    expect(state.cropTransform.crop).toBeNull()
+    expect(state.cropTransform.rotation.angle).toBe(0)
   })
 
   it('supports modified adjustment values', () => {
@@ -332,6 +365,10 @@ describe('EditState interface', () => {
           ],
         },
       },
+      cropTransform: {
+        crop: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+        rotation: { angle: 45, straighten: 2 },
+      },
     }
 
     expect(state.adjustments.temperature).toBe(15)
@@ -345,5 +382,122 @@ describe('EditState interface', () => {
     expect(state.adjustments.vibrance).toBe(35)
     expect(state.adjustments.saturation).toBe(-20)
     expect(state.adjustments.toneCurve.points).toHaveLength(3)
+    expect(state.cropTransform.crop?.width).toBe(0.8)
+    expect(state.cropTransform.rotation.angle).toBe(45)
+  })
+})
+
+describe('DEFAULT_CROP_TRANSFORM', () => {
+  it('has no crop', () => {
+    expect(DEFAULT_CROP_TRANSFORM.crop).toBeNull()
+  })
+
+  it('has zero rotation', () => {
+    expect(DEFAULT_CROP_TRANSFORM.rotation.angle).toBe(0)
+    expect(DEFAULT_CROP_TRANSFORM.rotation.straighten).toBe(0)
+  })
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(DEFAULT_CROP_TRANSFORM)).toBe(true)
+  })
+})
+
+describe('isModifiedCropTransform', () => {
+  it('returns false for default transform', () => {
+    expect(isModifiedCropTransform(DEFAULT_CROP_TRANSFORM)).toBe(false)
+  })
+
+  it('returns true when crop is set', () => {
+    const transform: CropTransform = {
+      crop: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+      rotation: { angle: 0, straighten: 0 },
+    }
+    expect(isModifiedCropTransform(transform)).toBe(true)
+  })
+
+  it('returns true when rotation angle is set', () => {
+    const transform: CropTransform = {
+      crop: null,
+      rotation: { angle: 45, straighten: 0 },
+    }
+    expect(isModifiedCropTransform(transform)).toBe(true)
+  })
+
+  it('returns true when straighten is set', () => {
+    const transform: CropTransform = {
+      crop: null,
+      rotation: { angle: 0, straighten: 5 },
+    }
+    expect(isModifiedCropTransform(transform)).toBe(true)
+  })
+})
+
+describe('getTotalRotation', () => {
+  it('returns sum of angle and straighten', () => {
+    expect(getTotalRotation({ angle: 45, straighten: 5 })).toBe(50)
+    expect(getTotalRotation({ angle: -10, straighten: 3 })).toBe(-7)
+    expect(getTotalRotation({ angle: 0, straighten: 0 })).toBe(0)
+  })
+})
+
+describe('validateCropRectangle', () => {
+  it('returns true for valid crop', () => {
+    const crop: CropRectangle = { left: 0.1, top: 0.2, width: 0.5, height: 0.6 }
+    expect(validateCropRectangle(crop)).toBe(true)
+  })
+
+  it('returns true for full image crop', () => {
+    const crop: CropRectangle = { left: 0, top: 0, width: 1, height: 1 }
+    expect(validateCropRectangle(crop)).toBe(true)
+  })
+
+  it('returns false for negative left', () => {
+    const crop: CropRectangle = { left: -0.1, top: 0, width: 0.5, height: 0.5 }
+    expect(validateCropRectangle(crop)).toBe(false)
+  })
+
+  it('returns false for left > 1', () => {
+    const crop: CropRectangle = { left: 1.1, top: 0, width: 0.5, height: 0.5 }
+    expect(validateCropRectangle(crop)).toBe(false)
+  })
+
+  it('returns false for zero width', () => {
+    const crop: CropRectangle = { left: 0, top: 0, width: 0, height: 0.5 }
+    expect(validateCropRectangle(crop)).toBe(false)
+  })
+
+  it('returns false when crop exceeds right edge', () => {
+    const crop: CropRectangle = { left: 0.6, top: 0, width: 0.5, height: 0.5 }
+    expect(validateCropRectangle(crop)).toBe(false)
+  })
+
+  it('returns false when crop exceeds bottom edge', () => {
+    const crop: CropRectangle = { left: 0, top: 0.6, width: 0.5, height: 0.5 }
+    expect(validateCropRectangle(crop)).toBe(false)
+  })
+})
+
+describe('cloneCropTransform', () => {
+  it('creates a deep copy', () => {
+    const original: CropTransform = {
+      crop: { left: 0.1, top: 0.2, width: 0.5, height: 0.6 },
+      rotation: { angle: 45, straighten: 5 },
+    }
+    const cloned = cloneCropTransform(original)
+
+    expect(cloned).toEqual(original)
+    expect(cloned).not.toBe(original)
+    expect(cloned.crop).not.toBe(original.crop)
+    expect(cloned.rotation).not.toBe(original.rotation)
+  })
+
+  it('handles null crop', () => {
+    const original: CropTransform = {
+      crop: null,
+      rotation: { angle: 0, straighten: 0 },
+    }
+    const cloned = cloneCropTransform(original)
+
+    expect(cloned.crop).toBeNull()
   })
 })

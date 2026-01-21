@@ -34,6 +34,10 @@ export type {
   SupportedExtension,
   Adjustments,
   EditState,
+  // Crop/Transform types
+  CropRectangle,
+  RotationParameters,
+  CropTransform,
 } from './types'
 
 // Classes and enums
@@ -50,6 +54,13 @@ export {
   createDefaultEditState,
   hasModifiedAdjustments,
   isModifiedToneCurve,
+  // Crop/Transform utilities
+  DEFAULT_ROTATION,
+  DEFAULT_CROP_TRANSFORM,
+  isModifiedCropTransform,
+  getTotalRotation,
+  validateCropRectangle,
+  cloneCropTransform,
 } from './types'
 
 // Services

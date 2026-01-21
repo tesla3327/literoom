@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 13:26 EST
-**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Implementation Plan Created)
+**Last Updated**: 2026-01-21 13:36 EST
+**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.1 Complete - Types & Store)
 
 ## Project Structure
 
@@ -197,6 +197,7 @@ literoom/
 | [62](./iterations-61-70.md:39) | 2026-01-21 | Fix Direct URL Navigation to Edit View |
 | [63](./iterations-61-70.md:3) | 2026-01-21 | Phase 12 - Crop/Rotate/Straighten Research Complete |
 | [64](./iterations-61-70.md:3) | 2026-01-21 | Phase 12 - Implementation Plan Created |
+| [65](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.1 Complete - TypeScript Types and Utilities |
 
 ---
 
@@ -206,7 +207,7 @@ literoom/
 |---------|-------|--------|
 | literoom-core | 107 | Passing |
 | literoom-wasm | 30 | Passing |
-| packages/core | 237 | Passing |
+| packages/core | 257 | Passing |
 | apps/web (unit) | 1 | Passing |
 | apps/web (E2E) | 17 | Passing |
 

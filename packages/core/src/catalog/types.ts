@@ -457,8 +457,12 @@ export function getFilenameWithoutExtension(filename: string): string {
 /**
  * Current schema version for edit state.
  * Increment when making breaking changes to the schema.
+ * Version history:
+ * - v1: Initial version with basic adjustments
+ * - v2: Added tone curve to adjustments
+ * - v3: Added crop transform
  */
-export const EDIT_SCHEMA_VERSION = 2
+export const EDIT_SCHEMA_VERSION = 3
 
 /**
  * Basic image adjustments.
@@ -515,9 +519,9 @@ export interface EditState {
   version: typeof EDIT_SCHEMA_VERSION
   /** Basic adjustment values */
   adjustments: Adjustments
+  /** Crop and rotation settings */
+  cropTransform: CropTransform
   // Future additions:
-  // toneCurve?: ToneCurve
-  // crop?: CropTransform
   // masks?: Mask[]
 }
 
@@ -528,6 +532,7 @@ export function createDefaultEditState(): EditState {
   return {
     version: EDIT_SCHEMA_VERSION,
     adjustments: { ...DEFAULT_ADJUSTMENTS },
+    cropTransform: cloneCropTransform(DEFAULT_CROP_TRANSFORM),
   }
 }
 
@@ -574,4 +579,106 @@ export function hasModifiedAdjustments(adjustments: Adjustments): boolean {
 
   // Check tone curve
   return isModifiedToneCurve(adjustments.toneCurve)
+}
+
+// ============================================================================
+// Crop/Transform Types
+// ============================================================================
+
+/**
+ * Crop rectangle in normalized coordinates (0-1).
+ * Origin is top-left of the image.
+ */
+export interface CropRectangle {
+  /** Left edge position (0-1) */
+  left: number
+  /** Top edge position (0-1) */
+  top: number
+  /** Width of crop region (0-1) */
+  width: number
+  /** Height of crop region (0-1) */
+  height: number
+}
+
+/**
+ * Rotation parameters.
+ */
+export interface RotationParameters {
+  /** Main rotation angle in degrees (-180 to 180) */
+  angle: number
+  /** Additional straighten angle in degrees (typically small, -45 to 45) */
+  straighten: number
+}
+
+/**
+ * Combined crop and transform state.
+ * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+ */
+export interface CropTransform {
+  /** Crop region, or null for no crop (full image) */
+  crop: CropRectangle | null
+  /** Rotation parameters */
+  rotation: RotationParameters
+}
+
+/**
+ * Default rotation parameters (no rotation).
+ */
+export const DEFAULT_ROTATION: Readonly<RotationParameters> = Object.freeze({
+  angle: 0,
+  straighten: 0,
+})
+
+/**
+ * Default crop transform (no crop, no rotation).
+ */
+export const DEFAULT_CROP_TRANSFORM: Readonly<CropTransform> = Object.freeze({
+  crop: null,
+  rotation: DEFAULT_ROTATION,
+})
+
+/**
+ * Check if crop transform differs from default.
+ */
+export function isModifiedCropTransform(transform: CropTransform): boolean {
+  // Check rotation
+  if (transform.rotation.angle !== 0 || transform.rotation.straighten !== 0) {
+    return true
+  }
+  // Check crop
+  if (transform.crop !== null) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Get total rotation angle (main + straighten).
+ */
+export function getTotalRotation(rotation: RotationParameters): number {
+  return rotation.angle + rotation.straighten
+}
+
+/**
+ * Validate crop rectangle bounds.
+ * Returns true if valid, false otherwise.
+ */
+export function validateCropRectangle(crop: CropRectangle): boolean {
+  if (crop.left < 0 || crop.left > 1) return false
+  if (crop.top < 0 || crop.top > 1) return false
+  if (crop.width <= 0 || crop.width > 1) return false
+  if (crop.height <= 0 || crop.height > 1) return false
+  if (crop.left + crop.width > 1.001) return false // Small tolerance
+  if (crop.top + crop.height > 1.001) return false
+  return true
+}
+
+/**
+ * Create a deep copy of a crop transform.
+ */
+export function cloneCropTransform(transform: CropTransform): CropTransform {
+  return {
+    crop: transform.crop ? { ...transform.crop } : null,
+    rotation: { ...transform.rotation },
+  }
 }
