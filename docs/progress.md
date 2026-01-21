@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 01:39 EST
-**Current Phase**: Phase 6.3 Complete - CatalogGrid Component
+**Last Updated**: 2026-01-21 06:41 EST
+**Current Phase**: Phase 6.4 Complete - FilterBar Component
 
 ## Project Structure
 
@@ -37,6 +37,39 @@ literoom/
 ```
 
 ## Completed Work
+
+### 34: 2026-01-21 06:41 EST: Phase 6.4 Complete - FilterBar Component
+
+**Objective**: Implement FilterBar component for filtering and sorting photos in the catalog grid.
+
+**Work Completed**:
+- Created `apps/web/app/components/catalog/FilterBar.vue`:
+  - Filter mode buttons: All, Picks, Rejects, Unflagged
+  - Count badges showing number of items per filter
+  - Active filter highlighted with solid variant
+  - Sort dropdown with options:
+    - Date (newest/oldest)
+    - Name (A-Z/Z-A)
+    - Size (largest/smallest)
+  - Sort dropdown displays current sort label
+  - Integration with `catalogStore` and `catalogUIStore`
+
+**Key Features**:
+- Reactive filter counts from catalogStore (totalCount, pickCount, rejectCount, unflaggedCount)
+- Sort options grouped by field type in dropdown menu
+- Current sort state displayed in dropdown button
+- Tailwind styling with dark theme (gray-950, border-gray-800)
+- Uses Nuxt UI components: UButton, UBadge, UDropdownMenu
+
+**Files Created**:
+- `apps/web/app/components/catalog/FilterBar.vue`
+
+**Verification**:
+- No FilterBar-specific type errors (pre-existing errors in packages/core are unrelated)
+
+**Next Step**: Phase 6.5 - PermissionRecovery store and component.
+
+---
 
 ### 33: 2026-01-21 01:39 EST: Phase 6.3 Complete - CatalogGrid Component
 
