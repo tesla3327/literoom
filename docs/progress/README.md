@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 14:07 EST
-**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.5 Complete - Worker Integration)
+**Last Updated**: 2026-01-21 14:15 EST
+**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.6 Complete - Preview Pipeline)
 
 ## Project Structure
 
@@ -202,6 +202,7 @@ literoom/
 | [67](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.4 Complete - WASM Transform Bindings |
 | [68](./iterations-61-70.md:3) | 2026-01-21 | Fix Histogram RGB Channel Rendering |
 | [69](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.5 Complete - Worker Integration for Transforms |
+| [70](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.6 Complete - Preview Pipeline Integration |
 
 ---
 

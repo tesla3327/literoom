@@ -1,5 +1,39 @@
 # Iterations 61-70
 
+## 70: 2026-01-21 14:15 EST: Phase 12.6 Complete - Preview Pipeline Integration
+
+**Objective**: Integrate transforms (rotation, crop) into the preview rendering pipeline.
+
+**Work Completed**:
+
+**1. Updated `apps/web/app/composables/useEditPreview.ts`:**
+- Added imports for `isModifiedCropTransform` and `getTotalRotation` from `@literoom/core/catalog`
+- Updated `renderPreview()` to apply transforms in correct order: Rotate -> Crop -> Adjustments -> Tone Curve
+- Added rotation step that calls `$decodeService.applyRotation()` when `getTotalRotation()` returns non-zero angle
+- Added crop step that calls `$decodeService.applyCrop()` when `editStore.cropTransform.crop` is not null
+- Added watcher for `editStore.cropTransform` changes to trigger debounced re-renders
+- Updated logic to skip rendering when neither adjustments nor transforms are modified
+
+**Transform Pipeline Order**:
+1. **Rotation**: Apply total rotation (angle + straighten) using bilinear interpolation for preview
+2. **Crop**: Apply crop using normalized coordinates
+3. **Adjustments**: Apply exposure, contrast, etc.
+4. **Tone Curve**: Apply tone curve if modified from linear
+
+**Files Modified**:
+- `apps/web/app/composables/useEditPreview.ts` - Added transform pipeline
+
+**Verification**:
+- Build succeeds
+- All 257 packages/core tests pass
+- TypeScript imports resolve correctly
+
+**Status**: Complete
+
+**Next Step**: Phase 12.7 - Crop Editor UI (useCropEditor composable and EditCropEditor component)
+
+---
+
 ## 69: 2026-01-21 14:02 EST: Phase 12.5 Complete - Worker Integration for Transforms
 
 **Objective**: Add worker message handlers and DecodeService methods for rotation and crop operations.

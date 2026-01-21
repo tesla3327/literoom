@@ -4,13 +4,20 @@
  * Manages the preview rendering pipeline for the edit view:
  * - Loads source preview for an asset
  * - Watches for edit changes and triggers re-renders
- * - Applies adjustments via WASM decode service
+ * - Applies transforms (rotation, crop) and adjustments via WASM decode service
  * - Implements debouncing to prevent excessive renders during slider drag
  * - Provides draft/full render quality indicators
+ *
+ * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
  */
 import type { Ref } from 'vue'
 import type { Adjustments } from '@literoom/core/catalog'
-import { hasModifiedAdjustments, isModifiedToneCurve } from '@literoom/core/catalog'
+import {
+  hasModifiedAdjustments,
+  isModifiedToneCurve,
+  isModifiedCropTransform,
+  getTotalRotation,
+} from '@literoom/core/catalog'
 
 // ============================================================================
 // Types
@@ -241,7 +248,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   }
 
   /**
-   * Render the preview with current adjustments.
+   * Render the preview with current transforms and adjustments.
+   *
+   * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
    *
    * @param quality - 'draft' for fast render during drag, 'full' for high quality
    */
@@ -285,33 +294,67 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         toneCurve: editStore.adjustments.toneCurve,
       }
 
-      // Check if any adjustments are non-default
+      // Check if any adjustments or transforms are non-default
       const hasAdjustments = hasModifiedAdjustments(adjustments)
+      const hasTransforms = isModifiedCropTransform(editStore.cropTransform)
 
       let resultUrl: string
 
-      if (!hasAdjustments) {
-        // No adjustments, use source directly
+      if (!hasAdjustments && !hasTransforms) {
+        // No adjustments or transforms, use source directly
         resultUrl = sourceUrl.value!
       }
       else {
-        // Apply basic adjustments via WASM
+        // Apply transforms and adjustments via WASM
         let currentPixels = pixels
         let currentWidth = width
         let currentHeight = height
 
-        // Apply basic adjustments (exposure, contrast, etc.)
-        const result = await $decodeService.applyAdjustments(
-          currentPixels,
-          currentWidth,
-          currentHeight,
-          adjustments,
-        )
-        currentPixels = result.pixels
-        currentWidth = result.width
-        currentHeight = result.height
+        // ===== STEP 1: Apply rotation (if needed) =====
+        const totalRotation = getTotalRotation(editStore.cropTransform.rotation)
+        if (Math.abs(totalRotation) > 0.001) {
+          console.log('[useEditPreview] Applying rotation:', totalRotation, 'degrees')
+          const rotated = await $decodeService.applyRotation(
+            currentPixels,
+            currentWidth,
+            currentHeight,
+            totalRotation,
+            false, // Use bilinear for preview (fast)
+          )
+          currentPixels = rotated.pixels
+          currentWidth = rotated.width
+          currentHeight = rotated.height
+        }
 
-        // Apply tone curve if it differs from linear
+        // ===== STEP 2: Apply crop (if needed) =====
+        const crop = editStore.cropTransform.crop
+        if (crop) {
+          console.log('[useEditPreview] Applying crop:', crop)
+          const cropped = await $decodeService.applyCrop(
+            currentPixels,
+            currentWidth,
+            currentHeight,
+            crop,
+          )
+          currentPixels = cropped.pixels
+          currentWidth = cropped.width
+          currentHeight = cropped.height
+        }
+
+        // ===== STEP 3: Apply basic adjustments (exposure, contrast, etc.) =====
+        if (hasAdjustments) {
+          const result = await $decodeService.applyAdjustments(
+            currentPixels,
+            currentWidth,
+            currentHeight,
+            adjustments,
+          )
+          currentPixels = result.pixels
+          currentWidth = result.width
+          currentHeight = result.height
+        }
+
+        // ===== STEP 4: Apply tone curve if it differs from linear =====
         if (isModifiedToneCurve(adjustments.toneCurve)) {
           const curveResult = await $decodeService.applyToneCurve(
             currentPixels,
@@ -372,6 +415,20 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
    */
   watch(
     () => editStore.adjustments,
+    () => {
+      if (sourceCache.value) {
+        debouncedRender()
+      }
+    },
+    { deep: true },
+  )
+
+  /**
+   * Watch for crop/transform changes and trigger debounced render.
+   * Deep watch to catch rotation and crop region changes.
+   */
+  watch(
+    () => editStore.cropTransform,
     () => {
       if (sourceCache.value) {
         debouncedRender()
