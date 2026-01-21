@@ -3,12 +3,12 @@
 ## Table of Contents
 
 ### Open Issues
-- [Filmstrip navigation causes stuck loading state (Critical)](#filmstrip-navigation-causes-stuck-loading-state)
 - [Direct URL navigation to edit view (Critical - Partial)](#direct-url-navigation-to-edit-view)
-- [Clipping overlay not rendered on preview (High)](#clipping-overlay-not-rendered-on-preview)
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview)
 
 ### Solved Issues
+- [Clipping overlay not rendered on preview (High)](#clipping-overlay-not-rendered-on-preview---solved)
+- [Filmstrip navigation causes stuck loading state (Critical)](#filmstrip-navigation-causes-stuck-loading-state---solved)
 - [E/Enter/D keys don't navigate to edit view (Medium)](#eenterd-keys-dont-navigate-to-edit-view---solved)
 - [Arrow keys captured by image navigation (Medium)](#arrow-keys-captured-by-image-navigation---solved)
 - [Histogram does not render correctly (Critical)](#histogram-does-not-render-correctly---solved)
@@ -24,63 +24,6 @@
 ---
 
 ## Open Issues
-
-### Filmstrip navigation causes stuck loading state
-
-**Severity**: Critical | **Status**: Open | **Discovered**: 2026-01-21
-
-Rapidly clicking between thumbnails in the edit view filmstrip can cause both the preview and histogram to get stuck in a "Loading..." state. In severe cases, the entire edit view becomes broken with empty filmstrip and "0 / 0" position indicator.
-
-**Expected**: Clicking filmstrip thumbnails should smoothly transition between photos, with preview and histogram updating for each new asset.
-
-**Observed**:
-- After rapid navigation between filmstrip thumbnails, preview shows "Loading preview..." indefinitely
-- Histogram shows "Loading..." indefinitely
-- In severe cases:
-  - Header shows "0 / 0" instead of asset position
-  - Filmstrip becomes completely empty
-  - No filename, format, or size displayed
-- The only recovery is navigating back to catalog (G key) and re-entering edit view
-
-**Console Errors Found**:
-```
-[Vue warn] Set operation on key "value" failed: target is readonly. RefImpl
-[Vue warn]: Unhandled error during execution of watcher callback
-[Vue warn]: Unhandled error during execution of component update
-```
-
-Note: Some transient Vite HMR errors also appeared (`createGaussianKernel is not defined`, `SMOOTHING_KERNEL is not defined`) but these are hot-reload artifacts, not actual code issues.
-
-**Root Causes**:
-
-1. **Readonly ref mutation attempt**: The code attempts to set a value on a readonly ref created by `toRef(props, 'assetId')`. When Vue prints `Set operation on key "value" failed: target is readonly. RefImpl`, it indicates that somewhere a composable is trying to write to a readonly ref derived from props.
-
-2. **Race condition in async operations**: When navigating rapidly, multiple async thumbnail loading and histogram computation operations run simultaneously. When operations complete out of order, they may update state for the wrong asset or corrupt shared state.
-
-3. **Watcher callback errors**: The `[Vue warn]: Unhandled error during execution of watcher callback` indicates that watchers in composables are throwing uncaught exceptions during rapid navigation.
-
-4. **shallowRef reactivity issues**: The catalog store uses `shallowRef` for the assets Map, which may not properly trigger computed property updates in composables when individual asset properties change.
-
-**Files Involved**:
-- `apps/web/app/composables/useEditPreview.ts` - Preview loading logic with `toRef` usage
-- `apps/web/app/composables/useHistogramDisplay.ts` - Histogram computation with missing constants
-- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Uses `toRef(props, 'assetId')`
-- `apps/web/app/components/edit/EditHistogramDisplay.vue` - Uses `toRef(props, 'assetId')`
-- `apps/web/app/stores/catalog.ts` - Uses `shallowRef` for assets Map
-
-**Recommended Fix**:
-1. Fix the missing `SMOOTHING_KERNEL` and `createGaussianKernel` references in histogram code
-2. Add proper cancellation tokens for async operations when asset changes
-3. Consider using `computed` instead of `toRef` for prop-derived values
-4. Add debouncing to filmstrip click handlers to prevent rapid navigation
-5. Ensure watchers properly cancel pending operations before starting new ones
-
-**Screenshots**:
-- `docs/screenshots/verify-filmstrip-nav-07-histogram-stuck-loading.png`
-- `docs/screenshots/verify-filmstrip-nav-08-both-stuck-loading.png`
-- `docs/screenshots/verify-filmstrip-nav-09-broken-state.png`
-
----
 
 ### Direct URL navigation to edit view
 
@@ -125,35 +68,6 @@ The 500 server error is resolved, but the page doesn't load data correctly when 
 
 ---
 
-### Clipping overlay not rendered on preview
-
-**Severity**: High | **Status**: Open
-
-The J key and Shadows/Highlights buttons toggle clipping state correctly (buttons change opacity), but no visual overlay appears on the preview image to show clipped pixels.
-
-**Expected**: When clipping is enabled, pixels that are clipped in shadows (R, G, or B = 0) should be highlighted in blue, and pixels clipped in highlights (R, G, or B = 255) should be highlighted in red on the preview image.
-
-**Observed**: Preview image remains unchanged regardless of clipping toggle state. The UI text says "Press J to toggle clipping overlay" but no overlay is rendered.
-
-**Root Cause**: The clipping overlay feature is incomplete:
-1. `useHistogramDisplay.ts` correctly manages `showHighlightClipping` and `showShadowClipping` refs
-2. `EditHistogramDisplay.vue` uses these refs only for button opacity styling
-3. `useEditPreview.ts` does NOT consume the clipping states
-4. No code exists to render clipped pixels as a colored overlay on the preview canvas
-
-**Implementation Needed**:
-1. Export clipping states from histogram composable or share via store
-2. Modify `useEditPreview.ts` to watch clipping toggle states
-3. When rendering preview, check each pixel for clipping and overlay with blue (shadows) or red (highlights)
-4. Re-render preview when clipping toggles change
-
-**Locations**:
-- `apps/web/app/composables/useHistogramDisplay.ts` - Has the toggle states
-- `apps/web/app/composables/useEditPreview.ts` - Needs to consume states and render overlay
-- `apps/web/app/components/edit/EditPreviewCanvas.vue` - May need overlay layer
-
----
-
 ### Crop/transform controls not overlayed on preview
 
 **Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
@@ -195,6 +109,65 @@ The crop region and rotation controls are only visible in a small thumbnail in t
 ---
 
 ## Solved Issues
+
+### Clipping overlay not rendered on preview - SOLVED
+
+**Severity**: High | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+The clipping overlay feature is now fully implemented. When enabled, pixels that are clipped in shadows (R, G, or B = 0) are highlighted in blue, and pixels clipped in highlights (R, G, or B = 255) are highlighted in red on the preview image.
+
+**Implementation**:
+1. Created `editUI` Pinia store to share clipping toggle state between histogram and preview
+2. Added `ClippingMap` interface and `detectClippedPixels()` function to `useEditPreview.ts`
+3. Created `useClippingOverlay.ts` composable for overlay rendering
+4. Updated `EditPreviewCanvas.vue` with overlay canvas element
+
+**Files Created**:
+- `apps/web/app/stores/editUI.ts`
+- `apps/web/app/composables/useClippingOverlay.ts`
+
+**Files Modified**:
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useHistogramDisplay.ts`
+- `apps/web/app/composables/useHistogramDisplaySVG.ts`
+- `apps/web/app/components/edit/EditHistogramDisplay.vue`
+- `apps/web/app/components/edit/EditHistogramDisplaySVG.vue`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+
+---
+
+### Filmstrip navigation causes stuck loading state - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+Rapidly clicking between thumbnails in the edit view filmstrip previously caused both the preview and histogram to get stuck in a "Loading..." state. This critical bug has been fixed.
+
+**Original Problem**:
+- After rapid navigation between filmstrip thumbnails, preview showed "Loading preview..." indefinitely
+- Histogram showed "Loading..." indefinitely
+- In severe cases: Header showed "0 / 0", filmstrip became empty
+- Console showed Vue warnings about readonly ref mutations
+
+**Root Causes Fixed**:
+1. Race conditions in async operations - Now handled with proper operation cancellation
+2. Readonly ref mutation attempts - No longer attempting to mutate readonly refs
+3. shallowRef reactivity issues - Reactivity now triggers correctly
+
+**Verification Results**:
+- ✅ Rapidly clicked 6 thumbnails in sequence - works
+- ✅ Rapidly clicked 8 thumbnails in sequence - works
+- ✅ Rapidly clicked 10 thumbnails in sequence - works
+- ✅ No Vue reactivity errors in console
+- ✅ Preview and histogram update correctly throughout
+- ✅ Header shows correct asset position
+- ✅ Filmstrip remains populated
+
+**Screenshots**:
+- `docs/screenshots/verify-filmstrip-fix-03-edit-view-working.png` - Working edit view
+- `docs/screenshots/verify-filmstrip-fix-05-after-rapid-clicks.png` - After 6 rapid clicks (working)
+- `docs/screenshots/verify-filmstrip-fix-07-after-10-rapid-clicks.png` - After 10 rapid clicks (working)
+
+---
 
 ### Histogram does not render correctly - SOLVED
 

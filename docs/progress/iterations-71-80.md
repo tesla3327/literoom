@@ -1,5 +1,40 @@
 # Iterations 71-80
 
+## 78: 2026-01-21 15:10 EST: Direct URL Navigation Fix - Research Complete
+
+**Objective**: Research and plan fix for the critical issue where direct URL navigation to `/edit/[id]` shows empty state.
+
+**Problem**: When navigating directly to edit page via URL (refresh, shared link), the catalog hasn't been initialized with assets. The `ensure-catalog` middleware only waits for the service to be created, not for assets to be loaded.
+
+**Research Completed**:
+- Launched 4 parallel research agents to investigate:
+  1. Current initialization flow
+  2. Middleware capabilities
+  3. Edit page lifecycle
+  4. Demo mode specifics
+
+**Key Findings**:
+1. Home page's `onMounted()` triggers `restoreSession()` → `selectFolder()` which loads assets
+2. Direct URL navigation bypasses home page, so assets never load
+3. Middleware CAN call async functions but CANNOT reliably use composables
+4. Solution: Add `$initializeCatalog()` helper to plugin, call from middleware
+
+**Solution Design**:
+- Add `initializeCatalog()` function to `catalog.client.ts` plugin
+- Function checks if assets exist, if not initializes catalog
+- Demo mode: auto-load demo catalog
+- Real mode: restore from database or return false
+- Middleware calls this after `$catalogReady` resolves
+
+**Files Created**:
+- `docs/research/2026-01-21-direct-url-nav-research-plan.md`
+- `docs/research/2026-01-21-direct-url-nav-synthesis.md`
+- `docs/plans/2026-01-21-direct-url-nav-plan.md`
+
+**Status**: Research complete, plan created. Ready for implementation.
+
+---
+
 ## 77: 2026-01-21 15:14 EST: Clipping Overlay Implementation - Complete
 
 **Objective**: Implement the clipping overlay feature to show clipped pixels on the preview canvas.
