@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 14:15 EST
-**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.6 Complete - Preview Pipeline)
+**Last Updated**: 2026-01-21 14:22 EST
+**Current Phase**: Phase 12 - Crop/Rotate/Straighten (Phase 12.7 & 12.8 Complete - UI Components)
 
 ## Project Structure
 
@@ -89,11 +89,15 @@ literoom/
 - Preview with WASM-based adjustments
 - Keyboard shortcuts
 
-### Phase 12: Histogram Display
-- Rust histogram computation (O(n) single-pass)
-- WASM bindings for histogram
-- Canvas 2D rendering with RGB channels
-- Clipping indicators (J shortcut)
+### Phase 12: Crop/Rotate/Straighten
+- TypeScript types: CropRectangle, RotationParameters, CropTransform
+- Rust transform module: rotation with bilinear/lanczos3 interpolation, crop
+- WASM bindings for apply_rotation and apply_crop
+- Worker integration for transform operations
+- Preview pipeline integration (Rotate -> Crop -> Adjustments -> Tone Curve)
+- Crop editor composable with aspect ratio presets and handle dragging
+- EditCropEditor component with rule of thirds grid
+- EditRotationControls component with 90° buttons and fine sliders
 
 ---
 
@@ -203,6 +207,12 @@ literoom/
 | [68](./iterations-61-70.md:3) | 2026-01-21 | Fix Histogram RGB Channel Rendering |
 | [69](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.5 Complete - Worker Integration for Transforms |
 | [70](./iterations-61-70.md:3) | 2026-01-21 | Phase 12.6 Complete - Preview Pipeline Integration |
+
+### [Iterations 71-80](./iterations-71-80.md)
+
+| # | Date | Title |
+|---|------|-------|
+| [71](./iterations-71-80.md:3) | 2026-01-21 | Phase 12.7 & 12.8 Complete - Crop Editor UI & Rotation Controls |
 
 ---
 

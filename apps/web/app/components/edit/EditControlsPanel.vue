@@ -4,14 +4,18 @@
  *
  * Right panel in edit view containing:
  * - Basic Adjustments (10 sliders)
- * - Tone Curve (placeholder)
- * - Crop & Transform (placeholder)
+ * - Tone Curve
+ * - Crop & Transform
  */
 import type { Adjustments } from '@literoom/core/catalog'
 
 interface Props {
   /** The asset ID being edited */
   assetId: string
+  /** Image width in pixels */
+  imageWidth?: number
+  /** Image height in pixels */
+  imageHeight?: number
 }
 
 const props = defineProps<Props>()
@@ -154,16 +158,21 @@ function handleReset() {
         </div>
       </template>
 
-      <!-- Crop & Transform Section (Placeholder) -->
+      <!-- Crop & Transform Section -->
       <template #crop-body>
-        <div class="py-4 text-center">
-          <UIcon
-            name="i-heroicons-scissors"
-            class="w-8 h-8 text-gray-600 mx-auto mb-2"
+        <div class="pt-2 space-y-6">
+          <!-- Rotation Controls -->
+          <EditRotationControls />
+
+          <!-- Divider -->
+          <hr class="border-gray-700" />
+
+          <!-- Crop Editor -->
+          <EditCropEditor
+            :asset-id="assetId"
+            :image-width="imageWidth ?? 1920"
+            :image-height="imageHeight ?? 1080"
           />
-          <p class="text-sm text-gray-500">
-            Crop & transform coming in Phase 12
-          </p>
         </div>
       </template>
     </UAccordion>
