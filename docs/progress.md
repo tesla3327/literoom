@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-20 22:36 EST
-**Current Phase**: Catalog Service - Phase 4 Complete (CatalogService)
+**Last Updated**: 2026-01-20 22:42 EST
+**Current Phase**: Catalog Service - Phase 5 Complete (Pinia Stores)
 
 ## Project Structure
 
@@ -37,6 +37,63 @@ literoom/
 ```
 
 ## Completed Work
+
+### 28: 2026-01-20 22:42 EST: Catalog Service - Phase 5 Complete (Pinia Stores)
+
+**Objective**: Implement Pinia stores for reactive state management in Vue components.
+
+**Work Completed**:
+- Created `apps/web/app/stores/catalog.ts` (catalogStore):
+  - Core catalog state: `assets` (Map), `assetIds` (array), `folderPath`
+  - Uses `shallowRef` for Map to avoid deep reactivity overhead
+  - Scan progress tracking (`isScanning`, `scanProgress`)
+  - Computed flag counts (`pickCount`, `rejectCount`, `unflaggedCount`)
+  - Actions: `addAssetBatch`, `updateAsset`, `updateThumbnail`, `setFlag`, `setFlagBatch`
+  - Proper Object URL cleanup in `clear()` to prevent memory leaks
+
+- Created `apps/web/app/stores/catalogUI.ts` (catalogUIStore):
+  - UI state: `filterMode`, `sortField`, `sortDirection`, `viewMode`
+  - Grid layout: `gridColumns`, `thumbnailSize`
+  - Computed `filteredAssetIds` and `sortedAssetIds`
+  - Actions for setting filter, sort, view mode, and reset to defaults
+
+- Created `apps/web/app/stores/selection.ts` (selectionStore):
+  - Selection state: `currentId`, `selectedIds` (Set), `lastClickedId`
+  - Computed: `selectionCount`, `hasMultipleSelected`, `isEmpty`
+  - Full selection support:
+    - `selectSingle` - plain click
+    - `toggleSelection` - Ctrl/Cmd+click
+    - `selectRange` - Shift+click with anchor
+    - `handleClick` - main entry point with modifier detection
+  - Navigation: `navigateNext`, `navigatePrevious`, `navigateToNextUnflagged`
+  - Culling workflow support with `selectAll` and flag-based navigation
+
+- Added Pinia to web app:
+  - Installed `@pinia/nuxt` and `pinia` dependencies
+  - Added `@pinia/nuxt` to nuxt.config.ts modules
+
+- Added `./catalog` export path to `packages/core/package.json`
+
+- Created missing `apps/web/app/assets/css/main.css` (empty placeholder)
+
+**Test Summary**:
+- `packages/core`: 87 tests (all passing)
+- TypeScript compiles without store-related errors
+
+**Files Created**:
+- `apps/web/app/stores/catalog.ts`
+- `apps/web/app/stores/catalogUI.ts`
+- `apps/web/app/stores/selection.ts`
+- `apps/web/app/assets/css/main.css`
+
+**Files Modified**:
+- `apps/web/nuxt.config.ts` (added @pinia/nuxt)
+- `apps/web/package.json` (added pinia dependencies)
+- `packages/core/package.json` (added ./catalog export)
+
+**Next Step**: Phase 6 - UI Components (CatalogGrid, CatalogThumbnail, FilterBar, PermissionRecovery).
+
+---
 
 ### 27: 2026-01-20 22:36 EST: Catalog Service - Phase 4 Complete (CatalogService)
 

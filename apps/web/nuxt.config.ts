@@ -12,6 +12,7 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@nuxt/eslint',
     '@nuxt/test-utils/module',
+    '@pinia/nuxt',
   ],
 
   devtools: { enabled: true },
