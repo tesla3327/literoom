@@ -1,5 +1,63 @@
 # Iterations 51-60
 
+## 59: 2026-01-21 12:14 EST: Phase 11.6 Complete - useToneCurve Composable
+
+**Objective**: Implement the useToneCurve composable for interactive tone curve editing with canvas rendering and point interactions.
+
+**Work Completed**:
+
+**Composable Created** (`apps/web/app/composables/useToneCurve.ts`):
+- Created full-featured tone curve composable (~450 lines)
+- Canvas rendering with:
+  - Dark background (#1a1a1a)
+  - Grid lines (quarter and center)
+  - Diagonal reference line (dashed)
+  - Smooth curve interpolation (256 sample points)
+  - Control points with hover/drag states
+  - Optional histogram background overlay
+- Mouse interactions:
+  - Click on point to start drag
+  - Drag point to adjust curve (y constrained to 0-1)
+  - Anchor points (first/last) locked to x=0 and x=1
+  - Interior points constrained between neighbors
+  - Click on canvas to add new point
+  - Double-click on point to delete (except anchors)
+- State management:
+  - Local curve state synced with edit store
+  - Debounced store updates (16ms for 60fps)
+  - Immediate visual feedback during drag
+  - Store update on mouse release
+- Coordinate conversion utilities:
+  - `toCanvas()` - normalized to canvas coords
+  - `toNormalized()` - canvas to normalized coords
+  - `findPointAt()` - hit testing with radius
+
+**Constants Defined**:
+- Canvas size: 256x256
+- Point radius: 6px
+- Hit radius: 14px (for easier clicking)
+- Colors: background, grid, curve (white), point states
+
+**Return Interface**:
+- `canvasRef` - Ref for canvas element
+- `localCurve` - Current curve state
+- `draggedPointIndex` / `hoveredPointIndex` - Interaction state
+- `isDragging` - Computed for UI feedback
+- `deletePoint()` / `resetCurve()` - Public actions
+- `render()` - Manual re-render trigger
+
+**Files Created**:
+- `apps/web/app/composables/useToneCurve.ts`
+
+**Verification**:
+- Build passes (verified)
+- All 237 packages/core tests pass
+- TypeScript compiles without errors (build-time validation)
+
+**Next Step**: Phase 11.7 - ToneCurveEditor Component (create Vue component using the composable)
+
+---
+
 ## 58: 2026-01-21 12:10 EST: Phase 11.5 Complete - Edit Store Extensions
 
 **Objective**: Add tone curve state management to the edit store (Phase 11.5 of the Tone Curve plan).
