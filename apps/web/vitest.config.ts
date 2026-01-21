@@ -6,6 +6,13 @@ export default defineVitestConfig({
     environmentOptions: {
       nuxt: {
         domEnvironment: 'happy-dom',
+        overrides: {
+          runtimeConfig: {
+            public: {
+              demoMode: true,
+            },
+          },
+        },
       },
     },
     include: ['test/**/*.{test,spec}.{js,ts}'],

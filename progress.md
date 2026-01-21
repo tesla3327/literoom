@@ -2,7 +2,25 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 07:09 EST
+**Last Updated**: 2026-01-21 09:10 EST
+
+### Current Task: Fix E2E Tests
+
+Unit tests now passing (201 tests). E2E tests have 11 failures due to:
+1. Grid focus handler not triggering `data-current` as expected by tests
+2. Tests assume specific flag states that don't match demo data (pre-flagged assets)
+3. Virtual scrolling test expects fewer rendered items, but viewport may show all 20
+
+Need to update E2E tests to:
+- Wait for grid focus to propagate to first item
+- Account for pre-existing demo asset flags
+- Use correct assertions for the demo catalog
+
+### Unit Tests Fixed ✅
+
+Fixed issues in `apps/web/test` setup:
+- **vitest.config.ts**: Added `runtimeConfig.public.demoMode: true` in nuxt overrides
+- **example.nuxt.test.ts**: Fixed import path `~/app/app.vue` → `~/app.vue` and updated assertion
 
 ### Phase 7.1: Mock Services - Complete ✅
 
