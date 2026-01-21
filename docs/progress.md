@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 09:57 EST
-**Current Phase**: Phase 8.4 Complete - Preview with Edits
+**Last Updated**: 2026-01-21 10:03 EST
+**Current Phase**: Phase 9 Research Complete - WASM Edit Pipeline
 
 ## Project Structure
 
@@ -37,6 +37,139 @@ literoom/
 ```
 
 ## Completed Work
+
+### 47: 2026-01-21 10:03 EST: Phase 9 Research Complete - WASM Edit Pipeline
+
+**Objective**: Research and plan the implementation of `apply_adjustments()` function to enable real-time photo editing.
+
+**Work Completed**:
+
+**Research Documents Created**:
+- `docs/research/2026-01-21-wasm-edit-pipeline-research-plan.md` - Research plan
+- `docs/research/2026-01-21-wasm-edit-pipeline-synthesis.md` - Combined findings
+
+**Implementation Plan Created**:
+- `docs/plans/2026-01-21-wasm-edit-pipeline-plan.md` - Detailed 6-phase plan
+
+**Key Findings**:
+
+1. **Existing Infrastructure**:
+   - `BasicAdjustments` struct fully defined in Rust
+   - WASM bindings already expose getters/setters
+   - Decode worker/service pattern ready for extension
+   - `useEditPreview` has placeholder for WASM integration
+
+2. **Missing Piece**:
+   - No `apply_adjustments(pixels, adjustments)` function exists
+   - Need to implement 10 adjustment algorithms in Rust
+   - Need to wire through worker/service to composable
+
+3. **Adjustment Algorithms** (researched formulas for all 10):
+   - Exposure: `pixel * 2^(exposure_value)`
+   - Contrast: `(pixel - 0.5) * factor + 0.5`
+   - Temperature/Tint: Per-channel RGB multipliers
+   - Highlights/Shadows: Luminance-based selective adjustment
+   - Whites/Blacks: Threshold-based extremes adjustment
+   - Saturation: HSV conversion, multiply S channel
+   - Vibrance: Selective saturation protecting skin tones
+
+4. **Performance Strategy**:
+   - Draft quality: 600px, <50ms (during slider drag)
+   - Full quality: 2560px, <300ms (after slider release)
+   - 300ms debounce (already implemented)
+
+**Implementation Plan Structure** (6 phases):
+- Phase 9.1: Rust Adjustment Module (`crates/literoom-core/src/adjustments.rs`)
+- Phase 9.2: WASM Bindings (`apply_adjustments` function)
+- Phase 9.3: Worker Message Types (`ApplyAdjustmentsRequest`)
+- Phase 9.4: Worker Handler (decode-worker.ts)
+- Phase 9.5: Decode Service Method (`applyAdjustments()`)
+- Phase 9.6: Preview Integration (useEditPreview.ts)
+
+**Files to Create**:
+- `crates/literoom-core/src/adjustments.rs` - Adjustment algorithms
+
+**Files to Modify**:
+- `crates/literoom-core/src/lib.rs` - Add module export
+- `crates/literoom-wasm/src/adjustments.rs` - Add WASM binding
+- `crates/literoom-wasm/src/lib.rs` - Export function
+- `packages/core/src/decode/worker-messages.ts` - Add message type
+- `packages/core/src/decode/decode-worker.ts` - Add handler
+- `packages/core/src/decode/decode-service.ts` - Add method
+- `apps/web/app/composables/useEditPreview.ts` - Wire to WASM
+
+**Next Step**: Phase 9.1 - Implement Rust adjustment algorithms.
+
+---
+
+### 46: 2026-01-21 10:15 EST: Fixed CSS Loading - Upgraded to Nuxt 4 and Nuxt UI 4
+
+**Objective**: Fix CSS not loading in the application.
+
+**Problem Identified**:
+The app's CSS file (`main.css`) used Tailwind v4 / Nuxt UI v4 syntax:
+```css
+@import "tailwindcss";
+@import "@nuxt/ui";
+```
+
+But the app was running on older versions:
+- `nuxt: ^3.15.4` (not v4)
+- `@nuxt/ui: ^3.0.0` (not v4)
+
+Additionally, in Nuxt 4's directory structure, `~/assets` resolves to `app/assets/`. The file at `app/assets/css/main.css` was **empty** (0 bytes), while the content existed in the old location `assets/css/main.css`.
+
+**Fixes Applied**:
+
+1. **Upgraded dependencies** in `apps/web/package.json`:
+   - `nuxt`: `^3.15.4` → `^4.2.2`
+   - `@nuxt/ui`: `^3.0.0` → `^4.4.0`
+
+2. **Fixed the CSS file** at `app/assets/css/main.css`:
+   ```css
+   @import "tailwindcss";
+   @import "@nuxt/ui";
+   ```
+
+3. **Cleaned up** duplicate old `assets/css/main.css` file
+
+**Verification**:
+- App now displays correctly with Nuxt UI v4 styling (dark theme, styled buttons, proper layout)
+- Browser automation confirmed CSS loading via screenshot
+
+**Files Modified**:
+- `apps/web/package.json` (dependency upgrades)
+- `apps/web/app/assets/css/main.css` (added CSS imports)
+- `docs/issues.md` (marked issues as resolved)
+
+**Files Deleted**:
+- `apps/web/assets/css/main.css` (duplicate old file)
+
+---
+
+### 45: 2026-01-21 09:56 EST: Phase 8.5 Verified Complete - Keyboard Shortcuts
+
+**Objective**: Verify and document that Phase 8.5 (Keyboard Shortcuts) was already implemented as part of the edit view shell.
+
+**Verification**:
+- Reviewed `apps/web/app/pages/edit/[id].vue`
+- All Phase 8.5 requirements were already implemented:
+  - Escape key returns to grid ✅
+  - Left/Right arrows navigate between photos ✅
+  - G key also returns to grid ✅
+  - Shortcuts ignore input when typing in form fields ✅
+  - Event listener cleanup on unmount ✅
+
+**Phase 8 Edit View is now complete!** All sub-phases delivered:
+- Phase 8.1: Edit Page Shell
+- Phase 8.2: Edit State Store
+- Phase 8.3: Basic Adjustments UI
+- Phase 8.4: Preview with Edits
+- Phase 8.5: Keyboard Shortcuts
+
+**Next Step**: Phase 9 - WASM Edit Pipeline (apply_adjustments function), OR address Nuxt v3→v4 version issue in docs/issues.md.
+
+---
 
 ### 44: 2026-01-21 09:57 EST: Phase 8.4 Complete - Preview with Edits
 
