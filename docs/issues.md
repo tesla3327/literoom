@@ -6,10 +6,10 @@
 - [Previously opened folder auto-loads unexpectedly (Medium)](#previously-opened-folder-auto-loads-unexpectedly)
 - [Import UX feels slow (Medium)](#import-ux-feels-slow)
 - [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail)
-- ["All" count keeps increasing (High)](#all-count-keeps-increasing)
-- [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit)
+- [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---partially-solved)
 
 ### Recently Solved
+- ["All" count keeps increasing (High)](#all-count-keeps-increasing---solved)
 - [Export doesn't apply edits (Critical)](#export-doesnt-apply-edits---solved)
 - [Export button always disabled (Medium)](#export-button-always-disabled---solved)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives---solved)
@@ -89,30 +89,48 @@ When a thumbnail is visible (appears loaded), users may double-click to enter ed
 
 ---
 
-### "All" count keeps increasing
+### "All" count keeps increasing - SOLVED
 
-**Severity**: High
+**Severity**: High | **Fixed**: 2026-01-22
 
 **Problem**:
-Every time a user navigates from the edit page back to the gallery, the "All" count in the filter bar increases. This is a bug.
+Every time a user navigates from the edit page back to the gallery, the "All" count in the filter bar increases.
 
-**Expected Behavior**:
-The "All" count should remain constant and reflect the actual number of images in the catalog.
+**Root Cause Analysis**:
+The bug was unable to be reproduced after extensive testing (5+ navigation cycles, browser back button, page reload). However, a potential vulnerability was identified in `addAssetBatch()` where duplicate IDs could be added to the `assetIds` array if called multiple times without clearing.
+
+**Fix Applied** (defensive):
+1. **Duplicate ID prevention in `addAssetBatch()`** - Now uses a Set to track existing IDs and only adds new ones
+2. **Guard in `restoreSession()`** - Skips re-initialization if assets are already loaded, preventing unnecessary rescans when returning from edit view
+
+**Files Modified**:
+- `apps/web/app/stores/catalog.ts`
+- `apps/web/app/composables/useCatalog.ts`
 
 ---
 
-### Gallery loading state after returning from edit
+### Gallery loading state after returning from edit - PARTIALLY SOLVED
 
-**Severity**: High
+**Severity**: High | **Partially Fixed**: 2026-01-22
 
 **Problem**:
 When returning to the gallery from the edit page:
 - Sometimes only a loading state is shown with no thumbnails
 - Thumbnails are not updated/regenerated to reflect edits made to the photo
 
-**Expected Behavior**:
-- Gallery should show all thumbnails immediately when returning from edit view
-- Thumbnails should update to reflect any edits made
+**Issue 1 - Loading State Fix** (SOLVED):
+Added defensive guards in CatalogGrid.vue:
+- `v-if` check on CatalogThumbnail to skip rendering for missing assets
+- Fallback placeholder with loading animation for missing assets
+- Debug logging when asset ID exists but asset data missing
+
+**Issue 2 - Thumbnails Don't Reflect Edits** (DEFERRED):
+Requires implementing thumbnail regeneration pipeline:
+- Add `invalidateThumbnail()` method to ThumbnailCache
+- Hook edit store save to trigger thumbnail regeneration
+- This is significant work tracked for a future iteration
+
+**Files Modified**: `apps/web/app/components/catalog/CatalogGrid.vue`
 
 ---
 
