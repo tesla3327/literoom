@@ -17,7 +17,11 @@
 const catalogStore = useCatalogStore()
 const selectionStore = useSelectionStore()
 const permissionStore = usePermissionRecoveryStore()
+const exportStore = useExportStore()
 const { selectFolder, restoreSession, isDemoMode } = useCatalog()
+
+// Help modal keyboard shortcuts
+useHelpModal()
 
 // ============================================================================
 // State
@@ -105,9 +109,40 @@ async function initializeApp() {
   }
 }
 
+// ============================================================================
+// Keyboard Shortcuts
+// ============================================================================
+
+/**
+ * Handle keyboard shortcuts for the catalog page.
+ */
+function handleKeydown(event: KeyboardEvent): void {
+  // Ignore if typing in an input field
+  const target = event.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+    return
+  }
+
+  // Cmd/Ctrl+E = Open export modal
+  if ((event.metaKey || event.ctrlKey) && event.key === 'e') {
+    event.preventDefault()
+    // Only open if we have assets and at least one pick
+    if (hasAssets.value && catalogStore.pickCount > 0) {
+      exportStore.openModal()
+    }
+  }
+}
+
 // Initialize on client-side mount
 onMounted(() => {
   initializeApp()
+  // Add keyboard listener
+  window.addEventListener('keydown', handleKeydown)
+})
+
+// Cleanup keyboard listener
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -125,6 +160,9 @@ onMounted(() => {
 
     <!-- Export modal -->
     <ExportModal />
+
+    <!-- Help modal -->
+    <HelpModal />
 
     <!-- Welcome screen (no folder selected) -->
     <div

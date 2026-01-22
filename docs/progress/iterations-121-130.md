@@ -271,3 +271,51 @@
 
 **Status**: Research and planning complete. Ready for implementation.
 
+---
+
+## 125: 2026-01-22 07:00 EST: Keyboard Shortcuts Help Modal - Implementation Complete
+
+**Objective**: Implement the help modal that documents all keyboard shortcuts, triggered by `?` or `Cmd/Ctrl+/`.
+
+**Status**: Complete
+
+**Implementation**:
+
+### Files Created (3)
+1. **`stores/help.ts`** - Pinia store for modal state management
+   - `isModalOpen` ref
+   - `openModal()`, `closeModal()`, `toggleModal()` methods
+
+2. **`components/help/HelpModal.vue`** - Modal component
+   - Two-column layout (Grid View | Edit View)
+   - Platform-aware modifier keys (Cmd on Mac, Ctrl on Windows/Linux)
+   - Grouped sections: Navigation, Flagging, Views, Selection, Actions, Editing, Display, Mask Editing, Help
+   - Styled `<kbd>` elements for keyboard shortcuts
+   - Fixed CSS to use raw CSS properties instead of Tailwind `@apply` (v4 compatibility)
+
+3. **`composables/useHelpModal.ts`** - Composable for global keyboard handler
+   - Listens for `?` key (Shift+/)
+   - Listens for `Cmd/Ctrl+/`
+   - Skips shortcuts when focused on input fields
+
+### Files Modified (2)
+1. **`pages/index.vue`** - Added `useHelpModal()` and `<HelpModal />`
+2. **`pages/edit/[id].vue`** - Added `useHelpModal()` and `<HelpModal />`
+
+**Verification**:
+- ✅ `?` key opens help modal
+- ✅ `Cmd+/` opens help modal
+- ✅ Two-column layout displays correctly
+- ✅ All keyboard shortcuts documented
+- ✅ Platform-aware modifier key shows "Cmd" on Mac
+- ✅ ESC closes modal
+- ✅ Close button works
+
+**Screenshots**:
+- `docs/screenshots/help-modal-04-after-question.png` - Help modal open (? key)
+- `docs/screenshots/help-modal-06-cmd-slash.png` - Help modal open (Cmd+/ key)
+
+**Spec Requirement Met**: Section 7.3 "Keyboard shortcuts are documented in-app (help modal)"
+
+---
+

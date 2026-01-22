@@ -29,6 +29,9 @@ const editStore = useEditStore()
 const editUIStore = useEditUIStore()
 const { openCopyModal, pasteSettings, canPaste } = useCopyPasteSettings()
 
+// Help modal keyboard shortcuts
+useHelpModal()
+
 // ============================================================================
 // Preview Component Ref
 // ============================================================================
@@ -294,6 +297,9 @@ onUnmounted(() => {
 
     <!-- Copy Settings Modal -->
     <EditCopySettingsModal />
+
+    <!-- Help modal -->
+    <HelpModal />
   </div>
 </template>
 
