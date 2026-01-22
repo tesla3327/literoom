@@ -207,3 +207,49 @@ Change "Select Folder" to "Previously Opened Folders" with a list of recent fold
 
 ---
 
+## 135: 2026-01-22 10:22 EST: Recent Folders Feature - Implementation Plan Created
+
+**Objective**: Create a detailed implementation plan for the Recent Folders feature based on completed research.
+
+**Plan Created**: `docs/plans/2026-01-22-recent-folders-plan.md`
+
+**Implementation Phases**:
+
+| Phase | Description | Effort |
+|-------|-------------|--------|
+| 1 | Service Layer Enhancements (`listFolders()`, `loadFolderById()`) | 30 min |
+| 2 | Create `useRecentFolders` composable | 45 min |
+| 3 | Create `RecentFoldersDropdown` component | 1 hour |
+| 4 | Update Home Page UI (welcome screen, dropdown) | 45 min |
+| 5 | Update Initialization Behavior (remove auto-restore on home) | 30 min |
+| 6 | Testing & Polish | 30 min |
+
+**Total Estimated Effort**: ~4 hours
+
+**Key Changes**:
+1. Add `listFolders()` and `loadFolderById()` to CatalogService
+2. Create `useRecentFolders.ts` composable for state management
+3. Create `RecentFoldersDropdown.vue` using Nuxt UI dropdown
+4. Update welcome screen to show recent folders as clickable cards
+5. Remove auto-restore behavior on home page mount (keep for edit page deep links)
+
+**Files to Create**:
+- `apps/web/app/composables/useRecentFolders.ts`
+- `apps/web/app/components/catalog/RecentFoldersDropdown.vue`
+
+**Files to Modify**:
+- `packages/core/src/catalog/catalog-service.ts`
+- `packages/core/src/catalog/types.ts`
+- `packages/core/src/catalog/mock-catalog-service.ts`
+- `apps/web/app/pages/index.vue`
+
+**Success Criteria**:
+- Clicking folder dropdown shows recent folders list
+- Welcome screen shows recent folders if available
+- Home page does NOT auto-load previous folder
+- Edit page deep links still work (auto-restore)
+
+**Status**: Complete - Ready for implementation
+
+---
+
