@@ -133,3 +133,55 @@ The preview pipeline needs to call the mask processing step after global adjustm
 
 ---
 
+## 114: 2026-01-21 21:33 EST: Crop Bug Research - Issue Resolved (Not a Bug)
+
+**Objective**: Research and fix the high-severity issue "Crop doesn't update the image".
+
+**Background**: From docs/issues.md:
+- Crop overlay UI works (handles can be dragged, region can be moved)
+- No way to "set" or "lock in" the crop
+- The actual image/preview is never updated with the crop
+
+**Research Process**:
+1. Launched 4 parallel research agents to investigate:
+   - Preview pipeline (where crop is applied)
+   - Store state management (how crop values are stored)
+   - WASM implementation (crop functions)
+   - UI components (how they interact)
+
+2. All agents confirmed crop implementation is **complete and working**:
+   - WASM `applyCrop()` function exists and works correctly
+   - Worker handler for crop operations exists
+   - `DecodeService.applyCrop()` method exists
+   - Preview pipeline applies crop at STEP 2 (after rotation, before adjustments)
+   - Store correctly manages crop state with `setCrop()` action
+   - Watchers trigger re-render when `editStore.cropTransform` changes
+
+3. Browser testing confirmed:
+   - Console shows `[useEditPreview] Applying crop:` log when crop is set
+   - Crop IS being applied to the preview
+
+**Root Cause of Confusion**:
+The issue was a **misunderstanding of expected behavior**, not a bug. The app follows the same pattern as Lightroom:
+
+1. **When crop tool is ACTIVE** (Crop & Transform expanded):
+   - Full image shown with crop overlay
+   - User can see and adjust crop region with handles
+   - Dark mask shows area to be cropped out
+
+2. **When crop tool is INACTIVE** (Crop & Transform collapsed):
+   - Only cropped region is displayed
+   - Preview shows final cropped result
+
+**Resolution**: Marked issue as SOLVED in `docs/issues.md`. The behavior is correct and matches professional photo editors.
+
+**Screenshots**:
+- `docs/screenshots/crop-test-08-after-long-wait.png` - Tool active (full image + overlay)
+- `docs/screenshots/crop-test-09-crop-collapsed.png` - Tool inactive (cropped result)
+
+**Status**: Complete - Issue resolved as "working as designed"
+
+---
+
+---
+

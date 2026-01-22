@@ -3,11 +3,11 @@
 ## Table of Contents
 
 ### Open Issues
-- [Crop doesn't update the image (High)](#crop-doesnt-update-the-image)
 - [Edit view should never use thumbnail (High)](#edit-view-should-never-use-thumbnail)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Crop doesn't update the image (High)](#crop-doesnt-update-the-image---solved)
 - [Export doesn't actually export anything (Critical)](#export-doesnt-actually-export-anything---solved)
 - [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip---solved)
 - [Copy/Paste Settings - Paste does not apply settings (Critical)](#copypaste-settings---paste-does-not-apply-settings---solved)
@@ -34,22 +34,40 @@
 
 ## Open Issues
 
-### Crop doesn't update the image
+### Crop doesn't update the image - SOLVED
 
-**Severity**: High | **Status**: Open | **Discovered**: 2026-01-21
+**Severity**: High | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
 
-The crop overlay UI works (handles can be dragged, region can be moved), but the crop is never actually applied to the image.
+The crop feature is **working correctly**. This issue was based on a misunderstanding of the expected behavior.
 
-**Current State**:
-- Crop handles and UI are functional
-- User can resize and reposition the crop region
-- No way to "set" or "lock in" the crop
-- The actual image/preview is never updated with the crop
+**Original Concern**:
+The reporter thought the crop wasn't being applied because the image still showed the full preview while editing.
 
-**Expected Behavior**:
-- After adjusting the crop region, the crop should be applied to the image
-- The preview should update to show only the cropped area
-- Export should respect the crop region
+**Actual Behavior (Correct)**:
+1. **When crop tool is ACTIVE** (Crop & Transform section expanded):
+   - Full image is shown with crop overlay
+   - User can see and adjust the crop region with handles
+   - Dark mask shows the area that will be cropped out
+
+2. **When crop tool is INACTIVE** (Crop & Transform section collapsed):
+   - Only the cropped region is displayed
+   - Preview shows the final cropped result
+   - This is what will be exported
+
+**Why This Behavior is Correct**:
+This matches professional photo editors like Lightroom - when editing a crop, you need to see the full image to decide what to include/exclude. The cropped result is shown when you're done editing (collapse the section).
+
+**Verification Steps**:
+1. Enter edit view, expand "Crop & Transform" section
+2. Drag crop handles to select a region
+3. Note: Full image visible with overlay showing crop region
+4. Collapse "Crop & Transform" section
+5. Observe: Preview now shows ONLY the cropped portion
+6. The histogram updates to reflect the cropped image
+
+**Screenshots**:
+- `docs/screenshots/crop-test-08-after-long-wait.png` - Crop tool active (full image + overlay)
+- `docs/screenshots/crop-test-09-crop-collapsed.png` - Crop tool inactive (cropped result)
 
 ---
 
