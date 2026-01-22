@@ -164,3 +164,46 @@ Launched 4 parallel research agents to investigate:
 
 ---
 
+## 134: 2026-01-22 10:17 EST: Previously Opened Folder Auto-loads - Research Complete
+
+**Objective**: Address the medium-severity issue "Previously opened folder auto-loads unexpectedly" to improve the folder selection UX.
+
+**Problem Statement** (from issues.md):
+When loading the app or clicking "Select Folder" after previously loading a folder, the app automatically loads the previous folder. This is unexpected UX behavior.
+
+**Suggested Fix** (from issues.md):
+Change "Select Folder" to "Previously Opened Folders" with a list of recent folders, allowing users to quickly jump to a previous folder or select a new one.
+
+**Status**: Complete - Research synthesis document created
+
+**Research Areas Completed**:
+1. Current folder persistence mechanism (handles, IndexedDB)
+2. Session restoration flow in catalog plugin
+3. UI/UX patterns for recent folder lists
+4. Nuxt UI dropdown/menu components
+
+**Key Findings**:
+
+1. **Auto-Load Origin**: The `loadFromDatabase()` method in `CatalogService` always loads `folders[0]` (first folder in DB). This is called by:
+   - `ensure-catalog.ts` middleware before edit pages
+   - `index.vue` on mount via `restoreSession()`
+
+2. **Database Architecture**:
+   - Folders stored in Dexie DB (`LiteroomCatalog`, `folders` table)
+   - FileSystemDirectoryHandles persisted separately in IndexedDB (`literoom-fs`)
+   - Each folder has `lastScanDate` that could be used for ordering
+
+3. **UI Components Available**:
+   - `UDropdownMenu` already used in FilterBar for sort options
+   - Pattern from `PermissionRecovery.vue` for folder lists with status
+
+4. **Proposed Solution**: Recent Folders Dropdown
+   - Show list of recent folders (from DB, ordered by lastScanDate)
+   - "Choose New Folder..." option to open file picker
+   - Handle unavailable folders (permission denied) gracefully
+
+**Documents Created**:
+- `docs/research/2026-01-22-recent-folders-synthesis.md`
+
+---
+
