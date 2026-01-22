@@ -31,7 +31,7 @@ defineEmits<{
 // Thumbnail Loading
 // ============================================================================
 
-const { requestThumbnail, updateThumbnailPriority } = useCatalog()
+const { requestThumbnail, updateThumbnailPriority, requestPreview } = useCatalog()
 
 /**
  * Determine priority based on index.
@@ -102,8 +102,11 @@ const router = useRouter()
 
 /**
  * Navigate to edit view on double-click.
+ * Starts preview generation BEFORE navigation to reduce wait time in edit view.
  */
 function handleDoubleClick() {
+  // Start preview generation early (before navigation) so it's ready when edit view loads
+  requestPreview(props.asset.id, ThumbnailPriority.VISIBLE)
   router.push(`/edit/${props.asset.id}`)
 }
 

@@ -19,6 +19,7 @@ import {
   isModifiedToneCurve,
   isModifiedCropTransform,
   getTotalRotation,
+  ThumbnailPriority,
 } from '@literoom/core/catalog'
 
 // ============================================================================
@@ -483,7 +484,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         return
       }
 
-      // Get current adjustments from store
+      // Get current adjustments from store (deep clone to avoid reactive proxies)
       const adjustments: Adjustments = {
         temperature: editStore.adjustments.temperature,
         tint: editStore.adjustments.tint,
@@ -495,7 +496,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         blacks: editStore.adjustments.blacks,
         vibrance: editStore.adjustments.vibrance,
         saturation: editStore.adjustments.saturation,
-        toneCurve: editStore.adjustments.toneCurve,
+        toneCurve: {
+          points: editStore.adjustments.toneCurve.points.map(p => ({ x: p.x, y: p.y })),
+        },
       }
 
       // Check if any adjustments, transforms, or masks are non-default
@@ -749,35 +752,34 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         return
       }
 
-      // Request generation (priority 0 = highest for edit view)
+      // Request generation for edit view
       // This ensures we have images even if navigating directly to edit view
       // Only run on client (catalog service is client-only)
       if (import.meta.client && catalog) {
-        // Request both thumbnail (for grid display) and preview (for edit view)
-        catalog.requestThumbnail(id, 0)
-        catalog.requestPreview(id, 0)
+        // In edit view, preview is the primary display (2560px) - highest priority
+        // Thumbnail is only needed as fallback (512px) - lower priority
+        catalog.requestPreview(id, ThumbnailPriority.VISIBLE)  // Priority 0 - highest
+        catalog.requestThumbnail(id, ThumbnailPriority.PRELOAD) // Priority 2 - lower
       }
 
       // Check if preview is already available (cached)
       const asset = catalogStore.assets.get(id)
-      if (asset?.preview1xStatus === 'ready' && asset.preview1xUrl) {
-        // Preview already cached - show immediately (no loading flash)
-        console.log('[useEditPreview] Preview already cached for:', id)
-        previewUrl.value = asset.preview1xUrl
-        isPreviewUrlOwned.value = false
-        isWaitingForPreview.value = false
-      }
-      else {
+      const cachedPreviewUrl = asset?.preview1xStatus === 'ready' && asset.preview1xUrl
+        ? asset.preview1xUrl
+        : null
+
+      if (!cachedPreviewUrl) {
         // Preview not ready - show loading state, NEVER show thumbnail in edit view
         console.log('[useEditPreview] Waiting for preview to generate for:', id)
         previewUrl.value = null
         isWaitingForPreview.value = true
+        return // The preview status watcher will handle loading when ready
       }
 
-      // Early return if waiting for preview - the preview status watcher will handle loading
-      if (isWaitingForPreview.value) {
-        return
-      }
+      // Preview is cached - but don't show it yet if there are edits to apply
+      // This prevents the "flash of unedited image" when returning to edit view
+      console.log('[useEditPreview] Preview cached, checking for edits:', id)
+      isWaitingForPreview.value = false
 
       try {
         // Load source pixels in background
@@ -789,9 +791,23 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           return
         }
 
+        // Wait a tick for edit store to finish loading (it runs concurrently)
+        await nextTick()
+
+        // Check generation again after tick
+        if (renderGeneration.value !== currentGen) {
+          return
+        }
+
         // Render with current adjustments if any
-        if (sourceCache.value && editStore.isDirty) {
+        if (sourceCache.value && editStore.hasModifications) {
           await renderPreview('full')
+        }
+        else {
+          // No modifications - safe to show the unedited preview
+          console.log('[useEditPreview] No modifications, showing unedited preview')
+          previewUrl.value = cachedPreviewUrl
+          isPreviewUrlOwned.value = false
         }
       }
       catch (err) {
@@ -820,10 +836,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         console.log('[useEditPreview] Preview ready, loading:', newUrl)
         const currentGen = renderGeneration.value
 
-        // Preview is ready, load it
+        // Preview is ready - but don't show yet, wait to check for edits
         isWaitingForPreview.value = false
-        previewUrl.value = newUrl
-        isPreviewUrlOwned.value = false
 
         try {
           await loadSource(assetId.value)
@@ -833,9 +847,21 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             return
           }
 
+          // Wait a tick for edit store to finish loading
+          await nextTick()
+
+          if (renderGeneration.value !== currentGen) {
+            return
+          }
+
           // Render with current adjustments after loading
-          if (sourceCache.value && editStore.isDirty) {
+          if (sourceCache.value && editStore.hasModifications) {
             await renderPreview('full')
+          }
+          else {
+            // No modifications - safe to show the unedited preview
+            previewUrl.value = newUrl
+            isPreviewUrlOwned.value = false
           }
         }
         catch (err) {
@@ -866,8 +892,6 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
         if (asset?.thumbnailUrl) {
           isWaitingForPreview.value = false
-          previewUrl.value = asset.thumbnailUrl
-          isPreviewUrlOwned.value = false
           error.value = 'Preview generation failed, showing thumbnail'
 
           try {
@@ -878,9 +902,21 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
               return
             }
 
+            // Wait a tick for edit store to finish loading
+            await nextTick()
+
+            if (renderGeneration.value !== currentGen) {
+              return
+            }
+
             // Render with current adjustments after loading
-            if (sourceCache.value && editStore.isDirty) {
+            if (sourceCache.value && editStore.hasModifications) {
               await renderPreview('full')
+            }
+            else {
+              // No modifications - safe to show the unedited thumbnail
+              previewUrl.value = asset.thumbnailUrl
+              isPreviewUrlOwned.value = false
             }
           }
           catch (err) {

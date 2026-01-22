@@ -15,6 +15,7 @@
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGridKeyboard, scrollIntoViewIfNeeded } from '~/composables/useGridKeyboard'
 import type { FlagStatus } from '@literoom/core/catalog'
+import { ThumbnailPriority } from '@literoom/core/catalog'
 
 // ============================================================================
 // Stores
@@ -23,6 +24,7 @@ import type { FlagStatus } from '@literoom/core/catalog'
 const catalogStore = useCatalogStore()
 const catalogUIStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
+const { requestPreview } = useCatalog()
 
 // ============================================================================
 // Refs
@@ -259,6 +261,8 @@ const { handleKeydown } = useGridKeyboard({
       catalogUIStore.setViewMode('loupe')
       const currentId = selectionStore.currentId
       if (currentId) {
+        // Start preview generation early (before navigation) so it's ready when edit view loads
+        requestPreview(currentId, ThumbnailPriority.VISIBLE)
         navigateTo(`/edit/${currentId}`)
       }
     }
