@@ -399,3 +399,84 @@ const result = apply_masked_adjustments(sourceImage, maskStack);
 
 ---
 
+## 109: 2026-01-21 20:48 EST: Local Masks - Phase 4 Complete (Worker Integration)
+
+**Objective**: Expose mask operations through the decode worker for use in the preview pipeline.
+
+**Background**: Phase 3 created WASM bindings for mask operations. Phase 4 integrates these bindings into the TypeScript worker infrastructure so the frontend can call `applyMaskedAdjustments()` through the `IDecodeService` interface.
+
+**Implementation**:
+
+1. **Updated `packages/core/src/decode/worker-messages.ts`**:
+   - Added `MaskStackData` interface for mask stack data transfer
+   - Added `ApplyMaskedAdjustmentsRequest` message type
+   - Updated `DecodeRequest` union to include new message type
+
+2. **Updated `packages/core/src/decode/decode-service.ts`**:
+   - Added `applyMaskedAdjustments()` method to `IDecodeService` interface
+   - Implemented method in `DecodeService` class
+
+3. **Updated `packages/core/src/decode/decode-worker.ts`**:
+   - Imported `apply_masked_adjustments` from WASM
+   - Added handler case for `'apply-masked-adjustments'` message type
+   - Handles conversion from camelCase (TS) to snake_case (WASM)
+   - Filters disabled masks before processing
+
+4. **Updated `packages/core/src/decode/mock-decode-service.ts`**:
+   - Added `onApplyMaskedAdjustments` custom handler option
+   - Implemented full mock for linear and radial mask evaluation
+   - Includes `smootherstep()` function for realistic feathering
+   - Includes simplified adjustment application for demo mode
+
+5. **Updated `packages/core/src/decode/index.ts`**:
+   - Exported `MaskStackData` and `ApplyMaskedAdjustmentsRequest` types
+
+**Files Modified** (5 files):
+- `packages/core/src/decode/worker-messages.ts`
+- `packages/core/src/decode/decode-service.ts`
+- `packages/core/src/decode/decode-worker.ts`
+- `packages/core/src/decode/mock-decode-service.ts`
+- `packages/core/src/decode/index.ts`
+
+**Tests**:
+- All 362 TypeScript tests pass
+- All 184 Rust literoom-core tests pass
+- All 44 WASM literoom-wasm tests pass
+- WASM build successful
+
+**TypeScript API**:
+```typescript
+interface IDecodeService {
+  // ... existing methods ...
+  applyMaskedAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStackData
+  ): Promise<DecodedImage>
+}
+
+interface MaskStackData {
+  linearMasks: Array<{
+    startX: number; startY: number
+    endX: number; endY: number
+    feather: number
+    enabled: boolean
+    adjustments: Partial<Adjustments>
+  }>
+  radialMasks: Array<{
+    centerX: number; centerY: number
+    radiusX: number; radiusY: number
+    rotation: number  // degrees
+    feather: number
+    invert: boolean
+    enabled: boolean
+    adjustments: Partial<Adjustments>
+  }>
+}
+```
+
+**Status**: Complete. Phase 4 done. Next: Phase 5 (Edit Store Integration).
+
+---
+

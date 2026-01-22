@@ -8,6 +8,34 @@
 import type { Adjustments, ErrorCode } from './types'
 
 /**
+ * Mask stack data for masked adjustments request.
+ * Contains arrays of enabled/disabled linear and radial gradient masks.
+ */
+export interface MaskStackData {
+  linearMasks: Array<{
+    startX: number
+    startY: number
+    endX: number
+    endY: number
+    feather: number
+    enabled: boolean
+    adjustments: Partial<Adjustments>
+  }>
+  radialMasks: Array<{
+    centerX: number
+    centerY: number
+    radiusX: number
+    radiusY: number
+    /** Rotation angle in degrees */
+    rotation: number
+    feather: number
+    invert: boolean
+    enabled: boolean
+    adjustments: Partial<Adjustments>
+  }>
+}
+
+/**
  * Request message sent from main thread to decode worker.
  */
 export type DecodeRequest =
@@ -21,6 +49,8 @@ export type DecodeRequest =
   | ApplyToneCurveRequest
   | ApplyRotationRequest
   | ApplyCropRequest
+  | EncodeJpegRequest
+  | ApplyMaskedAdjustmentsRequest
 
 /**
  * Decode a JPEG file to raw RGB pixels.
@@ -160,6 +190,40 @@ export interface ApplyCropRequest {
 }
 
 /**
+ * Encode image pixels to JPEG bytes.
+ */
+export interface EncodeJpegRequest {
+  id: string
+  type: 'encode-jpeg'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+  /** JPEG quality (1-100, recommended: 90) */
+  quality: number
+}
+
+/**
+ * Apply masked adjustments to image pixels.
+ * Applies local adjustments (linear gradient, radial gradient masks)
+ * with per-mask adjustment parameters.
+ */
+export interface ApplyMaskedAdjustmentsRequest {
+  id: string
+  type: 'apply-masked-adjustments'
+  /** RGB pixel data (3 bytes per pixel) */
+  pixels: Uint8Array
+  /** Image width */
+  width: number
+  /** Image height */
+  height: number
+  /** Mask stack containing linear and radial gradient masks */
+  maskStack: MaskStackData
+}
+
+/**
  * Response message sent from decode worker to main thread.
  */
 export type DecodeResponse =
@@ -167,6 +231,7 @@ export type DecodeResponse =
   | FileTypeResponse
   | HistogramResponse
   | ToneCurveResponse
+  | EncodeJpegResponse
   | DecodeErrorResponse
 
 /**
@@ -234,4 +299,14 @@ export interface ToneCurveResponse {
   width: number
   /** Image height */
   height: number
+}
+
+/**
+ * JPEG encoding response.
+ */
+export interface EncodeJpegResponse {
+  id: string
+  type: 'encode-jpeg-result'
+  /** JPEG-encoded bytes */
+  bytes: Uint8Array
 }

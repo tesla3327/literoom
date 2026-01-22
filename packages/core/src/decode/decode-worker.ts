@@ -24,6 +24,7 @@ import init, {
   apply_crop,
   compute_histogram,
   encode_jpeg,
+  apply_masked_adjustments,
   BasicAdjustments,
   JsDecodedImage,
   JsToneCurveLut
@@ -409,6 +410,88 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
         // Transfer the JPEG buffer to avoid copying
         self.postMessage(response, [jpegBytes.buffer])
+        break
+      }
+
+      case 'apply-masked-adjustments': {
+        const { pixels, width, height, maskStack } = request
+
+        // Create input image from pixels
+        const inputImage = new JsDecodedImage(width, height, pixels)
+
+        // Convert mask stack to WASM format
+        // The WASM function expects snake_case field names
+        const wasmMaskData = {
+          linear_masks: maskStack.linearMasks
+            .filter(m => m.enabled)
+            .map(m => ({
+              start_x: m.startX,
+              start_y: m.startY,
+              end_x: m.endX,
+              end_y: m.endY,
+              feather: m.feather,
+              enabled: true,
+              adjustments: {
+                exposure: m.adjustments.exposure ?? 0,
+                contrast: m.adjustments.contrast ?? 0,
+                highlights: m.adjustments.highlights ?? 0,
+                shadows: m.adjustments.shadows ?? 0,
+                whites: m.adjustments.whites ?? 0,
+                blacks: m.adjustments.blacks ?? 0,
+                temperature: m.adjustments.temperature ?? 0,
+                tint: m.adjustments.tint ?? 0,
+                saturation: m.adjustments.saturation ?? 0,
+                vibrance: m.adjustments.vibrance ?? 0,
+              },
+            })),
+          radial_masks: maskStack.radialMasks
+            .filter(m => m.enabled)
+            .map(m => ({
+              center_x: m.centerX,
+              center_y: m.centerY,
+              radius_x: m.radiusX,
+              radius_y: m.radiusY,
+              rotation: m.rotation, // WASM converts degrees to radians
+              feather: m.feather,
+              invert: m.invert,
+              enabled: true,
+              adjustments: {
+                exposure: m.adjustments.exposure ?? 0,
+                contrast: m.adjustments.contrast ?? 0,
+                highlights: m.adjustments.highlights ?? 0,
+                shadows: m.adjustments.shadows ?? 0,
+                whites: m.adjustments.whites ?? 0,
+                blacks: m.adjustments.blacks ?? 0,
+                temperature: m.adjustments.temperature ?? 0,
+                tint: m.adjustments.tint ?? 0,
+                saturation: m.adjustments.saturation ?? 0,
+                vibrance: m.adjustments.vibrance ?? 0,
+              },
+            })),
+        }
+
+        // Apply masked adjustments (returns new image)
+        const outputImage = apply_masked_adjustments(inputImage, wasmMaskData)
+        const outputPixels = outputImage.pixels()
+        const outputWidth = outputImage.width
+        const outputHeight = outputImage.height
+
+        // Free WASM memory
+        inputImage.free()
+
+        const maskedResponse: DecodeSuccessResponse = {
+          id,
+          type: 'success',
+          width: outputWidth,
+          height: outputHeight,
+          pixels: outputPixels
+        }
+
+        // Transfer the pixel buffer to avoid copying
+        self.postMessage(maskedResponse, [outputPixels.buffer])
+
+        // Free output image WASM memory
+        outputImage.free()
         break
       }
 

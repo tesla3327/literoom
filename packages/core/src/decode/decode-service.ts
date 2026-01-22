@@ -6,7 +6,7 @@
  * timeout handling, and proper error propagation.
  */
 
-import type { DecodeRequest, DecodeResponse } from './worker-messages'
+import type { DecodeRequest, DecodeResponse, MaskStackData } from './worker-messages'
 import type {
   DecodedImage,
   DecodeServiceState,
@@ -90,6 +90,13 @@ export interface IDecodeService {
     height: number,
     quality?: number
   ): Promise<Uint8Array>
+  /** Apply masked adjustments (local adjustments) to image pixel data */
+  applyMaskedAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStackData
+  ): Promise<DecodedImage>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -486,6 +493,32 @@ export class DecodeService implements IDecodeService {
       width,
       height,
       quality
+    })
+  }
+
+  /**
+   * Apply masked adjustments (local adjustments) to image pixel data.
+   * This applies linear and radial gradient masks with per-mask adjustments.
+   *
+   * @param pixels - RGB pixel data (3 bytes per pixel)
+   * @param width - Image width
+   * @param height - Image height
+   * @param maskStack - Mask stack containing linear and radial gradient masks
+   * @returns New image with masked adjustments applied
+   */
+  async applyMaskedAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStackData
+  ): Promise<DecodedImage> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'apply-masked-adjustments',
+      pixels,
+      width,
+      height,
+      maskStack
     })
   }
 

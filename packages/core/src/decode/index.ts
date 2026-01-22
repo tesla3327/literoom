@@ -17,6 +17,7 @@ export {
   type HistogramData,
   type CurvePoint,
   type ToneCurve,
+  type Adjustments,
   DEFAULT_TONE_CURVE,
   DecodeError,
   filterToNumber
@@ -34,6 +35,8 @@ export {
   type ComputeHistogramRequest,
   type ApplyToneCurveRequest,
   type EncodeJpegRequest,
+  type ApplyMaskedAdjustmentsRequest,
+  type MaskStackData,
   type DecodeResponse,
   type DecodeSuccessResponse,
   type FileTypeResponse,

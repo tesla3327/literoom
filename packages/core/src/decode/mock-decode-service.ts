@@ -11,6 +11,7 @@
  */
 
 import type { IDecodeService } from './decode-service'
+import type { MaskStackData } from './worker-messages'
 import type {
   DecodedImage,
   DecodeServiceState,
@@ -61,6 +62,13 @@ export interface MockDecodeServiceOptions {
     width: number,
     height: number
   ) => Promise<HistogramData>
+  /** Custom handler for applyMaskedAdjustments */
+  onApplyMaskedAdjustments?: (
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStackData
+  ) => Promise<DecodedImage>
 }
 
 /**
@@ -598,6 +606,212 @@ export class MockDecodeService implements IDecodeService {
     mockJpeg[mockJpegHeader.length + 1] = 0xD9 // EOI (End Of Image)
 
     return mockJpeg
+  }
+
+  async applyMaskedAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStackData
+  ): Promise<DecodedImage> {
+    await this.simulateOperation()
+
+    if (this.options.onApplyMaskedAdjustments) {
+      return this.options.onApplyMaskedAdjustments(pixels, width, height, maskStack)
+    }
+
+    // Filter enabled masks
+    const linearMasks = maskStack.linearMasks.filter(m => m.enabled)
+    const radialMasks = maskStack.radialMasks.filter(m => m.enabled)
+
+    // Fast path: no masks = no change
+    if (linearMasks.length === 0 && radialMasks.length === 0) {
+      return { width, height, pixels: new Uint8Array(pixels) }
+    }
+
+    // Apply simplified masked adjustments for demo mode
+    const outputPixels = new Uint8Array(pixels.length)
+
+    for (let py = 0; py < height; py++) {
+      for (let px = 0; px < width; px++) {
+        const idx = (py * width + px) * 3
+
+        // Normalized coordinates (0-1)
+        const x = (px + 0.5) / width
+        const y = (py + 0.5) / height
+
+        // Start with original pixel values
+        let r = pixels[idx]
+        let g = pixels[idx + 1]
+        let b = pixels[idx + 2]
+
+        // Apply each linear mask
+        for (const mask of linearMasks) {
+          const maskVal = this.evaluateLinearMask(mask, x, y)
+          if (maskVal < 0.001) continue
+
+          // Apply adjustments and blend
+          const [ar, ag, ab] = this.applyPixelAdjustments(r, g, b, mask.adjustments)
+          r = Math.round(r * (1 - maskVal) + ar * maskVal)
+          g = Math.round(g * (1 - maskVal) + ag * maskVal)
+          b = Math.round(b * (1 - maskVal) + ab * maskVal)
+        }
+
+        // Apply each radial mask
+        for (const mask of radialMasks) {
+          const maskVal = this.evaluateRadialMask(mask, x, y)
+          if (maskVal < 0.001) continue
+
+          // Apply adjustments and blend
+          const [ar, ag, ab] = this.applyPixelAdjustments(r, g, b, mask.adjustments)
+          r = Math.round(r * (1 - maskVal) + ar * maskVal)
+          g = Math.round(g * (1 - maskVal) + ag * maskVal)
+          b = Math.round(b * (1 - maskVal) + ab * maskVal)
+        }
+
+        outputPixels[idx] = Math.max(0, Math.min(255, r))
+        outputPixels[idx + 1] = Math.max(0, Math.min(255, g))
+        outputPixels[idx + 2] = Math.max(0, Math.min(255, b))
+      }
+    }
+
+    return { width, height, pixels: outputPixels }
+  }
+
+  /**
+   * Smootherstep function for smooth feathering.
+   */
+  private smootherstep(t: number): number {
+    const clamped = Math.max(0, Math.min(1, t))
+    return clamped * clamped * clamped * (clamped * (clamped * 6 - 15) + 10)
+  }
+
+  /**
+   * Evaluate linear gradient mask at given coordinates.
+   */
+  private evaluateLinearMask(
+    mask: MaskStackData['linearMasks'][0],
+    x: number,
+    y: number
+  ): number {
+    const dx = mask.endX - mask.startX
+    const dy = mask.endY - mask.startY
+    const lenSq = dx * dx + dy * dy
+
+    // Degenerate case
+    if (lenSq < 0.000001) return 0.5
+
+    // Project point onto gradient line
+    const t = ((x - mask.startX) * dx + (y - mask.startY) * dy) / lenSq
+
+    // Apply feathering centered at 0.5
+    const featherZone = 0.5 * Math.max(0, Math.min(1, mask.feather))
+    const center = 0.5
+
+    if (t <= center - featherZone) {
+      return 1.0 // Full effect on start side
+    } else if (t >= center + featherZone) {
+      return 0.0 // No effect on end side
+    } else {
+      // Interpolate with smootherstep
+      const localT = (t - (center - featherZone)) / Math.max(0.001, 2 * featherZone)
+      return 1.0 - this.smootherstep(localT)
+    }
+  }
+
+  /**
+   * Evaluate radial gradient mask at given coordinates.
+   */
+  private evaluateRadialMask(
+    mask: MaskStackData['radialMasks'][0],
+    x: number,
+    y: number
+  ): number {
+    const dx = x - mask.centerX
+    const dy = y - mask.centerY
+
+    // Rotate to local coordinate space
+    const angleRad = mask.rotation * Math.PI / 180
+    const cosR = Math.cos(angleRad)
+    const sinR = Math.sin(angleRad)
+    const localX = dx * cosR + dy * sinR
+    const localY = -dx * sinR + dy * cosR
+
+    // Avoid division by zero
+    const rx = Math.max(0.001, mask.radiusX)
+    const ry = Math.max(0.001, mask.radiusY)
+
+    // Normalized distance from center (1.0 = on ellipse edge)
+    const normDist = Math.sqrt((localX / rx) ** 2 + (localY / ry) ** 2)
+
+    // Inner boundary based on feather
+    const inner = 1.0 - Math.max(0, Math.min(1, mask.feather))
+
+    let maskVal: number
+    if (normDist <= inner) {
+      maskVal = 1.0 // Full effect inside inner boundary
+    } else if (normDist >= 1.0) {
+      maskVal = 0.0 // No effect outside ellipse
+    } else {
+      // Feathered region
+      const t = (normDist - inner) / Math.max(0.001, 1.0 - inner)
+      maskVal = 1.0 - this.smootherstep(t)
+    }
+
+    return mask.invert ? 1.0 - maskVal : maskVal
+  }
+
+  /**
+   * Apply adjustments to a single pixel (simplified for demo).
+   */
+  private applyPixelAdjustments(
+    r: number,
+    g: number,
+    b: number,
+    adjustments: Partial<Adjustments>
+  ): [number, number, number] {
+    let outR = r
+    let outG = g
+    let outB = b
+
+    // Apply exposure
+    if (adjustments.exposure && adjustments.exposure !== 0) {
+      const multiplier = Math.pow(2, adjustments.exposure)
+      outR = outR * multiplier
+      outG = outG * multiplier
+      outB = outB * multiplier
+    }
+
+    // Apply contrast
+    if (adjustments.contrast && adjustments.contrast !== 0) {
+      const factor = (adjustments.contrast / 100) + 1
+      outR = ((outR / 255 - 0.5) * factor + 0.5) * 255
+      outG = ((outG / 255 - 0.5) * factor + 0.5) * 255
+      outB = ((outB / 255 - 0.5) * factor + 0.5) * 255
+    }
+
+    // Apply temperature
+    if (adjustments.temperature && adjustments.temperature !== 0) {
+      const tempFactor = adjustments.temperature / 100
+      outR = outR + tempFactor * 30
+      outB = outB - tempFactor * 30
+    }
+
+    // Apply saturation
+    if (adjustments.saturation && adjustments.saturation !== 0) {
+      const sat = (adjustments.saturation / 100) + 1
+      const gray = 0.299 * outR + 0.587 * outG + 0.114 * outB
+      outR = gray + (outR - gray) * sat
+      outG = gray + (outG - gray) * sat
+      outB = gray + (outB - gray) * sat
+    }
+
+    // Clamp values
+    return [
+      Math.max(0, Math.min(255, outR)),
+      Math.max(0, Math.min(255, outG)),
+      Math.max(0, Math.min(255, outB)),
+    ]
   }
 
   destroy(): void {
