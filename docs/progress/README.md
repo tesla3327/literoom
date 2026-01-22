@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 09:40 EST
-**Current Phase**: Export Doesn't Apply Edits - Implementation Complete
+**Last Updated**: 2026-01-22 09:58 EST
+**Current Phase**: Gallery Loading State Fix - Implementation Complete
 
 ## Project Structure
 
@@ -328,6 +328,8 @@ literoom/
 | [126](./iterations-121-130.md:321) | 2026-01-22 | Export Button Always Disabled - Fixed |
 | [127](./iterations-121-130.md:347) | 2026-01-22 | Export Doesn't Apply Edits - Research |
 | [128](./iterations-121-130.md:400) | 2026-01-22 | Export Doesn't Apply Edits - Implementation Complete |
+| [129](./iterations-121-130.md:467) | 2026-01-22 | "All" Count Bug - Defensive Fix Applied |
+| [130](./iterations-121-130.md:534) | 2026-01-22 | Gallery Loading State Fix - Implementation Complete |
 
 ---
 

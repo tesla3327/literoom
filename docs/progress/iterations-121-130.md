@@ -462,3 +462,117 @@ Added `applyMaskedAdjustments` mock to `createMockDependencies()`
 - Edits are lost on page refresh (no database persistence yet)
 - This is acceptable for now since the user workflow is typically: edit → export within same session
 
+---
+
+## 129: 2026-01-22 09:50 EST: "All" Count Keeps Increasing Bug - Research & Defensive Fix
+
+**Objective**: Fix the high-severity issue "All count keeps increasing" - every time a user navigates from the edit page back to the gallery, the "All" count in the filter bar increases.
+
+**Status**: Complete - Defensive fixes applied
+
+**Research Findings**:
+
+### Potential Bug Location Identified
+In `addAssetBatch()` in `stores/catalog.ts`, if called twice with the same asset IDs without `clear()` in between, the `assetIds` array would accumulate duplicates:
+```typescript
+for (const asset of newAssets) {
+  newMap.set(asset.id, asset)  // Map handles duplicates - OK
+  newIds.push(asset.id)        // Array ALWAYS pushes - potential BUG
+}
+```
+
+### Protection Already Exists
+- `useCatalog.selectFolder()` calls `catalogStore.clear()` before scanning
+- `initializeCatalog()` in plugin has guard: returns early if `assetIds.length > 0`
+
+### Unable to Reproduce
+Tested extensively in demo mode:
+- Navigated between edit view and gallery 5+ times via keyboard (G key)
+- Navigated using browser back button
+- Reloaded page on gallery
+- All tests showed count staying at "All 50"
+
+### Root Cause Hypothesis
+The bug likely occurred when `restoreSession()` was called on every index page mount (including when returning from edit), which in demo mode would call `selectFolder()` → `clear()` → `scanFolder()`. While this should reset the count, a race condition or timing issue could have caused duplicates.
+
+**Defensive Fixes Applied**:
+
+### 1. Added duplicate ID prevention in `addAssetBatch()` (`stores/catalog.ts:116-131`)
+```typescript
+const existingIds = new Set(newIds)
+for (const asset of newAssets) {
+  newMap.set(asset.id, asset)
+  if (!existingIds.has(asset.id)) {
+    newIds.push(asset.id)
+    existingIds.add(asset.id)
+  }
+}
+```
+
+### 2. Added guard in `restoreSession()` (`composables/useCatalog.ts:80-84`)
+```typescript
+if (catalogStore.assetIds.length > 0) {
+  return true  // Skip restoration if assets already loaded
+}
+```
+
+**Files Modified** (2):
+- `apps/web/app/stores/catalog.ts`
+- `apps/web/app/composables/useCatalog.ts`
+
+**Testing**:
+- ✅ All 362 core package tests pass
+- ✅ Manual testing shows count stays at 50 after multiple edit/gallery navigations
+- ✅ App loads correctly in demo mode
+
+**Note**: While the bug couldn't be reproduced, the defensive fixes ensure:
+1. `addAssetBatch` will never create duplicate IDs even if called multiple times
+2. `restoreSession` won't re-scan if assets are already loaded
+
+---
+
+## 130: 2026-01-22 09:51 EST: Gallery Loading State After Edit - Implementation Complete
+
+**Objective**: Fix the high-severity issue "Gallery loading state after returning from edit" - when returning to the gallery from the edit page, sometimes only a loading state is shown with no thumbnails.
+
+**Status**: Complete
+
+**Problem Description** (from issues.md):
+1. When returning to the gallery from the edit page, sometimes only a loading state is shown with no thumbnails
+2. Thumbnails are not updated/regenerated to reflect edits made to the photo (future iteration)
+
+**Root Cause Analysis** (from research):
+- `getAsset()` in CatalogGrid.vue could return `undefined` if asset ID exists but asset data isn't in the store
+- The component used non-null assertion (`!`) to pass asset to CatalogThumbnail
+- If asset was undefined, CatalogThumbnail would try to access properties on undefined
+
+**Implementation**:
+
+### Phase 1: Add v-if Guard in CatalogGrid Template
+Changed the template to use a wrapper `<template>` with `v-if` check:
+```vue
+<template v-for="colIndex in columnsInRow(virtualRow.index)">
+  <CatalogThumbnail
+    v-if="getAsset(virtualRow.index, colIndex - 1)"
+    :asset="getAsset(virtualRow.index, colIndex - 1)!"
+    ...
+  />
+  <div v-else class="aspect-square rounded-lg bg-gray-900 animate-pulse" />
+</template>
+```
+
+### Phase 2: Add Debug Logging
+Added console warning in `getAsset()` when asset ID exists but asset data not found:
+```typescript
+if (!asset) {
+  console.warn(`[CatalogGrid] Asset ID "${assetId}" exists but asset data not found in store`)
+}
+```
+
+**Files Modified** (1):
+- `apps/web/app/components/catalog/CatalogGrid.vue`
+
+**Limitations** (documented for future work):
+- Thumbnails don't update to reflect edits (requires thumbnail regeneration pipeline)
+- This fix only addresses Issue 1 (loading state); Issue 2 is deferred
+

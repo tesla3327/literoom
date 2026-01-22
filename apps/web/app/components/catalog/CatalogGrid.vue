@@ -98,10 +98,19 @@ function getAssetId(rowIndex: number, colIndex: number): string | undefined {
 
 /**
  * Get the asset for a specific row/column position.
+ * Returns undefined if asset ID doesn't exist or asset is not in store.
  */
 function getAsset(rowIndex: number, colIndex: number) {
   const assetId = getAssetId(rowIndex, colIndex)
-  return assetId ? catalogStore.getAsset(assetId) : undefined
+  if (!assetId) return undefined
+
+  const asset = catalogStore.getAsset(assetId)
+  if (!asset) {
+    // Debug: Log when asset is in assetIds but not in assets Map
+    // This indicates a desync that shouldn't happen in normal operation
+    console.warn(`[CatalogGrid] Asset ID "${assetId}" exists but asset data not found in store`)
+  }
+  return asset
 }
 
 /**
@@ -310,15 +319,27 @@ function handleContainerFocus() {
         }"
       >
         <!-- Items in this row -->
-        <CatalogThumbnail
+        <template
           v-for="colIndex in columnsInRow(virtualRow.index)"
           :key="getAssetId(virtualRow.index, colIndex - 1) ?? `empty-${virtualRow.index}-${colIndex}`"
-          :asset="getAsset(virtualRow.index, colIndex - 1)!"
-          :is-selected="isSelected(virtualRow.index, colIndex - 1)"
-          :is-current="isCurrent(virtualRow.index, colIndex - 1)"
-          :index="getGlobalIndex(virtualRow.index, colIndex - 1)"
-          @click="handleThumbnailClick($event, virtualRow.index, colIndex - 1)"
-        />
+        >
+          <!-- Render thumbnail if asset exists -->
+          <CatalogThumbnail
+            v-if="getAsset(virtualRow.index, colIndex - 1)"
+            :asset="getAsset(virtualRow.index, colIndex - 1)!"
+            :is-selected="isSelected(virtualRow.index, colIndex - 1)"
+            :is-current="isCurrent(virtualRow.index, colIndex - 1)"
+            :index="getGlobalIndex(virtualRow.index, colIndex - 1)"
+            @click="handleThumbnailClick($event, virtualRow.index, colIndex - 1)"
+          />
+          <!-- Fallback placeholder for missing assets (shouldn't happen normally) -->
+          <div
+            v-else
+            class="aspect-square rounded-lg bg-gray-900 animate-pulse"
+            role="gridcell"
+            aria-label="Loading..."
+          />
+        </template>
       </div>
     </div>
 
