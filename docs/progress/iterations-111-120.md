@@ -495,3 +495,67 @@ Modified `apps/web/app/components/edit/EditPreviewCanvas.vue`:
 
 ---
 
+## 120: 2026-01-21 23:15 EST: Edit View Thumbnail Fallback - Research & Plan Complete
+
+**Objective**: Fix the high-severity issue "Edit view should never use thumbnail".
+
+**Background**: From docs/issues.md:
+- The edit view currently falls back to displaying the small thumbnail (512px) while waiting for the high-resolution preview (2560px) to load
+- This provides a poor editing experience
+- Users may start making edits on a low-quality image
+- Creates confusion about actual image quality
+
+**Research Summary** (from 4 parallel agents):
+
+1. **useEditPreview Composable** (`useEditPreview.ts`):
+   - Line 339-343: `sourceUrl` computed prefers `preview1xUrl`, falls back to `thumbnailUrl`
+   - Line 710-714: Asset watcher immediately sets `previewUrl` to best available (usually thumbnail)
+   - Missing state: No `isWaitingForPreview` flag to indicate preview is loading
+
+2. **EditPreviewCanvas Component** (`EditPreviewCanvas.vue`):
+   - Line 76: `isInitialLoading` only checks if `previewUrl` is null
+   - Once thumbnail URL is set, loading state disappears prematurely
+   - Lines 186-211: Template shows image immediately when any URL exists
+
+3. **Preview Generation Flow** (`thumbnail-service.ts`, `catalog-service.ts`):
+   - Thumbnail: 512px, 0.85 JPEG quality
+   - Preview 1x: 2560px, 0.92 JPEG quality, lanczos3 filtering
+   - Separate queues, caches, and processing pipelines
+   - `preview1xStatus` field tracks: 'pending' → 'loading' → 'ready' | 'error'
+
+4. **Store Updates** (`catalog.ts`, `catalog.client.ts`):
+   - `onPreviewReady` callback updates `preview1xStatus: 'ready'` and `preview1xUrl`
+   - Reactive updates propagate to components
+
+**Root Cause**:
+The asset watcher in `useEditPreview.ts` (line 713) immediately sets `previewUrl` to thumbnail:
+```typescript
+const immediateUrl = asset?.preview1xUrl ?? asset?.thumbnailUrl ?? null
+previewUrl.value = immediateUrl  // ← Sets thumbnail immediately
+```
+
+This makes `isInitialLoading` become `false`, hiding the loading state while preview generates.
+
+**Solution**: Add `isWaitingForPreview` state that tracks when we're waiting for high-quality preview. Show loading state until preview is ready, never display thumbnail in edit view.
+
+**Documents Created**:
+- `docs/research/2026-01-21-thumbnail-fallback-synthesis.md`
+- `docs/plans/2026-01-21-thumbnail-fallback-plan.md`
+
+**Implementation Plan Summary**:
+
+| Phase | Description |
+|-------|-------------|
+| 1 | Add `isWaitingForPreview` state to `useEditPreview.ts` |
+| 2 | Update `EditPreviewCanvas.vue` loading condition |
+| 3 | Add watcher for preview ready callback |
+| 4 | Handle cached previews (no loading flash) |
+
+**Files to Modify**:
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+
+**Status**: Research and plan complete. Ready for implementation.
+
+---
+
