@@ -388,3 +388,110 @@ Comprehensive utility module with:
 
 ---
 
+## 119: 2026-01-21 23:03 EST: Local Masks UI - Phases 7.6 & 7.7 Complete (Mask Overlay)
+
+**Objective**: Implement the mask overlay composable and integrate it into the edit preview canvas.
+
+**Background**: Phases 7.1-7.5 of the Local Masks UI plan were complete. This iteration implements Phase 7.6 (useMaskOverlay.ts) and Phase 7.7 (EditPreviewCanvas integration), which enable users to create and edit masks visually on the preview canvas.
+
+**Status**: Complete
+
+**Changes Made**:
+
+### Phase 7.6: useMaskOverlay.ts Composable (NEW FILE)
+
+Created comprehensive mask overlay composable (`apps/web/app/composables/useMaskOverlay.ts`) with:
+
+#### State Management
+- `activeMaskType` - Track if editing linear or radial mask
+- `activeMaskId` - ID of mask being dragged
+- `activeLinearHandle` / `activeRadialHandle` - Currently dragged handle
+- `hoveredMaskId` / `hoveredLinearHandle` / `hoveredRadialHandle` - Hover state for cursor
+- `isDrawingMask` - Whether creating a new mask
+- `drawStart` / `drawCurrent` - Coordinates during mask drawing
+- `isMovingRadial` - Radial center move operation
+- `lastMousePos` - For move delta calculations
+
+#### Computed Properties
+- `isDragging` - Whether any handle is being dragged
+- `isDrawing` - Whether drawing a new mask
+- `cursorStyle` - Dynamic cursor based on interaction state (crosshair, grab, grabbing, resize cursors)
+
+#### Core Functions
+- `render()` - Draws all masks on canvas:
+  - Unselected masks first (back-to-front)
+  - Selected mask on top with full handles
+  - Temporary mask preview during drawing mode
+- `findMaskAt()` - Hit detection for masks and handles
+- `findLinearMask()` / `findRadialMask()` - Helpers to get mask by ID
+
+#### Event Handlers
+- `handleMouseDown()` - Start drawing, start drag, or select mask
+- `handleMouseMove()` - Drawing progress, handle drag, hover state
+- `handleMouseUp()` - Complete drawing (creates new mask), end drag
+- `handleMouseLeave()` - Cancel operations, clear hover
+- `handleKeyDown()` - Escape to cancel, Delete to remove selected mask
+
+#### Watchers
+- Re-render when masks change in store
+- Re-render when selected mask changes
+- Re-render when drawing mode changes
+- Re-render when canvas dimensions change
+
+### Phase 7.7: EditPreviewCanvas Integration
+
+Modified `apps/web/app/components/edit/EditPreviewCanvas.vue`:
+
+1. Added mask canvas ref: `maskCanvasRef`
+2. Initialized `useMaskOverlay` composable with canvas and dimensions
+3. Added mask overlay canvas element to template:
+   - Conditional render when `editUIStore.isMaskToolActive`
+   - Higher z-index (25) than crop overlay (20)
+   - Dynamic cursor from composable
+   - Touch action disabled for dragging
+
+**Features Implemented**:
+- ✅ Draw linear gradient masks by click-drag
+- ✅ Draw radial gradient masks by click-drag
+- ✅ Select masks by clicking on them
+- ✅ Drag handles to edit mask shape
+- ✅ Move radial mask center by dragging
+- ✅ Cursor feedback for all interactions
+- ✅ Escape key cancels drawing mode
+- ✅ Delete/Backspace removes selected mask
+- ✅ Hover highlighting for handles
+- ✅ Selected mask rendered on top
+
+**Files Created** (1):
+- `apps/web/app/composables/useMaskOverlay.ts`
+
+**Files Modified** (1):
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+
+**Testing**:
+- All 362 core package tests pass
+- 1 web app unit test passes
+- All 28 E2E tests pass
+
+**Local Masks UI Status**:
+- ✅ Phase 7.1: Edit UI Store Extensions (complete - from iteration 117)
+- ✅ Phase 7.2: EditMaskPanel.vue (complete - from iteration 117)
+- ✅ Phase 7.3: EditMaskAdjustments.vue (complete - from iteration 117)
+- ✅ Phase 7.4: Accordion Integration (complete - from iteration 117)
+- ✅ Phase 7.5: maskUtils.ts (complete - from iteration 118)
+- ✅ Phase 7.6: useMaskOverlay.ts (complete - this iteration)
+- ✅ Phase 7.7: EditPreviewCanvas integration (complete - this iteration)
+- ✅ Phase 7.8: Factory functions (already existed in types.ts)
+
+**Local Masks UI is now COMPLETE!** Users can:
+1. Expand the "Masks" accordion section in edit view
+2. Click "Linear" or "Radial" button to enter drawing mode
+3. Click and drag on the preview to create a mask
+4. Select masks to see their handles and adjustments
+5. Drag handles to resize/reshape masks
+6. Toggle mask visibility via eye icon
+7. Delete masks via trash icon or Delete key
+8. Adjust per-mask settings using the sliders
+
+---
+

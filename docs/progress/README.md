@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-21 23:00 EST
-**Current Phase**: Local Masks UI (Phase 7) - Phases 7.1-7.5 Complete (Mask Utilities)
+**Last Updated**: 2026-01-21 23:10 EST
+**Current Phase**: Local Masks UI (Phase 7) - COMPLETE
 
 ## Project Structure
 
@@ -107,6 +107,30 @@ literoom/
 - Copy/Paste buttons in EditControlsPanel
 - Toast notifications for feedback
 - Selective copy (Basic Adjustments, Tone Curve, Crop, Rotation)
+
+### Phase 14: Export Workflow
+- JPEG encoding in WASM (literoom-core encode module)
+- Worker integration for export operations
+- Filename template parser with tokens ({orig}, {seq}, {date})
+- ExportService for coordinating export process
+- ExportModal component with quality, resize, naming options
+- Progress indicator in FilterBar during export
+
+### Phase 15: Local Masks (Backend)
+- TypeScript types for linear/radial gradient masks
+- Rust mask evaluation algorithms (gradient computation, feathering)
+- WASM bindings for apply_masked_adjustments
+- Worker integration for mask processing
+- Edit store state management for masks
+- Preview pipeline integration (masks applied after tone curve)
+
+### Phase 16: Local Masks UI
+- EditMaskPanel component (mask list, add/delete buttons)
+- EditMaskAdjustments component (per-mask sliders)
+- Masks accordion section in EditControlsPanel
+- maskUtils.ts (coordinates, hit detection, rendering)
+- useMaskOverlay composable (canvas interaction, drawing mode)
+- EditPreviewCanvas integration (mask overlay canvas layer)
 
 ---
 
@@ -289,6 +313,7 @@ literoom/
 | [116](./iterations-111-120.md:224) | 2026-01-21 | Local Masks UI - Implementation Plan Created |
 | [117](./iterations-111-120.md:260) | 2026-01-21 | Local Masks UI - Phases 7.1-7.4 Complete |
 | [118](./iterations-111-120.md:315) | 2026-01-21 | Local Masks UI - Phase 7.5 Complete (Mask Utilities) |
+| [119](./iterations-111-120.md:391) | 2026-01-21 | Local Masks UI - Phases 7.6 & 7.7 Complete (COMPLETE) |
 
 ---
 

@@ -144,6 +144,19 @@ const { isDragging: isCropDragging, cursorStyle: cropCursorStyle } = useCropOver
   imageWidth: computed(() => previewDimensions.value?.width ?? 0),
   imageHeight: computed(() => previewDimensions.value?.height ?? 0),
 })
+
+/** Reference to the mask overlay canvas */
+const maskCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+/**
+ * Mask overlay composable.
+ * Renders and handles interaction with mask overlay on preview.
+ */
+const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskCursorStyle } = useMaskOverlay({
+  canvasRef: maskCanvasRef,
+  displayWidth: computed(() => renderedDimensions.value.width),
+  displayHeight: computed(() => renderedDimensions.value.height),
+})
 </script>
 
 <template>
@@ -229,6 +242,23 @@ const { isDragging: isCropDragging, cursorStyle: cropCursorStyle } = useCropOver
           touchAction: 'none',
         }"
         data-testid="crop-overlay-canvas"
+      />
+
+      <!-- Mask overlay canvas - positioned over the image, interactive -->
+      <canvas
+        v-if="editUIStore.isMaskToolActive"
+        ref="maskCanvasRef"
+        class="absolute top-0 left-0"
+        :width="renderedDimensions.width"
+        :height="renderedDimensions.height"
+        :style="{
+          width: renderedDimensions.width + 'px',
+          height: renderedDimensions.height + 'px',
+          cursor: maskCursorStyle,
+          zIndex: 25,
+          touchAction: 'none',
+        }"
+        data-testid="mask-overlay-canvas"
       />
     </div>
 
