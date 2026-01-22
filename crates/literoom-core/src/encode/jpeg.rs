@@ -57,7 +57,12 @@ pub enum EncodeError {
 /// // Verify JPEG magic bytes
 /// assert_eq!(&jpeg[0..2], &[0xFF, 0xD8]);
 /// ```
-pub fn encode_jpeg(pixels: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u8>, EncodeError> {
+pub fn encode_jpeg(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    quality: u8,
+) -> Result<Vec<u8>, EncodeError> {
     // Validate dimensions
     if width == 0 || height == 0 {
         return Err(EncodeError::InvalidDimensions { width, height });

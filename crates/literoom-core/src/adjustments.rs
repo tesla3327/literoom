@@ -497,7 +497,7 @@ mod tests {
         let result = apply(&pixels, &adj);
         // Colors should become more vivid
         // The difference between channels should increase
-        let orig_diff = (200 - 100) as i32;
+        let orig_diff: i32 = 200 - 100;
         let new_diff = (result[0] as i32 - result[2] as i32).abs();
         assert!(new_diff > orig_diff, "Color difference should increase");
     }

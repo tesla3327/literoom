@@ -63,8 +63,14 @@ use wasm_bindgen::prelude::*;
 /// console.log(`Encoded ${jpeg.byteLength} bytes`);
 /// ```
 #[wasm_bindgen]
-pub fn encode_jpeg(pixels: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u8>, JsValue> {
-    encode::encode_jpeg(pixels, width, height, quality).map_err(|e| JsValue::from_str(&e.to_string()))
+pub fn encode_jpeg(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    quality: u8,
+) -> Result<Vec<u8>, JsValue> {
+    encode::encode_jpeg(pixels, width, height, quality)
+        .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Encode a JsDecodedImage to JPEG bytes.

@@ -155,8 +155,8 @@ mod tests {
     fn test_identity_lut_values() {
         let lut = JsToneCurveLut::identity();
         let data = lut.get_lut();
-        for i in 0..256 {
-            assert_eq!(data[i], i as u8);
+        for (i, &val) in data.iter().enumerate() {
+            assert_eq!(val, i as u8);
         }
     }
 

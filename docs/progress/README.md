@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 10:30 EST
-**Current Phase**: Recent Folders Feature - Implementation Complete
+**Last Updated**: 2026-01-22 10:41 EST
+**Current Phase**: Rust CI Compatibility Fix - Complete
 
 ## Project Structure
 
@@ -341,6 +341,7 @@ literoom/
 | [134](./iterations-131-140.md:167) | 2026-01-22 | Previously Opened Folder Auto-loads - Research Complete |
 | [135](./iterations-131-140.md:210) | 2026-01-22 | Recent Folders Feature - Implementation Plan Created |
 | [136](./iterations-131-140.md:255) | 2026-01-22 | Recent Folders Feature - Implementation Complete |
+| [137](./iterations-131-140.md:325) | 2026-01-22 | Rust CI Compatibility Fix - Complete |
 
 ---
 
@@ -349,7 +350,7 @@ literoom/
 | Package | Tests | Status |
 |---------|-------|--------|
 | literoom-core | 184 | Passing |
-| literoom-wasm | 38 | Passing |
+| literoom-wasm | 44 | Passing |
 | packages/core | 362 | Passing |
 | apps/web (unit) | 1 | Passing |
 | apps/web (E2E) | 28 | Passing |

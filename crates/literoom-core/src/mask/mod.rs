@@ -70,7 +70,10 @@ mod tests {
         for i in 0..=100 {
             let t = i as f32 / 100.0;
             let val = smootherstep(t);
-            assert!(val >= prev, "smootherstep should be monotonically increasing");
+            assert!(
+                val >= prev,
+                "smootherstep should be monotonically increasing"
+            );
             prev = val;
         }
     }

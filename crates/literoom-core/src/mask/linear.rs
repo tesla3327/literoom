@@ -137,7 +137,11 @@ mod tests {
 
         // At start point: full effect
         let val_start = mask.evaluate(0.0, 0.5);
-        assert!(val_start > 0.99, "Start should have full effect, got {}", val_start);
+        assert!(
+            val_start > 0.99,
+            "Start should have full effect, got {}",
+            val_start
+        );
 
         // At end point: no effect
         let val_end = mask.evaluate(1.0, 0.5);
@@ -145,7 +149,11 @@ mod tests {
 
         // At center: half effect
         let val_center = mask.evaluate(0.5, 0.5);
-        assert!((val_center - 0.5).abs() < 0.01, "Center should be 0.5, got {}", val_center);
+        assert!(
+            (val_center - 0.5).abs() < 0.01,
+            "Center should be 0.5, got {}",
+            val_center
+        );
     }
 
     #[test]
@@ -184,11 +192,19 @@ mod tests {
 
         // Just before center: full effect
         let val_before = mask.evaluate(0.49, 0.5);
-        assert!(val_before > 0.99, "Before midpoint should be 1.0, got {}", val_before);
+        assert!(
+            val_before > 0.99,
+            "Before midpoint should be 1.0, got {}",
+            val_before
+        );
 
         // Just after center: no effect
         let val_after = mask.evaluate(0.51, 0.5);
-        assert!(val_after < 0.01, "After midpoint should be 0.0, got {}", val_after);
+        assert!(
+            val_after < 0.01,
+            "After midpoint should be 0.0, got {}",
+            val_after
+        );
     }
 
     #[test]
@@ -277,7 +293,10 @@ mod tests {
         for i in 0..=100 {
             let x = i as f32 / 100.0;
             let val = mask.evaluate(x, 0.5);
-            assert!(val <= prev + f32::EPSILON, "Mask should decrease monotonically");
+            assert!(
+                val <= prev + f32::EPSILON,
+                "Mask should decrease monotonically"
+            );
             prev = val;
         }
     }

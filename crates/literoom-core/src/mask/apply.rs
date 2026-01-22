@@ -167,7 +167,10 @@ mod tests {
 
         apply_masked_adjustments(&mut pixels, 100, 100, &[(mask, adj)], &[]);
 
-        assert_eq!(pixels, original, "Default adjustments should leave image unchanged");
+        assert_eq!(
+            pixels, original,
+            "Default adjustments should leave image unchanged"
+        );
     }
 
     #[test]
@@ -182,7 +185,11 @@ mod tests {
 
         // Left side (mask = 1.0) should be brighter
         let left_pixel = get_pixel(&pixels, 10, 0, 5);
-        assert!(left_pixel.0 > 200, "Left should be bright (exposure +1), got {}", left_pixel.0);
+        assert!(
+            left_pixel.0 > 200,
+            "Left should be bright (exposure +1), got {}",
+            left_pixel.0
+        );
 
         // Right side (mask = 0.0) should be unchanged
         let right_pixel = get_pixel(&pixels, 10, 9, 5);
@@ -222,11 +229,19 @@ mod tests {
 
         // Center (inverted mask = 0.0) should be unchanged
         let center = get_pixel(&pixels, 20, 10, 10);
-        assert_eq!(center, (100, 100, 100), "Center should be unchanged (inverted)");
+        assert_eq!(
+            center,
+            (100, 100, 100),
+            "Center should be unchanged (inverted)"
+        );
 
         // Corner (inverted mask = 1.0) should be brighter
         let corner = get_pixel(&pixels, 20, 0, 0);
-        assert!(corner.0 > 150, "Corner should be bright (inverted), got {}", corner.0);
+        assert!(
+            corner.0 > 150,
+            "Corner should be bright (inverted), got {}",
+            corner.0
+        );
     }
 
     #[test]
@@ -247,7 +262,11 @@ mod tests {
         // Just verify it doesn't crash and produces some change
         let center = get_pixel(&pixels, 20, 10, 10);
         // Center is affected by both masks
-        assert_ne!(center, (100, 100, 100), "Center should be modified by masks");
+        assert_ne!(
+            center,
+            (100, 100, 100),
+            "Center should be modified by masks"
+        );
     }
 
     #[test]
@@ -277,7 +296,11 @@ mod tests {
 
         // Should be nearly grayscale
         let diff = (pixels[0] as i32 - pixels[2] as i32).abs();
-        assert!(diff < 20, "Desaturated should be near gray, diff was {}", diff);
+        assert!(
+            diff < 20,
+            "Desaturated should be near gray, diff was {}",
+            diff
+        );
     }
 
     #[test]
@@ -306,7 +329,11 @@ mod tests {
             let jump = (curr - prev).abs();
             max_jump = max_jump.max(jump);
         }
-        assert!(max_jump < 20, "Transition should be smooth, max jump was {}", max_jump);
+        assert!(
+            max_jump < 20,
+            "Transition should be smooth, max jump was {}",
+            max_jump
+        );
     }
 
     #[test]
@@ -340,14 +367,14 @@ mod tests {
     #[test]
     fn test_highlights_shadows() {
         let mut pixels = vec![
-            50, 50, 50,    // Dark pixel
+            50, 50, 50, // Dark pixel
             200, 200, 200, // Bright pixel
         ];
 
         let mask = LinearGradientMask::new(0.0, 0.5, 2.0, 0.5, 0.0); // Both pixels fully affected
         let mut adj = BasicAdjustments::default();
         adj.highlights = -50.0; // Reduce highlights
-        adj.shadows = 50.0;     // Lift shadows
+        adj.shadows = 50.0; // Lift shadows
 
         let original = pixels.clone();
         apply_masked_adjustments(&mut pixels, 2, 1, &[(mask, adj)], &[]);

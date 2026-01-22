@@ -31,3 +31,11 @@ proptest = "1.5"
 [profile.release]
 opt-level = "s"
 lto = true
+
+# Lints configuration
+[workspace.lints.rust]
+unexpected_cfgs = "warn"
+
+[workspace.lints.clippy]
+# Allow field reassignment for test readability - tests often set individual fields
+field_reassign_with_default = "allow"

@@ -153,13 +153,7 @@ pub fn apply_masked_adjustments(
         .into_iter()
         .filter(|m| m.enabled)
         .map(|m| {
-            let mask = LinearGradientMask::new(
-                m.start_x,
-                m.start_y,
-                m.end_x,
-                m.end_y,
-                m.feather,
-            );
+            let mask = LinearGradientMask::new(m.start_x, m.start_y, m.end_x, m.end_y, m.feather);
             let adj: BasicAdjustments = m.adjustments.into();
             (mask, adj)
         })

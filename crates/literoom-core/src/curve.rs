@@ -349,7 +349,7 @@ mod tests {
         for i in 0..=100 {
             let x = i as f32 / 100.0;
             let y = evaluate_curve(&curve, x);
-            assert!(y >= 0.0 && y <= 1.0, "Overshoot at x={}: y={}", x, y);
+            assert!((0.0..=1.0).contains(&y), "Overshoot at x={}: y={}", x, y);
         }
     }
 

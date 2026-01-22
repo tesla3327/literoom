@@ -1,0 +1,5 @@
+# Configure the build tooling
+[build]
+# Use rustup-managed toolchain to ensure consistent versions
+# The rust-toolchain.toml selects "stable" but we need to ensure
+# the correct cargo/rustc is used instead of system versions

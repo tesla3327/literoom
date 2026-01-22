@@ -204,12 +204,16 @@ mod tests {
         // Points at normalized distance 0.5 from center in ellipse space
         // For horizontal: x_offset = 0.5 * 0.4 = 0.2
         // For vertical: y_offset = 0.5 * 0.2 = 0.1
-        let val_right = mask.evaluate(0.5 + 0.2, 0.5);  // 0.5 normalized distance
-        let val_top = mask.evaluate(0.5, 0.5 - 0.1);    // 0.5 normalized distance
+        let val_right = mask.evaluate(0.5 + 0.2, 0.5); // 0.5 normalized distance
+        let val_top = mask.evaluate(0.5, 0.5 - 0.1); // 0.5 normalized distance
 
         // Both should be similar since they're equidistant in normalized ellipse space
-        assert!((val_right - val_top).abs() < 0.05,
-            "Expected similar values, got right={}, top={}", val_right, val_top);
+        assert!(
+            (val_right - val_top).abs() < 0.05,
+            "Expected similar values, got right={}, top={}",
+            val_right,
+            val_top
+        );
     }
 
     #[test]
@@ -221,11 +225,15 @@ mod tests {
         // Points at normalized distance 0.5 from center in ellipse space
         // For vertical: y_offset = 0.5 * 0.4 = 0.2
         // For horizontal: x_offset = 0.5 * 0.2 = 0.1
-        let val_bottom = mask.evaluate(0.5, 0.5 + 0.2);   // 0.5 normalized distance
-        let val_right = mask.evaluate(0.5 + 0.1, 0.5);    // 0.5 normalized distance
+        let val_bottom = mask.evaluate(0.5, 0.5 + 0.2); // 0.5 normalized distance
+        let val_right = mask.evaluate(0.5 + 0.1, 0.5); // 0.5 normalized distance
 
-        assert!((val_right - val_bottom).abs() < 0.05,
-            "Expected similar values, got right={}, bottom={}", val_right, val_bottom);
+        assert!(
+            (val_right - val_bottom).abs() < 0.05,
+            "Expected similar values, got right={}, bottom={}",
+            val_right,
+            val_bottom
+        );
     }
 
     #[test]
@@ -243,9 +251,17 @@ mod tests {
         let val_at_narrow_edge = mask.evaluate(0.5 - 0.1 * 0.707, 0.5 + 0.1 * 0.707);
 
         // Point along wide axis should have more effect than point at narrow edge
-        assert!(val_along_wide > val_at_narrow_edge,
-            "Wide axis point should have more effect: {} vs {}", val_along_wide, val_at_narrow_edge);
-        assert!(val_along_wide > 0.5, "Point inside should have high effect, got {}", val_along_wide);
+        assert!(
+            val_along_wide > val_at_narrow_edge,
+            "Wide axis point should have more effect: {} vs {}",
+            val_along_wide,
+            val_at_narrow_edge
+        );
+        assert!(
+            val_along_wide > 0.5,
+            "Point inside should have high effect, got {}",
+            val_along_wide
+        );
     }
 
     #[test]
@@ -274,11 +290,19 @@ mod tests {
 
         // Just inside edge: full effect
         let val_inside = mask.evaluate(0.5, 0.5 + 0.29);
-        assert!(val_inside > 0.99, "Inside edge should be 1.0, got {}", val_inside);
+        assert!(
+            val_inside > 0.99,
+            "Inside edge should be 1.0, got {}",
+            val_inside
+        );
 
         // Just outside edge: no effect
         let val_outside = mask.evaluate(0.5, 0.5 + 0.31);
-        assert!(val_outside < 0.01, "Outside edge should be 0.0, got {}", val_outside);
+        assert!(
+            val_outside < 0.01,
+            "Outside edge should be 0.0, got {}",
+            val_outside
+        );
     }
 
     #[test]
@@ -290,7 +314,11 @@ mod tests {
 
         // Halfway to edge should be around 0.5
         let val_half = mask.evaluate(0.5, 0.5 + 0.2);
-        assert!((val_half - 0.5).abs() < 0.15, "Halfway should be ~0.5, got {}", val_half);
+        assert!(
+            (val_half - 0.5).abs() < 0.15,
+            "Halfway should be ~0.5, got {}",
+            val_half
+        );
 
         // At edge should be 0
         let val_edge = mask.evaluate(0.5, 0.5 + 0.4);
@@ -302,8 +330,14 @@ mod tests {
         let mask = RadialGradientMask::circle(0.5, 0.5, 0.2, 0.5);
 
         assert!(mask.contains(0.5, 0.5), "Center should be inside");
-        assert!(mask.contains(0.5, 0.6), "Point within radius should be inside");
-        assert!(!mask.contains(0.5, 0.8), "Point outside radius should be outside");
+        assert!(
+            mask.contains(0.5, 0.6),
+            "Point within radius should be inside"
+        );
+        assert!(
+            !mask.contains(0.5, 0.8),
+            "Point outside radius should be outside"
+        );
     }
 
     #[test]
@@ -334,7 +368,10 @@ mod tests {
         for i in 0..=100 {
             let dist = i as f32 / 100.0 * 0.4;
             let val = mask.evaluate(0.5 + dist, 0.5);
-            assert!(val <= prev + f32::EPSILON, "Mask should decrease monotonically");
+            assert!(
+                val <= prev + f32::EPSILON,
+                "Mask should decrease monotonically"
+            );
             prev = val;
         }
     }
