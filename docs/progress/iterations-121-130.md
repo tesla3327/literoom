@@ -207,3 +207,67 @@
 
 ---
 
+## 124: 2026-01-22 06:34 EST: Keyboard Shortcuts Help Modal - Research Complete
+
+**Objective**: Implement the spec requirement from section 7.3 "Keyboard shortcuts are documented in-app (help modal)".
+
+**Spec Requirement** (Section 7.3 - Accessibility & UX basics):
+> "Keyboard shortcuts are documented in-app (help modal)"
+
+**Current State Analysis**:
+- App has keyboard shortcuts implemented in multiple places:
+  - Grid view: Arrow keys, P/X/U flags, E/Enter/D for edit, Cmd+E for export
+  - Edit view: Arrow keys for navigation, Cmd+Shift+C/V for copy/paste, J for clipping toggle
+  - Mask editing: Escape to cancel, Delete to remove mask
+- No help modal or keyboard shortcut documentation exists
+
+**Research Completed**:
+
+### All Keyboard Shortcuts Catalogued
+
+**Grid View (15 shortcuts)**:
+- Arrow keys (4): Navigate grid
+- P/X/U: Flag/reject/unflag
+- E/Enter/D: Enter edit view
+- G: Grid view
+- Delete/Backspace: Delete photo
+- Cmd/Ctrl+E: Open export modal
+- Shift/Cmd/Ctrl+Click: Multi-select
+
+**Edit View (9 shortcuts)**:
+- Escape: Return to grid
+- Arrow Left/Right: Navigate photos
+- G: Return to grid
+- Cmd/Ctrl+Shift+C: Copy settings
+- Cmd/Ctrl+Shift+V: Paste settings
+- J: Toggle clipping overlay
+- Escape (mask): Cancel drawing
+- Delete/Backspace (mask): Delete selected mask
+
+### Nuxt UI 4 Modal Pattern Analyzed
+- Use `v-model:open` with Pinia store
+- Named slots: header, body, footer
+- `:dismissible="true"` for ESC/click-outside closing
+- Follow existing ExportModal, EditCopySettingsModal patterns
+
+**Design Decisions**:
+1. **Trigger Keys**: `?` and `Cmd/Ctrl+/` (standard help shortcuts)
+2. **Layout**: Two-column (Grid | Edit) with grouped sections
+3. **Platform Detection**: Show "Cmd" on Mac, "Ctrl" on Windows/Linux
+4. **State Management**: New `helpStore` Pinia store
+
+**Documents Created**:
+- `docs/research/2026-01-22-help-modal-synthesis.md`
+- `docs/plans/2026-01-22-help-modal-plan.md`
+
+**Files to Create** (3):
+1. `apps/web/app/stores/help.ts`
+2. `apps/web/app/components/help/HelpModal.vue`
+3. `apps/web/app/composables/useHelpModal.ts`
+
+**Files to Modify** (2):
+1. `apps/web/app/pages/index.vue`
+2. `apps/web/app/pages/edit/[id].vue`
+
+**Status**: Research and planning complete. Ready for implementation.
+
