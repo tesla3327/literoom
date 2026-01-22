@@ -312,3 +312,79 @@ Updated EditControlsPanel.vue:
 
 ---
 
+## 118: 2026-01-21 23:00 EST: Local Masks UI - Phase 7.5 Complete (Mask Utilities)
+
+**Objective**: Create shared utilities for mask overlay rendering and interaction.
+
+**Background**: Phase 7.5 of the Local Masks UI plan covers creating `maskUtils.ts` with coordinate conversions, hit detection, and rendering functions. This follows the same pattern established by `cropUtils.ts` for the crop overlay.
+
+**Status**: Complete
+
+**Changes Made**:
+
+### Created `apps/web/app/composables/maskUtils.ts`
+
+Comprehensive utility module with:
+
+#### Constants
+- `HANDLE_SIZE` (10px) - Visual size of handles
+- `HANDLE_HIT_RADIUS` (20px) - Hit detection radius (larger for easier interaction)
+- `MASK_COLORS` - Color scheme for selected/unselected/drawing states
+
+#### Type Definitions
+- `LinearHandle` - 'start' | 'end'
+- `RadialHandle` - 'center' | 'radiusX+' | 'radiusX-' | 'radiusY+' | 'radiusY-'
+- `MaskHandle` - Union of all handle types
+
+#### Coordinate Conversions
+- `toNormalized()` - Canvas coords to normalized (0-1)
+- `toCanvas()` - Normalized coords to canvas coords
+- `getCanvasCoords()` - Mouse event to canvas coords
+
+#### Linear Gradient Functions
+- `getLinearHandlePositions()` - Get handle positions in canvas coords
+- `findLinearHandleAt()` - Hit detection for linear handles
+- `isNearLinearGradient()` - Check if point is near the gradient line
+
+#### Radial Gradient Functions
+- `getRadialHandlePositions()` - Get 5 handles (center + 4 radius)
+- `findRadialHandleAt()` - Hit detection for radial handles
+- `isInsideRadialGradient()` - Check if point is inside ellipse
+
+#### Rendering Functions
+- `drawLinearMask()` - Draw linear gradient with handles and visualization
+- `drawRadialMask()` - Draw ellipse with handles
+- `drawTempLinearMask()` - Dashed preview during drawing mode
+- `drawTempRadialMask()` - Dashed ellipse preview during drawing mode
+
+#### Handle Drawing
+- `drawHandle()` - Circular handle with fill and stroke
+- `drawCenterHandle()` - Center handle with crosshair pattern
+
+#### Cursor Helpers
+- `getCursorForLinearHandle()` - Returns 'grab'/'grabbing'
+- `getCursorForRadialHandle()` - Returns 'move'/'ew-resize'/'ns-resize'
+
+#### Update Helpers
+- `updateLinearHandlePosition()` - Calculate new position updates
+- `updateRadialHandlePosition()` - Calculate radius updates from handle drag
+
+#### Utilities
+- `debounce()` - Debounce function with cancel capability
+
+**Note on Phase 7.8**: The factory functions `createLinearMask()` and `createRadialMask()` already exist in `packages/core/src/catalog/types.ts` (lines 861-893), so Phase 7.8 is effectively complete.
+
+**Files Created** (1):
+- `apps/web/app/composables/maskUtils.ts`
+
+**Testing**:
+- All 362 core package tests pass
+- 1 web app unit test passes
+- All 28 E2E tests pass
+
+**Next Steps**:
+- Phase 7.6: useMaskOverlay.ts (canvas interaction composable)
+- Phase 7.7: EditPreviewCanvas integration (overlay canvas layer)
+
+---
+
