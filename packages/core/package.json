@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./filesystem": "./src/filesystem/index.ts",
     "./decode": "./src/decode/index.ts",
-    "./catalog": "./src/catalog/index.ts"
+    "./catalog": "./src/catalog/index.ts",
+    "./export": "./src/export/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

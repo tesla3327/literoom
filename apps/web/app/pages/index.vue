@@ -112,7 +112,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-gray-950" data-testid="catalog-page">
+  <div
+    class="h-screen flex flex-col bg-gray-950"
+    data-testid="catalog-page"
+  >
     <!-- Permission recovery modal -->
     <PermissionRecovery
       @select-new-folder="handleSelectFolder"
@@ -120,8 +123,15 @@ onMounted(() => {
       @reauthorized="handleReauthorized"
     />
 
+    <!-- Export modal -->
+    <ExportModal />
+
     <!-- Welcome screen (no folder selected) -->
-    <div v-if="!hasFolder && !isLoading" class="flex-1 flex items-center justify-center p-8" data-testid="welcome-screen">
+    <div
+      v-if="!hasFolder && !isLoading"
+      class="flex-1 flex items-center justify-center p-8"
+      data-testid="welcome-screen"
+    >
       <div class="max-w-md text-center">
         <h1 class="text-4xl font-bold">
           Literoom
@@ -132,7 +142,10 @@ onMounted(() => {
           Your photos stay local, your edits persist.
         </p>
 
-        <div v-if="isDemoMode" class="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+        <div
+          v-if="isDemoMode"
+          class="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20"
+        >
           <p class="text-sm text-blue-400">
             Demo Mode: Using mock data for testing
           </p>
@@ -154,7 +167,10 @@ onMounted(() => {
         </div>
 
         <!-- Error message -->
-        <div v-if="scanError" class="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+        <div
+          v-if="scanError"
+          class="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20"
+        >
           <p class="text-sm text-red-400">
             {{ scanError }}
           </p>
@@ -163,18 +179,32 @@ onMounted(() => {
     </div>
 
     <!-- Loading state during initial scan -->
-    <div v-else-if="isLoading && !hasAssets" class="flex-1 flex items-center justify-center">
+    <div
+      v-else-if="isLoading && !hasAssets"
+      class="flex-1 flex items-center justify-center"
+    >
       <div class="text-center">
-        <UIcon name="i-heroicons-folder-open" class="w-12 h-12 text-gray-600 mb-4" />
-        <p class="text-gray-400 mb-2">Scanning folder...</p>
-        <p v-if="catalogStore.scanProgress" class="text-sm text-gray-500">
+        <UIcon
+          name="i-heroicons-folder-open"
+          class="w-12 h-12 text-gray-600 mb-4"
+        />
+        <p class="text-gray-400 mb-2">
+          Scanning folder...
+        </p>
+        <p
+          v-if="catalogStore.scanProgress"
+          class="text-sm text-gray-500"
+        >
           Found {{ catalogStore.scanProgress.totalFound }} files
         </p>
       </div>
     </div>
 
     <!-- Main catalog view -->
-    <div v-else-if="hasFolder" class="flex-1 flex flex-col min-h-0">
+    <div
+      v-else-if="hasFolder"
+      class="flex-1 flex flex-col min-h-0"
+    >
       <!-- Header -->
       <header class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
         <div class="flex items-center gap-3">
@@ -188,14 +218,23 @@ onMounted(() => {
           </UButton>
 
           <!-- Scanning indicator -->
-          <div v-if="catalogStore.isScanning" class="flex items-center gap-2 text-sm text-gray-400">
-            <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+          <div
+            v-if="catalogStore.isScanning"
+            class="flex items-center gap-2 text-sm text-gray-400"
+          >
+            <UIcon
+              name="i-heroicons-arrow-path"
+              class="w-4 h-4 animate-spin"
+            />
             <span>Scanning...</span>
           </div>
         </div>
 
         <!-- Selection info -->
-        <div v-if="selectionStore.selectionCount > 0" class="text-sm text-gray-400">
+        <div
+          v-if="selectionStore.selectionCount > 0"
+          class="text-sm text-gray-400"
+        >
           {{ selectionStore.selectionCount }} selected
         </div>
       </header>
@@ -206,9 +245,17 @@ onMounted(() => {
       <!-- Grid or empty state -->
       <div class="flex-1 min-h-0 overflow-hidden">
         <CatalogGrid v-if="hasAssets" />
-        <div v-else class="h-full flex flex-col items-center justify-center text-center">
-          <UIcon name="i-heroicons-photo" class="w-16 h-16 text-gray-600 mb-4" />
-          <p class="text-gray-500">No supported images found</p>
+        <div
+          v-else
+          class="h-full flex flex-col items-center justify-center text-center"
+        >
+          <UIcon
+            name="i-heroicons-photo"
+            class="w-16 h-16 text-gray-600 mb-4"
+          />
+          <p class="text-gray-500">
+            No supported images found
+          </p>
           <p class="text-sm text-gray-600 mt-2">
             Supported formats: JPEG, Sony ARW
           </p>
@@ -217,4 +264,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-

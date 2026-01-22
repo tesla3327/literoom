@@ -2,13 +2,14 @@
 /**
  * FilterBar Component
  *
- * Provides filter mode buttons (All, Picks, Rejects, Unflagged) and
- * sort dropdown for the catalog grid.
+ * Provides filter mode buttons (All, Picks, Rejects, Unflagged),
+ * export button, and sort dropdown for the catalog grid.
  */
 import type { FilterMode, SortField, SortDirection } from '@literoom/core/catalog'
 
 const catalogStore = useCatalogStore()
 const catalogUIStore = useCatalogUIStore()
+const exportStore = useExportStore()
 
 // Filter mode configuration
 const filterModes = computed(() => [
@@ -99,7 +100,10 @@ function setSort(field: SortField, direction: SortDirection): void {
 </script>
 
 <template>
-  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950 relative z-20" data-testid="filter-bar">
+  <div
+    class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950 relative z-20"
+    data-testid="filter-bar"
+  >
     <!-- Filter buttons -->
     <div class="flex gap-1">
       <UButton
@@ -112,7 +116,10 @@ function setSort(field: SortField, direction: SortDirection): void {
         @click="setFilterMode(mode.value)"
       >
         {{ mode.label }}
-        <template v-if="mode.count > 0" #trailing>
+        <template
+          v-if="mode.count > 0"
+          #trailing
+        >
           <UBadge
             size="xs"
             :color="catalogUIStore.filterMode === mode.value ? 'neutral' : 'neutral'"
@@ -124,12 +131,41 @@ function setSort(field: SortField, direction: SortDirection): void {
       </UButton>
     </div>
 
-    <!-- Sort dropdown -->
-    <UDropdownMenu :items="sortOptions">
-      <UButton variant="ghost" size="sm" trailing-icon="i-heroicons-chevron-down">
-        {{ sortLabel }}
+    <!-- Right side: Export button + Sort dropdown -->
+    <div class="flex items-center gap-2">
+      <!-- Export button -->
+      <UButton
+        variant="ghost"
+        size="sm"
+        icon="i-heroicons-arrow-up-tray"
+        :disabled="catalogStore.pickCount === 0"
+        data-testid="export-button"
+        @click="exportStore.openModal"
+      >
+        Export
+        <template
+          v-if="catalogStore.pickCount > 0"
+          #trailing
+        >
+          <UBadge
+            size="xs"
+            color="neutral"
+            variant="subtle"
+            :label="String(catalogStore.pickCount)"
+          />
+        </template>
       </UButton>
-    </UDropdownMenu>
+
+      <!-- Sort dropdown -->
+      <UDropdownMenu :items="sortOptions">
+        <UButton
+          variant="ghost"
+          size="sm"
+          trailing-icon="i-heroicons-chevron-down"
+        >
+          {{ sortLabel }}
+        </UButton>
+      </UDropdownMenu>
+    </div>
   </div>
 </template>
-
