@@ -394,3 +394,82 @@ RUSTC=~/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc \
 
 ---
 
+## 138: 2026-01-22 10:45 EST: Preview Priority on Edit Entry - Research Complete
+
+**Objective**: Address the medium-severity issue "Preview not ready when clicking thumbnail" to improve the edit view entry experience.
+
+**Problem Statement** (from issues.md):
+When a thumbnail is visible (appears loaded), users may double-click to enter edit view, but the preview is still generating. This creates confusion.
+
+**Status**: Complete - Research synthesis document created.
+
+**Research Areas Completed**:
+1. Preview generation architecture (ThumbnailService, separate queues, cache)
+2. Edit view entry flow (double-click, keyboard, middleware)
+3. Priority system (ThumbnailPriority enum, min-heap queue)
+4. Where priority boosting could be implemented
+
+**Key Findings**:
+
+1. **Preview Requested Too Late**
+   - Preview is only requested when edit page mounts (after navigation)
+   - User sees loading state while preview generates
+   - No advance notice to start preview generation
+
+2. **Thumbnail Competes with Preview**
+   - Both thumbnail and preview requested at Priority 0 in edit view
+   - Thumbnail doesn't need to be high priority in edit view (preview is what matters)
+
+3. **Filmstrip Creates Contention**
+   - EditFilmstrip requests ~30 thumbnails at Priority 1
+   - These compete with the current asset's preview
+
+**Proposed Solutions** (by impact and effort):
+
+| Solution | Effort | Impact |
+|----------|--------|--------|
+| Early preview request on double-click | Low | High |
+| Preview-first priority in edit view | Low | Medium |
+| Staggered filmstrip loading | Medium | Medium |
+| Predictive preloading on hover | High | High |
+
+**Recommended Implementation**:
+1. **Phase 1**: Request preview immediately on double-click (before navigation)
+2. **Phase 2**: In edit view, request preview at Priority 0, thumbnail at Priority 2
+3. **Phase 3**: (Optional) Stagger filmstrip thumbnails by distance
+
+**Documents Created**:
+- `docs/research/2026-01-22-preview-priority-synthesis.md`
+
+---
+
+## 139: 2026-01-22 10:50 EST: Preview Priority on Edit Entry - Implementation Plan Created
+
+**Objective**: Create an implementation plan for improving preview loading when entering edit view.
+
+**Plan Created**: `docs/plans/2026-01-22-preview-priority-plan.md`
+
+**Implementation Phases**:
+
+| Phase | Description | Effort |
+|-------|-------------|--------|
+| 1 | Early preview request on double-click in CatalogThumbnail | 15 min |
+| 2 | Early preview request on keyboard navigation in CatalogGrid | 15 min |
+| 3 | Preview-first priority in useEditPreview | 10 min |
+| 4 | Staggered filmstrip priority (optional if needed) | 30 min |
+
+**Total Estimated Effort**: ~1 hour (Phases 1-3), ~1.5 hours with Phase 4
+
+**Key Changes**:
+1. Add `requestPreview(assetId, 0)` before `navigateTo()` in `CatalogThumbnail.vue` double-click handler
+2. Add `requestPreview(assetId, 0)` before `navigateTo()` in `CatalogGrid.vue` keyboard handler
+3. Change `useEditPreview.ts` to request preview at Priority 0, thumbnail at Priority 2
+4. (Optional) Update `EditFilmstrip.vue` to use distance-based priority
+
+**Success Criteria**:
+- Preview loads faster when entering edit view
+- Loading state is minimized for clicked images
+- No regression in thumbnail generation speed
+
+**Status**: Complete - Ready for implementation
+

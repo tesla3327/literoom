@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 10:41 EST
-**Current Phase**: Rust CI Compatibility Fix - Complete
+**Last Updated**: 2026-01-22 10:50 EST
+**Current Phase**: Preview Priority on Edit Entry - Implementation Plan Created
 
 ## Project Structure
 
@@ -342,6 +342,8 @@ literoom/
 | [135](./iterations-131-140.md:210) | 2026-01-22 | Recent Folders Feature - Implementation Plan Created |
 | [136](./iterations-131-140.md:255) | 2026-01-22 | Recent Folders Feature - Implementation Complete |
 | [137](./iterations-131-140.md:325) | 2026-01-22 | Rust CI Compatibility Fix - Complete |
+| [138](./iterations-131-140.md:397) | 2026-01-22 | Preview Priority on Edit Entry - Research Complete |
+| [139](./iterations-131-140.md:444) | 2026-01-22 | Preview Priority on Edit Entry - Implementation Plan Created |
 
 ---
 
