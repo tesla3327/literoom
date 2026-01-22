@@ -101,3 +101,72 @@ watch(visibleIds, (ids) => {
 
 ---
 
+## 103: 2026-01-21 19:27 EST: Export Workflow - Phase 6 (Integration) - Complete
+
+**Objective**: Complete the final phase of the export workflow by wiring up the export functionality to the UI.
+
+**Background**: Phases 1-5 of the export workflow are complete:
+- Phase 1: JPEG encoding in Rust/WASM
+- Phase 2: Worker integration for encodeJpeg
+- Phase 3: Filename template parser
+- Phase 4: ExportService coordination
+- Phase 5: UI Components (store, composable, modal)
+
+Phase 6 integrates the export modal into the catalog page and adds keyboard shortcuts.
+
+**Implementation** (verified already complete):
+1. ✅ FilterBar includes Export button with picks count badge
+2. ✅ ExportModal added to index.vue
+3. ✅ Keyboard shortcut (Cmd/Ctrl+E) implemented in index.vue
+
+**Files Modified**:
+- `apps/web/app/components/catalog/FilterBar.vue` - Export button with badge
+- `apps/web/app/pages/index.vue` - ExportModal + keyboard handler
+
+**Tests**: All 317 unit tests pass.
+
+**Status**: Complete. Export workflow is fully implemented.
+
+---
+
+## 104: 2026-01-21 19:31 EST: Local Masks - Research Complete
+
+**Objective**: Research the implementation of local adjustment masks (linear gradient, radial gradient).
+
+**Background**: Per spec section 3.5.4, v1 requires:
+- Linear gradient mask: position/angle, feather
+- Radial gradient mask: ellipse position/size, feather, invert option
+- Mask management: create, select, reorder, enable/disable, delete
+- Per-mask adjustment subset
+- Mask overlay toggle
+
+**Research Approach**: Launched 4 parallel research agents:
+1. **Mathematics** - Gradient algorithms, feathering curves, mask blending
+2. **Codebase Integration** - Schema, stores, preview pipeline, copy/paste
+3. **Canvas UI** - Existing patterns (crop overlay, tone curve), handle design
+4. **Rust Implementation** - Current adjustment code, WASM patterns, performance
+
+**Key Findings**:
+1. **Math**: Use smootherstep for feathering (6t⁵ - 15t⁴ + 10t³), multiply for mask blending
+2. **Schema**: Add MaskStack to EditState v4, migration from v3
+3. **UI**: Follow crop overlay pattern (useMaskEditor.ts composable, debounced store sync)
+4. **Rust**: Sequential mask application with per-pixel blending, early-exit optimization
+
+**Files Created**:
+- `docs/research/2026-01-21-local-masks-research-plan.md`
+- `docs/research/2026-01-21-local-masks-synthesis.md`
+
+**Implementation Plan**: 8 phases:
+1. Core types and schema (TypeScript)
+2. Rust implementation (mask evaluation)
+3. WASM bindings
+4. Edit store integration
+5. Preview pipeline
+6. Mask editor UI
+7. Copy/paste integration
+8. Testing and polish
+
+**Status**: Complete. Research synthesis ready. Next: Create implementation plan.
+
+---
+
