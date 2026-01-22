@@ -170,3 +170,65 @@ Phase 6 integrates the export modal into the catalog page and adds keyboard shor
 
 ---
 
+## 105: 2026-01-21 19:40 EST: Local Masks - Implementation Plan Created
+
+**Objective**: Create a detailed implementation plan for local adjustment masks (linear gradient, radial gradient).
+
+**Background**: Iteration 104 completed the research synthesis for local masks. This iteration creates the implementation plan based on that research.
+
+**Plan Structure** (9 phases):
+
+1. **Phase 1: TypeScript Types and Schema**
+   - Add `LinearGradientMask`, `RadialGradientMask`, `MaskStack` types
+   - Update `EditState` to version 4
+   - Add migration function for v3 → v4
+
+2. **Phase 2: Rust Mask Implementation**
+   - Create `mask/mod.rs`, `mask/linear.rs`, `mask/radial.rs`, `mask/apply.rs`
+   - Implement `smootherstep()` for feathering
+   - Implement `evaluate()` methods for both mask types
+   - Implement `apply_masked_adjustments()` for per-pixel processing
+
+3. **Phase 3: WASM Bindings**
+   - Create `mask.rs` in literoom-wasm
+   - Define `JsMaskStack`, `JsLinearMask`, `JsRadialMask` structs
+   - Expose `apply_masked_adjustments()` to JavaScript
+
+4. **Phase 4: Worker Integration**
+   - Add `apply-masked-adjustments` message type
+   - Implement worker handler
+   - Add `applyMaskedAdjustments()` to `DecodeService`
+   - Update mock implementation
+
+5. **Phase 5: Edit Store Integration**
+   - Add `masks` and `selectedMaskId` state
+   - Add CRUD actions for masks
+   - Update `hasModifications` computed
+
+6. **Phase 6: Preview Pipeline Integration**
+   - Add mask step after tone curve
+   - Add watcher for mask changes
+
+7. **Phase 7: Mask Editor UI**
+   - Create `useMaskEditor.ts` composable
+   - Create `EditMaskPanel.vue`, `EditMaskOverlay.vue`, `EditMaskAdjustments.vue`
+   - Add mask overlay canvas to preview
+
+8. **Phase 8: Copy/Paste Integration**
+   - Add `masks` to `CopyGroups`
+   - Update copy/paste logic
+
+9. **Phase 9: Testing and Polish**
+   - Rust unit tests for mask evaluation
+   - TypeScript tests for schema migration
+   - Keyboard shortcuts (M, Delete, Tab)
+
+**Files Created**:
+- `docs/plans/2026-01-21-local-masks-plan.md`
+
+**Total Scope**: ~28 files across 9 phases
+
+**Status**: Complete. Implementation plan ready. Next: Begin Phase 1 implementation.
+
+---
+
