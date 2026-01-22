@@ -3,10 +3,10 @@
 ## Table of Contents
 
 ### Open Issues
-- [Edit view should never use thumbnail (High)](#edit-view-should-never-use-thumbnail)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Edit view should never use thumbnail (High)](#edit-view-should-never-use-thumbnail---solved)
 - [Crop doesn't update the image (High)](#crop-doesnt-update-the-image---solved)
 - [Export doesn't actually export anything (Critical)](#export-doesnt-actually-export-anything---solved)
 - [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip---solved)
@@ -71,23 +71,37 @@ This matches professional photo editors like Lightroom - when editing a crop, yo
 
 ---
 
-### Edit view should never use thumbnail
+### Edit view should never use thumbnail - SOLVED
 
-**Severity**: High | **Status**: Open | **Discovered**: 2026-01-21
+**Severity**: High | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
 
-The edit view currently falls back to displaying the small thumbnail (512px) while waiting for the high-resolution preview (2560px) to load. This provides a poor editing experience.
+The edit view now shows a loading state until the full 2560px preview is ready, instead of showing the pixelated 512px thumbnail.
 
-**Problem**:
-- Edit view shows pixelated thumbnail while preview generates
-- Users may start making edits on a low-quality image
-- Creates confusion about actual image quality
+**Original Problem**:
+- Edit view showed pixelated thumbnail while preview generates
+- Users could start making edits on a low-quality image
+- Created confusion about actual image quality
 
-**Expected Behavior**:
-- Edit view should wait for BOTH thumbnail AND preview to be generated before showing as "loaded"
-- Display a loading state until the full preview is ready
-- Never show the small thumbnail in the edit preview canvas
+**Fix Applied**:
+1. Added `isWaitingForPreview` state to `useEditPreview.ts`
+2. Updated asset watcher to check preview status:
+   - If preview is cached → show immediately
+   - If preview not ready → set `isWaitingForPreview = true`, keep `previewUrl = null`
+3. Added watcher for preview URL becoming available
+4. Added watcher for preview generation errors (falls back to thumbnail with warning)
+5. Updated `EditPreviewCanvas.vue` loading condition to check `isWaitingForPreview`
+6. Updated loading message to show "Generating preview..." when waiting
 
-**Related**: This is a follow-up to the "Edit preview uses thumbnail instead of full preview" issue that was previously solved, but the fallback behavior still exists.
+**Files Modified**:
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+
+**Verification**:
+- ✅ Edit view shows loading state until 2560px preview ready
+- ✅ Never displays pixelated 512px thumbnail in edit canvas
+- ✅ Cached previews display immediately (no loading flash)
+- ✅ Works in both demo mode and real mode
+- ✅ All existing tests pass
 
 ---
 

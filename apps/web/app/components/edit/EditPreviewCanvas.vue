@@ -40,6 +40,7 @@ const {
   previewDimensions,
   adjustedPixels,
   adjustedDimensions,
+  isWaitingForPreview,
 } = useEditPreview(toRef(props, 'assetId'))
 
 /**
@@ -71,9 +72,17 @@ const cropCanvasRef = ref<HTMLCanvasElement | null>(null)
 const asset = computed(() => catalogStore.assets.get(props.assetId))
 
 /**
- * Whether we're in an initial loading state (no preview yet).
+ * Whether we're in an initial loading state.
+ * This is true when:
+ * - No preview URL exists yet, OR
+ * - We're waiting for the high-quality preview to generate
+ *
+ * IMPORTANT: Edit view should never show the small thumbnail (512px).
+ * We display a loading state until the full preview (2560px) is ready.
  */
-const isInitialLoading = computed(() => !previewUrl.value && !error.value)
+const isInitialLoading = computed(() =>
+  (!previewUrl.value && !error.value) || isWaitingForPreview.value,
+)
 
 /**
  * Actual rendered dimensions of the preview image.
@@ -191,9 +200,9 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
     >
       <UIcon
         name="i-heroicons-photo"
-        class="w-12 h-12"
+        class="w-12 h-12 animate-pulse"
       />
-      <span class="text-sm">Loading preview...</span>
+      <span class="text-sm">{{ isWaitingForPreview ? 'Generating preview...' : 'Loading preview...' }}</span>
     </div>
 
     <!-- Preview image with clipping overlay -->

@@ -63,6 +63,8 @@ export interface UseEditPreviewReturn {
   adjustedPixels: Ref<Uint8Array | null>
   /** Dimensions of the adjusted pixels */
   adjustedDimensions: Ref<{ width: number; height: number } | null>
+  /** Whether we're waiting for a high-quality preview to load (never show thumbnail) */
+  isWaitingForPreview: Ref<boolean>
 }
 
 // ============================================================================
@@ -309,6 +311,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /** Dimensions of the adjusted pixels */
   const adjustedDimensions = shallowRef<{ width: number; height: number } | null>(null)
+
+  /** Whether we're waiting for a high-quality preview to load (never show thumbnail in edit view) */
+  const isWaitingForPreview = ref(false)
 
   /** Cached source pixels to avoid re-loading on every adjustment */
   const sourceCache = ref<{
@@ -674,9 +679,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
    * Watch for asset changes and immediately load new source.
    * Uses generation counter to prevent stale updates during rapid navigation.
    *
-   * Priority order for source image:
-   * 1. preview1x (2560px) - best quality for editing
-   * 2. thumbnail (512px) - fallback while preview generates
+   * IMPORTANT: Edit view should NEVER show the small thumbnail (512px).
+   * We wait for the high-quality preview (2560px) to be ready before displaying.
+   * If preview is already cached, display immediately (no loading flash).
    */
   watch(
     assetId,
@@ -695,6 +700,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       if (!id) {
         previewUrl.value = null
         isPreviewUrlOwned.value = false
+        isWaitingForPreview.value = false
         return
       }
 
@@ -702,19 +708,29 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       // This ensures we have images even if navigating directly to edit view
       // Only run on client (catalog service is client-only)
       if (import.meta.client && catalog) {
-        // Request both thumbnail (for immediate display) and preview (for high quality)
+        // Request both thumbnail (for grid display) and preview (for edit view)
         catalog.requestThumbnail(id, 0)
         catalog.requestPreview(id, 0)
       }
 
-      // Show best available image immediately (borrowed URL from store)
+      // Check if preview is already available (cached)
       const asset = catalogStore.assets.get(id)
-      const immediateUrl = asset?.preview1xUrl ?? asset?.thumbnailUrl ?? null
-      previewUrl.value = immediateUrl
-      isPreviewUrlOwned.value = false
+      if (asset?.preview1xStatus === 'ready' && asset.preview1xUrl) {
+        // Preview already cached - show immediately (no loading flash)
+        console.log('[useEditPreview] Preview already cached for:', id)
+        previewUrl.value = asset.preview1xUrl
+        isPreviewUrlOwned.value = false
+        isWaitingForPreview.value = false
+      }
+      else {
+        // Preview not ready - show loading state, NEVER show thumbnail in edit view
+        console.log('[useEditPreview] Waiting for preview to generate for:', id)
+        previewUrl.value = null
+        isWaitingForPreview.value = true
+      }
 
-      // Early return if no image URL yet - the sourceUrl watcher will pick up when it's ready
-      if (!immediateUrl) {
+      // Early return if waiting for preview - the preview status watcher will handle loading
+      if (isWaitingForPreview.value) {
         return
       }
 
@@ -746,12 +762,107 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   )
 
   /**
+   * Watch for preview URL becoming available (when preview generation completes).
+   * This handles the case where we're waiting for the high-quality preview.
+   */
+  watch(
+    () => {
+      const asset = catalogStore.assets.get(assetId.value)
+      return asset?.preview1xUrl
+    },
+    async (newUrl) => {
+      if (newUrl && isWaitingForPreview.value) {
+        console.log('[useEditPreview] Preview ready, loading:', newUrl)
+        const currentGen = renderGeneration.value
+
+        // Preview is ready, load it
+        isWaitingForPreview.value = false
+        previewUrl.value = newUrl
+        isPreviewUrlOwned.value = false
+
+        try {
+          await loadSource(assetId.value)
+
+          // Check generation before proceeding
+          if (renderGeneration.value !== currentGen) {
+            return
+          }
+
+          // Render with current adjustments after loading
+          if (sourceCache.value && editStore.isDirty) {
+            await renderPreview('full')
+          }
+        }
+        catch (err) {
+          if (renderGeneration.value === currentGen) {
+            error.value = err instanceof Error ? err.message : 'Failed to load preview'
+            isRendering.value = false
+            console.error('[useEditPreview] Preview load error:', err)
+          }
+        }
+      }
+    },
+  )
+
+  /**
+   * Watch for preview generation errors.
+   * If preview fails, fall back to thumbnail with a warning message.
+   */
+  watch(
+    () => {
+      const asset = catalogStore.assets.get(assetId.value)
+      return asset?.preview1xStatus
+    },
+    async (status) => {
+      if (status === 'error' && isWaitingForPreview.value) {
+        console.log('[useEditPreview] Preview generation failed, falling back to thumbnail')
+        const asset = catalogStore.assets.get(assetId.value)
+        const currentGen = renderGeneration.value
+
+        if (asset?.thumbnailUrl) {
+          isWaitingForPreview.value = false
+          previewUrl.value = asset.thumbnailUrl
+          isPreviewUrlOwned.value = false
+          error.value = 'Preview generation failed, showing thumbnail'
+
+          try {
+            await loadSource(assetId.value)
+
+            // Check generation before proceeding
+            if (renderGeneration.value !== currentGen) {
+              return
+            }
+
+            // Render with current adjustments after loading
+            if (sourceCache.value && editStore.isDirty) {
+              await renderPreview('full')
+            }
+          }
+          catch (err) {
+            if (renderGeneration.value === currentGen) {
+              console.error('[useEditPreview] Thumbnail fallback load error:', err)
+            }
+          }
+        }
+        else {
+          // No thumbnail either, show error state
+          isWaitingForPreview.value = false
+          error.value = 'Failed to generate preview'
+        }
+      }
+    },
+  )
+
+  /**
    * Watch for source URL changes (e.g., when thumbnail loads after request).
    * This handles the case where we navigate to edit view before thumbnail is ready.
+   * Note: In edit view, this is primarily for the preview URL, not thumbnail.
    */
   watch(
     sourceUrl,
     async (url) => {
+      // Skip if we're waiting for preview (preview watcher will handle it)
+      if (isWaitingForPreview.value) return
       if (!url || sourceCache.value) return
 
       const currentGen = renderGeneration.value
@@ -800,5 +911,6 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     previewDimensions,
     adjustedPixels,
     adjustedDimensions,
+    isWaitingForPreview,
   }
 }
