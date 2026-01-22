@@ -14,12 +14,13 @@ interface Props {
 const props = defineProps<Props>()
 
 // ============================================================================
-// Stores
+// Stores & Composables
 // ============================================================================
 
 const router = useRouter()
 const catalogStore = useCatalogStore()
 const uiStore = useCatalogUIStore()
+const { requestThumbnail } = useCatalog()
 
 // ============================================================================
 // Computed
@@ -72,6 +73,29 @@ watch(() => props.currentAssetId, () => {
     }
   })
 }, { immediate: true })
+
+// ============================================================================
+// Thumbnail Requests
+// ============================================================================
+
+/**
+ * Request thumbnails for visible filmstrip items.
+ *
+ * When navigating directly to /edit/[id] via URL (refresh, shared link),
+ * thumbnails haven't been generated yet. This watcher ensures visible
+ * filmstrip thumbnails are requested, similar to how CatalogThumbnail
+ * requests thumbnails when mounting in the grid view.
+ */
+watch(visibleIds, (ids) => {
+  for (const id of ids) {
+    const asset = catalogStore.assets.get(id)
+    if (asset && asset.thumbnailStatus === 'pending') {
+      // Priority 1 (near visible) since these are filmstrip thumbnails
+      // Current asset gets priority 0 via useEditPreview
+      requestThumbnail(id, 1)
+    }
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -97,7 +121,7 @@ watch(() => props.currentAssetId, () => {
       :class="[
         id === currentAssetId
           ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-950'
-          : 'opacity-60 hover:opacity-100'
+          : 'opacity-60 hover:opacity-100',
       ]"
       @click="navigateToAsset(id)"
     >
@@ -106,12 +130,15 @@ watch(() => props.currentAssetId, () => {
         :src="catalogStore.assets.get(id)?.thumbnailUrl ?? undefined"
         :alt="catalogStore.assets.get(id)?.filename"
         class="w-full h-full object-cover"
-      />
+      >
       <div
         v-else
         class="w-full h-full bg-gray-800 flex items-center justify-center"
       >
-        <UIcon name="i-heroicons-photo" class="w-6 h-6 text-gray-600" />
+        <UIcon
+          name="i-heroicons-photo"
+          class="w-6 h-6 text-gray-600"
+        />
       </div>
     </button>
 

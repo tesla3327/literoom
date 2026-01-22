@@ -3,10 +3,10 @@
 ## Table of Contents
 
 ### Open Issues
-- [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip---solved)
 - [Copy/Paste Settings - Paste does not apply settings (Critical)](#copypaste-settings---paste-does-not-apply-settings---solved)
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview---solved)
 - [Edit preview uses thumbnail instead of full preview (Critical)](#edit-preview-uses-thumbnail-instead-of-full-preview---solved)
@@ -30,31 +30,6 @@
 ---
 
 ## Open Issues
-
-### Direct edit URL only loads current thumbnail in filmstrip
-
-**Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
-
-When navigating directly to `/edit/[id]` via URL (e.g., page refresh, shared link, or typing URL directly), only the current image's thumbnail loads in the filmstrip. Other thumbnails remain in a loading/placeholder state.
-
-**Expected**: All thumbnails in the filmstrip should load, allowing users to navigate between images by clicking on any thumbnail.
-
-**Observed**:
-- Direct URL navigation to `/edit/[id]` only loads the thumbnail for the currently viewed image
-- Other filmstrip thumbnails show loading state indefinitely
-- Thumbnails only load when actually editing/viewing that specific image
-- If user first visits home page and then navigates to edit, all thumbnails load correctly
-
-**Root Cause (suspected)**: When initializing the catalog via direct URL navigation, thumbnail generation is only requested for the current asset. The filmstrip component may not be triggering `requestThumbnail()` for visible thumbnails, or the intersection observer isn't working correctly in this scenario.
-
-**Impact**: Users cannot see previews of other images in the filmstrip when accessing edit view directly, making it harder to navigate between photos.
-
-**Files Involved**:
-- `apps/web/app/components/edit/EditFilmstrip.vue` - Filmstrip component with thumbnails
-- `apps/web/app/plugins/catalog.client.ts` - Catalog initialization on direct navigation
-- `apps/web/app/composables/useIntersectionObserver.ts` - Lazy loading trigger
-
----
 
 ### Clipping detection has false positives
 
@@ -516,3 +491,42 @@ The Paste button and keyboard shortcut (Ctrl/Cmd+Shift+V) now correctly apply co
 - ✅ Click Paste button
 - ✅ Exposure slider shows +0.25 on target image
 - ✅ Toast notification appears
+
+---
+
+### Direct edit URL only loads current thumbnail in filmstrip - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+When navigating directly to `/edit/[id]` via URL (page refresh, shared link), all filmstrip thumbnails now load correctly.
+
+**Original Problem**:
+- Direct URL navigation to `/edit/[id]` only loaded the thumbnail for the currently viewed image
+- Other filmstrip thumbnails remained in loading/placeholder state indefinitely
+- Thumbnails only loaded after viewing that specific image
+
+**Root Cause**: The `EditFilmstrip.vue` component never called `requestThumbnail()` for its visible items. It only displayed thumbnails that already existed in the catalog store. When navigating via the catalog grid, `CatalogThumbnail.vue` requests thumbnails on mount, so they're already cached. But with direct URL navigation, assets load with `thumbnailStatus: 'pending'` and no component triggered thumbnail generation.
+
+**Fix Applied**: Added a watcher in `EditFilmstrip.vue` that requests thumbnails for all visible filmstrip items with `thumbnailStatus === 'pending'`. This mirrors the pattern used by `CatalogThumbnail.vue` in the grid view.
+
+```typescript
+watch(visibleIds, (ids) => {
+  for (const id of ids) {
+    const asset = catalogStore.assets.get(id)
+    if (asset && asset.thumbnailStatus === 'pending') {
+      requestThumbnail(id, 1)  // Priority 1 (near visible)
+    }
+  }
+}, { immediate: true })
+```
+
+**File Modified**: `apps/web/app/components/edit/EditFilmstrip.vue`
+
+**Verification**:
+- ✅ Direct URL navigation to `/edit/demo-25` loads all visible filmstrip thumbnails
+- ✅ Thumbnails display actual images, not placeholder icons
+- ✅ All 317 unit tests pass
+
+**Screenshots**:
+- `docs/screenshots/verify-filmstrip-fix-direct-url-01.png` - Filmstrip thumbnails loading
+- `docs/screenshots/verify-filmstrip-fix-direct-url-02.png` - All thumbnails loaded

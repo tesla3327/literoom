@@ -55,3 +55,49 @@ This phase creates the Vue/Nuxt components for the export UI.
 - Demo mode export will fail since mock service doesn't write files
 
 ---
+
+## 102: 2026-01-21 19:26 EST: Filmstrip Thumbnail Loading Issue - Fixed
+
+**Objective**: Fix the issue where direct URL navigation to `/edit/[id]` only loads the current thumbnail in the filmstrip, leaving other thumbnails in loading state.
+
+**Background**: This is an open medium-severity issue discovered on 2026-01-21. When users navigate directly to an edit URL (page refresh, shared link, or typing URL), only the currently viewed image's thumbnail loads in the filmstrip. Other thumbnails remain in loading state indefinitely.
+
+**Research Findings**:
+The root cause was that `EditFilmstrip.vue` never called `requestThumbnail()` for its visible items. It only displayed thumbnails that already existed in the catalog store.
+
+When navigating via the catalog grid:
+- `CatalogThumbnail.vue` requests thumbnails on mount
+- Thumbnails are already cached when entering edit view
+- Filmstrip displays cached thumbnails correctly
+
+When navigating directly via URL:
+- Assets load with `thumbnailStatus: 'pending'`
+- No component triggered thumbnail generation for filmstrip items
+- Thumbnails stuck in pending state indefinitely
+
+**Fix Applied**: Added a watcher in `EditFilmstrip.vue` that requests thumbnails for all visible filmstrip items when their status is `'pending'`:
+
+```typescript
+watch(visibleIds, (ids) => {
+  for (const id of ids) {
+    const asset = catalogStore.assets.get(id)
+    if (asset && asset.thumbnailStatus === 'pending') {
+      requestThumbnail(id, 1)  // Priority 1 (near visible)
+    }
+  }
+}, { immediate: true })
+```
+
+**Files Modified** (1 file):
+- `apps/web/app/components/edit/EditFilmstrip.vue`
+
+**Tests**: All 317 unit tests pass.
+
+**Verification**:
+- ✅ Direct URL navigation to `/edit/demo-25` loads all visible filmstrip thumbnails
+- ✅ Thumbnails display actual images, not placeholder icons
+
+**Status**: Complete. Issue marked as solved in `docs/issues.md`.
+
+---
+
