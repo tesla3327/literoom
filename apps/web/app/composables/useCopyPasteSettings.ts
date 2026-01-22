@@ -171,8 +171,10 @@ export function useCopyPasteSettings() {
     settings: CopiedSettings | Readonly<CopiedSettings>,
   ): Promise<boolean> {
     try {
-      // If this is the current asset in edit view, update via edit store
-      if (assetId === editStore.currentAssetId) {
+      // If this is the currently selected asset, apply via edit store
+      // Use selectionStore.currentId as the authoritative source of the current asset,
+      // since editStore.currentAssetId may not be synchronized during navigation
+      if (assetId === selectionStore.currentId) {
         applyToEditStore(settings)
         return true
       }
@@ -181,9 +183,8 @@ export function useCopyPasteSettings() {
       // For v1, only support paste in Edit view (current asset)
       // Grid batch paste can be added in v1.1 via CatalogService.updateEditState(assetId, editState)
 
-      // For now, if the asset is selected but not current, we skip it
-      // and only paste succeeds for the current asset
-      return assetId === selectionStore.currentId
+      // For now, if the asset is not current, we skip it
+      return false
     }
     catch {
       return false

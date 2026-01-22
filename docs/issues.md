@@ -7,6 +7,7 @@
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Copy/Paste Settings - Paste does not apply settings (Critical)](#copypaste-settings---paste-does-not-apply-settings---solved)
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview---solved)
 - [Edit preview uses thumbnail instead of full preview (Critical)](#edit-preview-uses-thumbnail-instead-of-full-preview---solved)
 - [Histogram doesn't update when edits are made (High)](#histogram-doesnt-update-when-edits-are-made---solved)
@@ -488,3 +489,30 @@ When a slider element has focus, arrow keys now properly adjust the slider value
 **Fix Applied**: Added a check for `target.getAttribute('role') === 'slider'` to skip navigation when focused on slider elements.
 
 **File Modified**: `apps/web/app/pages/edit/[id].vue`
+
+---
+
+### Copy/Paste Settings - Paste does not apply settings - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+The Paste button and keyboard shortcut (Ctrl/Cmd+Shift+V) now correctly apply copied settings to target images.
+
+**Original Problem**:
+- Copy modal appeared correctly and settings were copied to clipboard store
+- After navigating to a different image, clicking Paste did nothing
+- Sliders remained at default values (0)
+- No toast notification appeared
+
+**Root Cause**: The `applySettingsToAsset()` function in `useCopyPasteSettings.ts` checked if `assetId === editStore.currentAssetId` to decide whether to apply settings. However, when navigating between images in the filmstrip, `editStore.currentAssetId` was not synchronized with `selectionStore.currentId`. The fallback return returned `true` (because `assetId === selectionStore.currentId`) WITHOUT calling `applyToEditStore()`, making the paste appear to succeed when it hadn't applied any settings.
+
+**Fix Applied**: Changed the condition to check `selectionStore.currentId` instead of `editStore.currentAssetId`, since `selectionStore.currentId` is the authoritative source of the current asset.
+
+**File Modified**: `apps/web/app/composables/useCopyPasteSettings.ts`
+
+**Verification**:
+- ✅ Copy settings from source image (Exposure +0.25)
+- ✅ Navigate to different image in filmstrip
+- ✅ Click Paste button
+- ✅ Exposure slider shows +0.25 on target image
+- ✅ Toast notification appears

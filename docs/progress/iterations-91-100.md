@@ -443,3 +443,33 @@ const filename = renderTemplate('{orig}_{seq:4}', {
 **Status**: Phase 3 complete. Ready for Phase 4 (Export Service).
 
 ---
+
+## 99: 2026-01-21 19:08 EST: Copy/Paste Settings Bug Fix
+
+**Objective**: Fix critical bug where Paste does not apply settings to target images.
+
+**Background**: The Copy/Paste Settings feature was implemented in iteration #92, but testing revealed that the Paste functionality silently failed - settings were copied to the clipboard store but never applied to target images when pasting.
+
+**Root Cause**: In `useCopyPasteSettings.ts`, the `applySettingsToAsset()` function checked if `assetId === editStore.currentAssetId` to decide whether to apply settings. However, when navigating between images in the filmstrip, `editStore.currentAssetId` was not synchronized with `selectionStore.currentId`. The function returned `true` (because `assetId === selectionStore.currentId`) WITHOUT calling `applyToEditStore()`.
+
+**Fix Applied**: Changed the condition to check `selectionStore.currentId` instead of `editStore.currentAssetId`, since `selectionStore.currentId` is the authoritative source of the current asset.
+
+**Files Modified** (1 file):
+- `apps/web/app/composables/useCopyPasteSettings.ts` (lines 169-191)
+
+**Verification**:
+- ✅ Set Exposure to +0.25 on source image (IMG_0008)
+- ✅ Copy settings via Copy modal
+- ✅ Navigate to different image (IMG_0001) in filmstrip
+- ✅ Click Paste button
+- ✅ Exposure slider shows +0.25 on target image
+- ✅ Toast notification appears
+
+**Screenshots**:
+- `docs/screenshots/verify-paste-fix-06-exposure-high.png` - Source image with Exposure +0.25
+- `docs/screenshots/verify-paste-fix-09-different-image.png` - Target image before paste (Exposure 0.00)
+- `docs/screenshots/verify-paste-fix-10-after-paste.png` - Target image after paste (Exposure +0.25)
+
+**Status**: Bug fixed and verified. Issue moved to Solved Issues in docs/issues.md.
+
+---
