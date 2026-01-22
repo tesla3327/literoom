@@ -319,3 +319,30 @@
 
 ---
 
+## 126: 2026-01-22 07:13 EST: Export Button Always Disabled - Fixed
+
+**Objective**: Fix the medium-severity issue "Export button always disabled" so users can access the export modal.
+
+**Problem**: The Export button in the FilterBar was disabled when `catalogStore.pickCount === 0`. This blocked users from:
+1. Opening the export modal to change the export scope to "All" or "Selected"
+2. Exporting in demo mode where no images are flagged as picks by default
+3. Exporting selected images without having to mark them as picks first
+
+**Root Cause**: Line 163 in `FilterBar.vue` used the wrong condition:
+```vue
+:disabled="catalogStore.pickCount === 0"
+```
+
+**Fix Applied**: Changed the disabled condition to check total count instead:
+```vue
+:disabled="catalogStore.totalCount === 0"
+```
+
+Now the button is enabled whenever there are images in the catalog, allowing users to access the export modal where they can choose their preferred export scope (Picks, Selected, or All).
+
+**File Modified**: `apps/web/app/components/catalog/FilterBar.vue`
+
+**Status**: Complete
+
+---
+

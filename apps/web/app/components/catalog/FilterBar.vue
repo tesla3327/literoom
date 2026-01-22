@@ -160,7 +160,7 @@ function setSort(field: SortField, direction: SortDirection): void {
         variant="ghost"
         size="sm"
         icon="i-heroicons-arrow-up-tray"
-        :disabled="catalogStore.pickCount === 0"
+        :disabled="catalogStore.totalCount === 0"
         data-testid="export-button"
         @click="exportStore.openModal"
       >

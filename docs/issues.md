@@ -3,9 +3,10 @@
 ## Table of Contents
 
 ### Open Issues
-(None currently)
+None
 
 ### Recently Solved
+- [Export button always disabled (Medium)](#export-button-always-disabled---solved)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives---solved)
 
 ### Solved Issues
@@ -36,6 +37,24 @@
 ---
 
 ## Solved Issues
+
+### Export button always disabled - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-22
+
+**Problem**:
+The Export button in the FilterBar was disabled when `catalogStore.pickCount === 0`, blocking users from accessing the export modal to change the export scope.
+
+**Root Cause**:
+Line 163 in `FilterBar.vue` used the wrong disabled condition.
+
+**Fix Applied**:
+Changed the disabled condition from `pickCount === 0` to `totalCount === 0`. Now the button is enabled whenever there are images in the catalog.
+
+**File Modified**:
+- `apps/web/app/components/catalog/FilterBar.vue`
+
+---
 
 ### Clipping detection has false positives - SOLVED
 
