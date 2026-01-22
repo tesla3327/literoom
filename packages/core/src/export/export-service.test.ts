@@ -38,6 +38,11 @@ function createMockDependencies(): ExportServiceDependencies {
       width: w,
       height: h,
     })),
+    applyMaskedAdjustments: vi.fn().mockImplementation(async (pixels, w, h) => ({
+      data: new Uint8Array(pixels),
+      width: w,
+      height: h,
+    })),
     resize: vi.fn().mockImplementation(async (pixels, _w, _h, newW, newH) => ({
       data: new Uint8Array(pixels),
       width: newW,

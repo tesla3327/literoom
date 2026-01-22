@@ -85,6 +85,13 @@ export const useEditStore = defineStore('edit', () => {
    */
   const error = ref<string | null>(null)
 
+  /**
+   * In-memory cache of edit states per asset.
+   * This allows edits to persist within a session when switching between images.
+   * Note: This is NOT persisted to database - edits are lost on page refresh.
+   */
+  const editCache = ref<Map<string, EditState>>(new Map())
+
   // ============================================================================
   // Computed
   // ============================================================================
@@ -144,24 +151,65 @@ export const useEditStore = defineStore('edit', () => {
 
   /**
    * Load edit state for an asset.
-   * If no saved state exists, initializes with defaults.
+   * First checks the in-memory cache, then falls back to defaults.
+   * Saves current edits to cache before switching.
    */
   async function loadForAsset(assetId: string): Promise<void> {
-    // Save current edits before switching
-    if (isDirty.value && currentAssetId.value) {
-      await save()
+    // Save current edits to cache before switching
+    if (currentAssetId.value && isDirty.value) {
+      saveToCache(currentAssetId.value)
     }
 
     currentAssetId.value = assetId
     error.value = null
 
-    // TODO: Load from database once persistence is implemented
+    // Try to load from cache
+    const cached = editCache.value.get(assetId)
+    if (cached) {
+      adjustments.value = { ...cached.adjustments }
+      cropTransform.value = cloneCropTransform(cached.cropTransform)
+      masks.value = cached.masks ? cloneMaskStack(cached.masks) : null
+      selectedMaskId.value = null
+      isDirty.value = false
+      return
+    }
+
+    // TODO: Load from database once full persistence is implemented
     // For now, initialize with defaults
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
     masks.value = null
     selectedMaskId.value = null
     isDirty.value = false
+  }
+
+  /**
+   * Save current edit state to the in-memory cache.
+   */
+  function saveToCache(assetId: string): void {
+    editCache.value.set(assetId, {
+      version: EDIT_SCHEMA_VERSION,
+      adjustments: { ...adjustments.value },
+      cropTransform: cloneCropTransform(cropTransform.value),
+      masks: masks.value ? cloneMaskStack(masks.value) : undefined,
+    })
+  }
+
+  /**
+   * Get edit state for an asset from the cache.
+   * Returns null if not in cache.
+   */
+  function getEditStateForAsset(assetId: string): EditState | null {
+    // If it's the current asset, return current state (which may be newer than cache)
+    if (assetId === currentAssetId.value) {
+      return {
+        version: EDIT_SCHEMA_VERSION,
+        adjustments: { ...adjustments.value },
+        cropTransform: cloneCropTransform(cropTransform.value),
+        masks: masks.value ? cloneMaskStack(masks.value) : undefined,
+      }
+    }
+    return editCache.value.get(assetId) ?? null
   }
 
   /**
@@ -174,8 +222,18 @@ export const useEditStore = defineStore('edit', () => {
    */
   function setAdjustment(key: NumericAdjustmentKey, value: number): void {
     adjustments.value[key] = value
-    isDirty.value = true
-    error.value = null
+    markDirty()
+  }
+
+  /**
+   * Mark the edit state as dirty and update the cache.
+   */
+  function markDirty(): void {
+    markDirty()
+    // Update cache immediately so export always has latest edits
+    if (currentAssetId.value) {
+      saveToCache(currentAssetId.value)
+    }
   }
 
   /**
@@ -186,8 +244,7 @@ export const useEditStore = defineStore('edit', () => {
       ...adjustments.value,
       ...updates,
     }
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -198,8 +255,7 @@ export const useEditStore = defineStore('edit', () => {
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
     masks.value = null
     selectedMaskId.value = null
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -253,8 +309,7 @@ export const useEditStore = defineStore('edit', () => {
       ...adjustments.value,
       toneCurve: { points: [...curve.points] },
     }
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -309,8 +364,7 @@ export const useEditStore = defineStore('edit', () => {
    */
   function setCropTransform(transform: CropTransform): void {
     cropTransform.value = cloneCropTransform(transform)
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -321,8 +375,7 @@ export const useEditStore = defineStore('edit', () => {
       ...cropTransform.value,
       crop: crop ? { ...crop } : null,
     }
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -333,8 +386,7 @@ export const useEditStore = defineStore('edit', () => {
       ...cropTransform.value,
       rotation: { ...rotation },
     }
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -348,8 +400,7 @@ export const useEditStore = defineStore('edit', () => {
         angle,
       },
     }
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -363,8 +414,7 @@ export const useEditStore = defineStore('edit', () => {
         straighten,
       },
     }
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -372,8 +422,7 @@ export const useEditStore = defineStore('edit', () => {
    */
   function resetCropTransform(): void {
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   // ============================================================================
@@ -389,8 +438,7 @@ export const useEditStore = defineStore('edit', () => {
     }
     masks.value.linearMasks.push(cloneLinearMask(mask))
     selectedMaskId.value = mask.id
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -402,8 +450,7 @@ export const useEditStore = defineStore('edit', () => {
     }
     masks.value.radialMasks.push(cloneRadialMask(mask))
     selectedMaskId.value = mask.id
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -423,8 +470,7 @@ export const useEditStore = defineStore('edit', () => {
         enabled: updates.enabled ?? current.enabled,
         adjustments: updates.adjustments ?? current.adjustments,
       }
-      isDirty.value = true
-      error.value = null
+      markDirty()
     }
   }
 
@@ -448,8 +494,7 @@ export const useEditStore = defineStore('edit', () => {
         enabled: updates.enabled ?? current.enabled,
         adjustments: updates.adjustments ?? current.adjustments,
       }
-      isDirty.value = true
-      error.value = null
+      markDirty()
     }
   }
 
@@ -474,8 +519,7 @@ export const useEditStore = defineStore('edit', () => {
       selectedMaskId.value = null
     }
 
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -487,16 +531,14 @@ export const useEditStore = defineStore('edit', () => {
     const linearMask = masks.value.linearMasks.find(m => m.id === id)
     if (linearMask) {
       linearMask.enabled = !linearMask.enabled
-      isDirty.value = true
-      error.value = null
+      markDirty()
       return
     }
 
     const radialMask = masks.value.radialMasks.find(m => m.id === id)
     if (radialMask) {
       radialMask.enabled = !radialMask.enabled
-      isDirty.value = true
-      error.value = null
+      markDirty()
     }
   }
 
@@ -516,16 +558,14 @@ export const useEditStore = defineStore('edit', () => {
     const linearMask = masks.value.linearMasks.find(m => m.id === id)
     if (linearMask) {
       linearMask.adjustments = { ...adjustments }
-      isDirty.value = true
-      error.value = null
+      markDirty()
       return
     }
 
     const radialMask = masks.value.radialMasks.find(m => m.id === id)
     if (radialMask) {
       radialMask.adjustments = { ...adjustments }
-      isDirty.value = true
-      error.value = null
+      markDirty()
     }
   }
 
@@ -541,8 +581,7 @@ export const useEditStore = defineStore('edit', () => {
         ...linearMask.adjustments,
         [key]: value,
       }
-      isDirty.value = true
-      error.value = null
+      markDirty()
       return
     }
 
@@ -552,8 +591,7 @@ export const useEditStore = defineStore('edit', () => {
         ...radialMask.adjustments,
         [key]: value,
       }
-      isDirty.value = true
-      error.value = null
+      markDirty()
     }
   }
 
@@ -563,8 +601,7 @@ export const useEditStore = defineStore('edit', () => {
   function resetMasks(): void {
     masks.value = null
     selectedMaskId.value = null
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   /**
@@ -573,8 +610,7 @@ export const useEditStore = defineStore('edit', () => {
   function setMasks(maskStack: MaskStack | null): void {
     masks.value = maskStack ? cloneMaskStack(maskStack) : null
     selectedMaskId.value = null
-    isDirty.value = true
-    error.value = null
+    markDirty()
   }
 
   return {
@@ -631,5 +667,8 @@ export const useEditStore = defineStore('edit', () => {
     setMaskAdjustment,
     resetMasks,
     setMasks,
+
+    // Export-related Actions
+    getEditStateForAsset,
   }
 })

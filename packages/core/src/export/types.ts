@@ -5,7 +5,7 @@
  * applying all transformations and encoding to the final output.
  */
 
-import type { Asset, Adjustments, CropRectangle, RotationParameters } from '../catalog/types'
+import type { Asset, Adjustments, CropRectangle, RotationParameters, MaskStack } from '../catalog/types'
 import type { ToneCurve } from '../decode/types'
 
 // ============================================================================
@@ -116,6 +116,8 @@ export interface ExportEditState {
   crop?: CropRectangle | null
   /** Rotation parameters */
   rotation?: RotationParameters
+  /** Local adjustment masks (linear and radial gradients) */
+  masks?: MaskStack
 }
 
 // ============================================================================
@@ -217,6 +219,20 @@ export interface ExportServiceDependencies {
     height: number,
     quality: number
   ) => Promise<Uint8Array>
+
+  /**
+   * Apply masked adjustments (linear and radial gradient masks).
+   */
+  applyMaskedAdjustments: (
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStack
+  ) => Promise<{
+    data: Uint8Array
+    width: number
+    height: number
+  }>
 
   /**
    * Get edit state for an asset.

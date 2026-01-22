@@ -400,3 +400,65 @@ Instead of full database persistence (complex), implement session-based edit cac
 
 **Status**: Research and planning complete. Ready for implementation.
 
+---
+
+## 128: 2026-01-22 09:40 EST: Export Doesn't Apply Edits - Implementation Complete
+
+**Objective**: Fix the critical "Export doesn't apply edits" bug so exported images include all adjustments made in edit view.
+
+**Status**: Complete
+
+**Implementation**:
+
+### Phase 1: Add Masks to Export Types (`packages/core/src/export/types.ts`)
+
+1. Added import for `MaskStack` from catalog types
+2. Added `masks?: MaskStack` to `ExportEditState` interface
+3. Added `applyMaskedAdjustments` method to `ExportServiceDependencies` interface
+
+### Phase 2: Add Masked Adjustments Step (`packages/core/src/export/export-service.ts`)
+
+Added masked adjustments step in `applyEdits()` after tone curve application:
+- Checks if masks exist and any are enabled
+- Calls `applyMaskedAdjustments` dependency with mask stack
+
+### Phase 3: Add Edit State Caching (`apps/web/app/stores/edit.ts`)
+
+1. Added `editCache: Map<string, EditState>` ref for session-based caching
+2. Added `saveToCache(assetId)` method to save current state to cache
+3. Added `getEditStateForAsset(assetId)` method to retrieve cached edits
+4. Modified `loadForAsset()` to:
+   - Save current edits to cache before switching assets
+   - Load from cache if available, otherwise use defaults
+5. Added `markDirty()` helper that updates cache immediately on changes
+6. Converted all `isDirty.value = true` to use `markDirty()` (23 occurrences)
+
+### Phase 4: Wire Up Export Dependencies (`apps/web/app/composables/useExport.ts`)
+
+1. Imported `MaskStack` and `MaskStackData` types
+2. Updated `getEditState()` to use `editStore.getEditStateForAsset()` and include masks
+3. Added `applyMaskedAdjustments` dependency that converts `MaskStack` to `MaskStackData` for decode service
+
+### Phase 5: Update Test (`packages/core/src/export/export-service.test.ts`)
+
+Added `applyMaskedAdjustments` mock to `createMockDependencies()`
+
+**Files Modified** (5):
+- `packages/core/src/export/types.ts`
+- `packages/core/src/export/export-service.ts`
+- `packages/core/src/export/export-service.test.ts`
+- `apps/web/app/stores/edit.ts`
+- `apps/web/app/composables/useExport.ts`
+
+**Testing**:
+- ✅ All 362 core package tests pass
+
+**Key Design Decisions**:
+1. **Session-based caching** - Edits are cached in-memory during the session, not persisted to database (can be added later)
+2. **Immediate cache updates** - Cache is updated on every dirty change, ensuring export always has latest edits
+3. **Current asset priority** - For the current asset, returns live state (which may be newer than cache)
+
+**Limitations** (intentional for v1):
+- Edits are lost on page refresh (no database persistence yet)
+- This is acceptable for now since the user workflow is typically: edit → export within same session
+

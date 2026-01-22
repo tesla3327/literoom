@@ -3,9 +3,14 @@
 ## Table of Contents
 
 ### Open Issues
-None
+- [Previously opened folder auto-loads unexpectedly (Medium)](#previously-opened-folder-auto-loads-unexpectedly)
+- [Import UX feels slow (Medium)](#import-ux-feels-slow)
+- [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail)
+- ["All" count keeps increasing (High)](#all-count-keeps-increasing)
+- [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit)
 
 ### Recently Solved
+- [Export doesn't apply edits (Critical)](#export-doesnt-apply-edits---solved)
 - [Export button always disabled (Medium)](#export-button-always-disabled---solved)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives---solved)
 
@@ -36,7 +41,112 @@ None
 
 ---
 
+## Open Issues
+
+### Previously opened folder auto-loads unexpectedly
+
+**Severity**: Medium
+
+**Problem**:
+When loading the app or clicking "Select Folder" after previously loading a folder, the app automatically loads the previous folder. This is unexpected UX behavior.
+
+**Suggested Fix**:
+Change "Select Folder" to "Previously Opened Folders" with a list of recent folders, allowing users to quickly jump to a previous folder or select a new one.
+
+---
+
+### Import UX feels slow
+
+**Severity**: Medium
+
+**Problem**:
+The import experience feels slow and lacks feedback. Users are dropped into a gallery with loading placeholders without knowing the import progress.
+
+**Suggested Improvements**:
+1. Show scanning progress in the toolbar (currently only shows for scanning files, then disappears)
+2. Show progress for the entire import process: scanning → processing thumbnails → processing preview images
+3. Add a progress bar where it says "scanning" in the toolbar
+4. Consider showing an interstitial/modal with "loading" instead of immediately showing the gallery with placeholders
+5. Process the first page of thumbnails before showing the gallery
+6. Ensure thumbnails are loaded when users are dropped into the gallery
+7. Continue processing other thumbnails and previews in the background
+
+**Goal**: When users enter the gallery, it should feel like they can immediately start using the app.
+
+---
+
+### Preview not ready when clicking thumbnail
+
+**Severity**: Medium
+
+**Problem**:
+When a thumbnail is visible (appears loaded), users may double-click to enter edit view, but the preview is still generating. This creates confusion.
+
+**Suggested Fixes**:
+1. Process everything up front and wait before dropping users into the gallery
+2. If user enters edit view before preview is ready, prioritize generating that preview
+3. Implement a processing queue with priority jumping based on user actions
+
+---
+
+### "All" count keeps increasing
+
+**Severity**: High
+
+**Problem**:
+Every time a user navigates from the edit page back to the gallery, the "All" count in the filter bar increases. This is a bug.
+
+**Expected Behavior**:
+The "All" count should remain constant and reflect the actual number of images in the catalog.
+
+---
+
+### Gallery loading state after returning from edit
+
+**Severity**: High
+
+**Problem**:
+When returning to the gallery from the edit page:
+- Sometimes only a loading state is shown with no thumbnails
+- Thumbnails are not updated/regenerated to reflect edits made to the photo
+
+**Expected Behavior**:
+- Gallery should show all thumbnails immediately when returning from edit view
+- Thumbnails should update to reflect any edits made
+
+---
+
 ## Solved Issues
+
+### Export doesn't apply edits - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-22
+
+**Problem**:
+The export feature exported the original image without applying any edits.
+
+**Root Causes Fixed** (2 bugs):
+1. **Edit State Retrieval Failed**: `getEditState()` only returned edits for the currently-viewed asset. All other assets returned `null` because there was no persistence.
+2. **Masked Adjustments Missing**: The export pipeline didn't call `applyMaskedAdjustments` at all.
+
+**Fix Applied**:
+1. Added in-memory edit cache (`editCache: Map<string, EditState>`) to edit store
+2. Cache is updated immediately whenever edits change
+3. On asset switch, current edits are saved to cache before switching
+4. Export retrieves edits from cache using `getEditStateForAsset()`
+5. Added `masks` field to `ExportEditState` interface
+6. Added `applyMaskedAdjustments` to export dependencies and pipeline
+
+**Files Modified** (5):
+- `packages/core/src/export/types.ts`
+- `packages/core/src/export/export-service.ts`
+- `packages/core/src/export/export-service.test.ts`
+- `apps/web/app/stores/edit.ts`
+- `apps/web/app/composables/useExport.ts`
+
+**Note**: Edits are session-cached only (lost on page refresh). Database persistence can be added in a future iteration.
+
+---
 
 ### Export button always disabled - SOLVED
 

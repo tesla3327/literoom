@@ -269,6 +269,22 @@ export class ExportService {
       )
     }
 
+    // Apply masked adjustments (linear and radial gradient masks)
+    if (editState.masks) {
+      const hasEnabledMasks =
+        (editState.masks.linearMasks?.some((m) => m.enabled)) ||
+        (editState.masks.radialMasks?.some((m) => m.enabled))
+
+      if (hasEnabledMasks) {
+        result = await this.deps.applyMaskedAdjustments(
+          result.data,
+          result.width,
+          result.height,
+          editState.masks
+        )
+      }
+    }
+
     return result
   }
 

@@ -7,8 +7,8 @@
  * - Run the export process
  * - Progress tracking via store
  */
-import type { Asset, CropRectangle } from '@literoom/core/catalog'
-import type { IDecodeService, Adjustments as DecodeAdjustments } from '@literoom/core/decode'
+import type { Asset, CropRectangle, MaskStack } from '@literoom/core/catalog'
+import type { IDecodeService, Adjustments as DecodeAdjustments, MaskStackData } from '@literoom/core/decode'
 import type { ExportEditState, ExportResult, ExportServiceDependencies } from '@literoom/core/export'
 import {
   ExportService,
@@ -273,23 +273,23 @@ export function useExport() {
 
   /**
    * Get edit state for an asset.
-   * Currently only returns edits if the asset is currently loaded in the edit store.
-   * TODO: Load from database once edit state persistence is implemented.
+   * First checks the current edit store, then the session cache.
    */
   async function getEditState(assetId: string): Promise<ExportEditState | null> {
-    // If this is the currently loaded asset, get from edit store
-    if (editStore.currentAssetId === assetId) {
-      const state = editStore.editState
+    // Use the edit store's cache-aware method to get edits
+    const cachedState = editStore.getEditStateForAsset(assetId)
+
+    if (cachedState) {
       return {
-        adjustments: state.adjustments,
-        toneCurve: state.adjustments.toneCurve,
-        crop: state.cropTransform.crop,
-        rotation: state.cropTransform.rotation,
+        adjustments: cachedState.adjustments,
+        toneCurve: cachedState.adjustments.toneCurve,
+        crop: cachedState.cropTransform.crop,
+        rotation: cachedState.cropTransform.rotation,
+        masks: cachedState.masks,
       }
     }
 
-    // TODO: Load from database once persistence is implemented
-    // For now, return null (export without edits)
+    // No edits found - export without modifications
     return null
   }
 
@@ -384,6 +384,33 @@ export function useExport() {
       },
       applyToneCurve: async (pixels, width, height, points) => {
         const result = await decodeService.applyToneCurve(pixels, width, height, points)
+        return adaptDecodedImage(result)
+      },
+      applyMaskedAdjustments: async (pixels, width, height, maskStack: MaskStack) => {
+        // Convert MaskStack to MaskStackData for the decode service
+        const maskStackData: MaskStackData = {
+          linearMasks: maskStack.linearMasks.map(m => ({
+            startX: m.start.x,
+            startY: m.start.y,
+            endX: m.end.x,
+            endY: m.end.y,
+            feather: m.feather,
+            enabled: m.enabled,
+            adjustments: m.adjustments,
+          })),
+          radialMasks: maskStack.radialMasks.map(m => ({
+            centerX: m.center.x,
+            centerY: m.center.y,
+            radiusX: m.radiusX,
+            radiusY: m.radiusY,
+            rotation: m.rotation,
+            feather: m.feather,
+            invert: m.invert,
+            enabled: m.enabled,
+            adjustments: m.adjustments,
+          })),
+        }
+        const result = await decodeService.applyMaskedAdjustments(pixels, width, height, maskStackData)
         return adaptDecodedImage(result)
       },
       resize: async (pixels, width, height, newWidth, newHeight) => {
