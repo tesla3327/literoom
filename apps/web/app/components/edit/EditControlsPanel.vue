@@ -104,6 +104,7 @@ const accordionItems = [
   { value: 'basic', label: 'Basic', slot: 'basic' },
   { value: 'tonecurve', label: 'Tone Curve', slot: 'tonecurve' },
   { value: 'crop', label: 'Crop & Transform', slot: 'crop' },
+  { value: 'masks', label: 'Masks', slot: 'masks' },
 ]
 
 /**
@@ -125,6 +126,24 @@ watch(
     }
     else {
       editUIStore.deactivateCropTool()
+    }
+  },
+  { immediate: true },
+)
+
+/**
+ * Watch masks accordion expansion to toggle mask tool overlay.
+ * When masks section is expanded, show the mask overlay on the main preview.
+ * When collapsed, hide the mask overlay and exit drawing mode.
+ */
+watch(
+  () => expandedSections.value.includes('masks'),
+  (isMasksExpanded) => {
+    if (isMasksExpanded) {
+      editUIStore.activateMaskTool()
+    }
+    else {
+      editUIStore.deactivateMaskTool()
     }
   },
   { immediate: true },
@@ -255,6 +274,15 @@ function handleReset() {
             :image-width="imageWidth ?? 1920"
             :image-height="imageHeight ?? 1080"
           />
+        </div>
+      </template>
+
+      <!-- Masks Section -->
+      <template #masks-body>
+        <div class="pt-2 space-y-4">
+          <EditMaskPanel />
+          <hr class="border-gray-700" />
+          <EditMaskAdjustments />
         </div>
       </template>
     </UAccordion>

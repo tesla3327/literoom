@@ -257,3 +257,58 @@ The issue was a **misunderstanding of expected behavior**, not a bug. The app fo
 
 ---
 
+## 117: 2026-01-21 22:58 EST: Local Masks UI - Phases 7.1-7.4 Complete
+
+**Objective**: Implement the Masks panel UI components and integrate into the accordion controls.
+
+**Background**: The Local Masks UI plan specifies 8 implementation phases. This iteration covers phases 7.1-7.4, which establish the UI panel structure.
+
+**Changes Made**:
+
+### Phase 7.1: Edit UI Store Extensions (Already Complete)
+The editUI store already had mask tool state from previous work:
+- `isMaskToolActive` ref
+- `maskDrawingMode` ref (`'linear' | 'radial' | null`)
+- `activateMaskTool()`, `deactivateMaskTool()`, `setMaskDrawingMode()`, `cancelMaskDrawing()` methods
+
+### Phase 7.2: EditMaskPanel.vue (New Component)
+Created mask list panel with:
+- Add Linear/Radial mask buttons with icons
+- Mask list showing all masks (combined linear + radial)
+- Per-mask controls: visibility toggle (eye icon), selection highlighting, delete button
+- Drawing mode indicator with pulsing icon and cancel button
+- Empty state message when no masks exist
+
+### Phase 7.3: EditMaskAdjustments.vue (New Component)
+Created per-mask adjustment sliders with:
+- Adjustment sliders organized in groups (White Balance, Tone, Presence)
+- Same slider configuration as global adjustments (10 sliders)
+- Reset button to clear mask adjustments
+- Empty state when no mask selected
+
+### Phase 7.4: Accordion Integration
+Updated EditControlsPanel.vue:
+- Added "Masks" accordion item with slot
+- Added watcher for masks section expansion (activates/deactivates mask tool)
+- Added template slot containing EditMaskPanel + divider + EditMaskAdjustments
+
+**Files Created** (2):
+- `apps/web/app/components/edit/EditMaskPanel.vue`
+- `apps/web/app/components/edit/EditMaskAdjustments.vue`
+
+**Files Modified** (1):
+- `apps/web/app/components/edit/EditControlsPanel.vue`
+
+**Testing**:
+- All 362 core package tests pass
+- 1 web app unit test passes
+- All 28 E2E tests pass
+
+**Next Steps**:
+- Phase 7.5: maskUtils.ts (coordinate conversions, hit detection, rendering)
+- Phase 7.6: useMaskOverlay.ts (canvas interaction composable)
+- Phase 7.7: EditPreviewCanvas integration (overlay canvas layer)
+- Phase 7.8: Create mask factory functions
+
+---
+
