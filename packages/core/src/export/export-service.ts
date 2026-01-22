@@ -143,6 +143,7 @@ export class ExportService {
 
         result.successCount++
       } catch (error) {
+        console.error(`[ExportService] Failed to export "${asset.filename}":`, error)
         result.failureCount++
         result.failures.push({
           assetId: asset.id,

@@ -105,10 +105,136 @@ export function useExport() {
   // ============================================================================
 
   /**
+   * Generate synthetic JPEG bytes for demo mode.
+   * Creates a canvas with a gradient and converts to JPEG.
+   */
+  async function generateDemoImageBytes(asset: Asset): Promise<Uint8Array> {
+    // Extract index from asset id (e.g., "demo-25" -> 25)
+    const indexMatch = asset.id.match(/\d+$/)
+    const index = indexMatch ? parseInt(indexMatch[0], 10) : 0
+
+    // Create canvas for generating synthetic image
+    const canvas = document.createElement('canvas')
+    const size = 1024 // Generate at reasonable resolution
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+
+    // Generate deterministic variations based on index
+    const hueBase = (index * 37) % 360
+    const pattern = index % 5
+
+    // Create gradient background
+    const gradient = ctx.createLinearGradient(0, 0, size, size)
+    gradient.addColorStop(0, `hsl(${hueBase}, 70%, 50%)`)
+    gradient.addColorStop(0.5, `hsl(${(hueBase + 60) % 360}, 60%, 40%)`)
+    gradient.addColorStop(1, `hsl(${(hueBase + 120) % 360}, 50%, 30%)`)
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, size, size)
+
+    // Add visual patterns for variety
+    ctx.globalAlpha = 0.3
+    switch (pattern) {
+      case 0: // Circles
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath()
+          ctx.arc(
+            size * (0.2 + (i * 0.15)),
+            size * (0.3 + (i * 0.1)),
+            size * (0.1 + (i * 0.05)),
+            0,
+            Math.PI * 2,
+          )
+          ctx.fillStyle = `hsl(${(hueBase + i * 30) % 360}, 80%, 70%)`
+          ctx.fill()
+        }
+        break
+      case 1: // Diagonal stripes
+        ctx.strokeStyle = `hsl(${(hueBase + 180) % 360}, 60%, 60%)`
+        ctx.lineWidth = size * 0.02
+        for (let i = -size; i < size * 2; i += size * 0.1) {
+          ctx.beginPath()
+          ctx.moveTo(i, 0)
+          ctx.lineTo(i + size, size)
+          ctx.stroke()
+        }
+        break
+      case 2: // Squares
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = `hsl(${(hueBase + i * 45) % 360}, 70%, 60%)`
+          ctx.fillRect(
+            size * (0.1 + (i * 0.2)),
+            size * (0.15 + (i * 0.15)),
+            size * 0.3,
+            size * 0.3,
+          )
+        }
+        break
+      case 3: // Radial gradient overlay
+        const radialGradient = ctx.createRadialGradient(
+          size / 2, size / 2, 0,
+          size / 2, size / 2, size / 2,
+        )
+        radialGradient.addColorStop(0, `hsla(${(hueBase + 180) % 360}, 80%, 70%, 0.8)`)
+        radialGradient.addColorStop(1, 'transparent')
+        ctx.fillStyle = radialGradient
+        ctx.fillRect(0, 0, size, size)
+        break
+      case 4: // Triangles
+        ctx.fillStyle = `hsl(${(hueBase + 90) % 360}, 70%, 65%)`
+        ctx.beginPath()
+        ctx.moveTo(size * 0.5, size * 0.1)
+        ctx.lineTo(size * 0.9, size * 0.9)
+        ctx.lineTo(size * 0.1, size * 0.9)
+        ctx.closePath()
+        ctx.fill()
+        break
+    }
+
+    ctx.globalAlpha = 1.0
+
+    // Add text label with asset info
+    ctx.fillStyle = 'white'
+    ctx.font = `bold ${size * 0.05}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.shadowColor = 'black'
+    ctx.shadowBlur = 4
+    ctx.fillText(`Demo Image ${index + 1}`, size / 2, size * 0.95)
+
+    // Convert canvas to JPEG bytes
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Failed to create JPEG blob'))
+            return
+          }
+          blob.arrayBuffer().then(
+            buffer => resolve(new Uint8Array(buffer)),
+            reject,
+          )
+        },
+        'image/jpeg',
+        0.92,
+      )
+    })
+  }
+
+  /**
    * Load raw image bytes for an asset.
-   * Uses the catalog service's folder handle to navigate to the file.
+   * In demo mode, generates synthetic JPEG bytes.
+   * In real mode, uses the catalog service's folder handle to navigate to the file.
    */
   async function loadImageBytes(asset: Asset): Promise<Uint8Array> {
+    const config = useRuntimeConfig()
+    const isDemoMode = config.public.demoMode
+
+    // Demo mode: generate synthetic image bytes
+    if (isDemoMode) {
+      return generateDemoImageBytes(asset)
+    }
+
+    // Real mode: load from file system
     const folder = catalogService.getCurrentFolder()
     if (!folder) {
       throw new Error('No folder selected')
@@ -305,16 +431,23 @@ export function useExport() {
         })
       }
       else if (result.successCount > 0) {
+        // Log detailed failures to console
+        console.warn('[Export] Some exports failed:', result.failures)
+        const failedFiles = result.failures.slice(0, 3).map(f => f.filename).join(', ')
+        const moreText = result.failures.length > 3 ? ` and ${result.failures.length - 3} more` : ''
         toast.add({
           title: 'Export completed with errors',
-          description: `${result.successCount} succeeded, ${result.failureCount} failed`,
+          description: `${result.successCount} succeeded, ${result.failureCount} failed (${failedFiles}${moreText}). Check console for details.`,
           color: 'warning',
         })
       }
       else {
+        // Log detailed failures to console
+        console.error('[Export] All exports failed:', result.failures)
+        const firstError = result.failures[0]?.error || 'Unknown error'
         toast.add({
           title: 'Export failed',
-          description: `All ${result.failureCount} images failed to export`,
+          description: `All ${result.failureCount} images failed to export. Error: ${firstError}`,
           color: 'error',
         })
       }

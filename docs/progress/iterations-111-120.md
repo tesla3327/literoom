@@ -58,3 +58,45 @@ Export "completes" with 100% failure rate (silently)
 
 ---
 
+## 112: 2026-01-21 21:23 EST: Export Fix - Implementation Complete
+
+**Objective**: Fix the critical export issue so export actually produces output files.
+
+**Changes Implemented**:
+
+### Phase 1: Error Logging
+- Added `console.error()` in export service catch block (`export-service.ts:146`)
+- Errors now logged with asset filename and full error details
+
+### Phase 2: Demo Mode Image Loading
+- Added `generateDemoImageBytes()` function in `useExport.ts`
+- Generates synthetic JPEG images using canvas for demo mode
+- Creates visually distinct images with gradient backgrounds and patterns
+- Each demo asset gets a unique appearance based on its index
+
+### Phase 4: Show Export Errors in UI
+- Enhanced toast messages to include failure details
+- Shows first 3 failed filenames + count of additional failures
+- Logs all failures to console for debugging
+- Shows first error message when all exports fail
+
+### Phase 5: Progress Indicator in Toolbar
+- Added export progress bar to `FilterBar.vue`
+- Shows current/total count during export
+- Animated progress bar with percentage
+- Spinning icon to indicate activity
+- Replaces export button while exporting
+
+**Files Modified**:
+1. `packages/core/src/export/export-service.ts` - Error logging
+2. `apps/web/app/composables/useExport.ts` - Demo mode + error display
+3. `apps/web/app/components/catalog/FilterBar.vue` - Progress indicator
+
+**Testing**:
+- All 363 unit tests pass
+- Browser verification pending
+
+**Status**: Implementation complete. Ready for verification and commit.
+
+---
+

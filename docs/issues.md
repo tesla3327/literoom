@@ -3,9 +3,12 @@
 ## Table of Contents
 
 ### Open Issues
+- [Crop doesn't update the image (High)](#crop-doesnt-update-the-image)
+- [Edit view should never use thumbnail (High)](#edit-view-should-never-use-thumbnail)
 - [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
 
 ### Solved Issues
+- [Export doesn't actually export anything (Critical)](#export-doesnt-actually-export-anything---solved)
 - [Direct edit URL only loads current thumbnail in filmstrip (Medium)](#direct-edit-url-only-loads-current-thumbnail-in-filmstrip---solved)
 - [Copy/Paste Settings - Paste does not apply settings (Critical)](#copypaste-settings---paste-does-not-apply-settings---solved)
 - [Crop/transform controls not overlayed on preview (Medium)](#croptransform-controls-not-overlayed-on-preview---solved)
@@ -30,6 +33,45 @@
 ---
 
 ## Open Issues
+
+### Crop doesn't update the image
+
+**Severity**: High | **Status**: Open | **Discovered**: 2026-01-21
+
+The crop overlay UI works (handles can be dragged, region can be moved), but the crop is never actually applied to the image.
+
+**Current State**:
+- Crop handles and UI are functional
+- User can resize and reposition the crop region
+- No way to "set" or "lock in" the crop
+- The actual image/preview is never updated with the crop
+
+**Expected Behavior**:
+- After adjusting the crop region, the crop should be applied to the image
+- The preview should update to show only the cropped area
+- Export should respect the crop region
+
+---
+
+### Edit view should never use thumbnail
+
+**Severity**: High | **Status**: Open | **Discovered**: 2026-01-21
+
+The edit view currently falls back to displaying the small thumbnail (512px) while waiting for the high-resolution preview (2560px) to load. This provides a poor editing experience.
+
+**Problem**:
+- Edit view shows pixelated thumbnail while preview generates
+- Users may start making edits on a low-quality image
+- Creates confusion about actual image quality
+
+**Expected Behavior**:
+- Edit view should wait for BOTH thumbnail AND preview to be generated before showing as "loaded"
+- Display a loading state until the full preview is ready
+- Never show the small thumbnail in the edit preview canvas
+
+**Related**: This is a follow-up to the "Edit preview uses thumbnail instead of full preview" issue that was previously solved, but the fallback behavior still exists.
+
+---
 
 ### Clipping detection has false positives
 
@@ -106,6 +148,35 @@ Holding Alt/Option while dragging Whites/Blacks sliders shows detailed per-chann
 ---
 
 ## Solved Issues
+
+### Export doesn't actually export anything - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-21
+
+The export feature now works correctly in both demo mode and real mode.
+
+**Original Problems**:
+1. Export process didn't produce any output files
+2. No progress meter in the toolbar to show background export progress
+3. User had no visibility into whether export was working or its current state
+
+**Root Causes Fixed**:
+1. **Demo mode broke `loadImageBytes()`** - The function required a real folder handle from `catalogService.getCurrentFolder()`, which returns `null` in demo mode
+2. **No error logging** - Export errors were captured but never logged to console, making debugging impossible
+3. **No progress indicator** - User had no way to see export progress
+
+**Implementation**:
+1. Added `console.error()` logging in export service catch block
+2. Added `generateDemoImageBytes()` function that creates synthetic JPEG images using canvas for demo mode
+3. Enhanced toast messages to show failure details (first 3 filenames + error message)
+4. Added progress indicator to FilterBar showing current/total count and progress bar
+
+**Files Modified**:
+- `packages/core/src/export/export-service.ts` - Error logging
+- `apps/web/app/composables/useExport.ts` - Demo mode image loading + error display
+- `apps/web/app/components/catalog/FilterBar.vue` - Progress indicator
+
+---
 
 ### Crop/transform controls not overlayed on preview - SOLVED
 

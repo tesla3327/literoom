@@ -131,10 +131,32 @@ function setSort(field: SortField, direction: SortDirection): void {
       </UButton>
     </div>
 
-    <!-- Right side: Export button + Sort dropdown -->
+    <!-- Right side: Export progress/button + Sort dropdown -->
     <div class="flex items-center gap-2">
-      <!-- Export button -->
+      <!-- Export progress indicator (shown during export) -->
+      <div
+        v-if="exportStore.isExporting"
+        class="flex items-center gap-2 px-3 py-1 rounded-md bg-gray-800"
+        data-testid="export-progress"
+      >
+        <UIcon
+          name="i-heroicons-arrow-path"
+          class="w-4 h-4 animate-spin text-primary-400"
+        />
+        <span class="text-sm text-gray-300">
+          Exporting {{ exportStore.progress?.current ?? 0 }}/{{ exportStore.progress?.total ?? 0 }}
+        </span>
+        <div class="w-24 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+          <div
+            class="h-full bg-primary-500 transition-all duration-200"
+            :style="{ width: `${exportStore.progressPercent}%` }"
+          />
+        </div>
+      </div>
+
+      <!-- Export button (hidden during export) -->
       <UButton
+        v-else
         variant="ghost"
         size="sm"
         icon="i-heroicons-arrow-up-tray"
