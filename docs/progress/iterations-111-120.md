@@ -183,5 +183,77 @@ The issue was a **misunderstanding of expected behavior**, not a bug. The app fo
 
 ---
 
+## 115: 2026-01-21 21:41 EST: Local Masks UI - Research Complete
+
+**Objective**: Research and plan implementation of Local Masks UI (Phase 7).
+
+**Background**:
+- Phases 1-6 of local masks are complete (TypeScript types, Rust implementation, WASM bindings, worker integration, edit store, preview pipeline)
+- Phase 7 requires creating the UI components for creating and editing linear/radial gradient masks
+- This is a core v1 feature per spec section 3.5.1
+
+**Research Summary** (from 4 parallel agents):
+
+1. **Edit Store API** - Fully implemented:
+   - `masks` ref (MaskStack | null)
+   - `selectedMaskId` ref
+   - Actions: addLinearMask, addRadialMask, updateLinearMask, updateRadialMask, deleteMask, toggleMaskEnabled, selectMask, setMaskAdjustments, setMaskAdjustment, resetMasks, setMasks
+   - Computed: hasMaskModifications, selectedMask
+
+2. **EditControlsPanel Pattern** - UAccordion with 3 sections (Basic, Tone Curve, Crop & Transform)
+   - Watch on accordion expansion triggers tool activation
+   - Follow same pattern for masks section
+
+3. **Crop Overlay Pattern** - `useCropOverlay.ts` + `cropUtils.ts`
+   - Local state + debounced store sync
+   - Handle hit detection with 20px hit radius
+   - State machine for drag vs hover vs move
+   - Canvas layering with z-index
+
+4. **Mask Types** - Already defined in types.ts:
+   - LinearGradientMask: id, start, end, feather, enabled, adjustments
+   - RadialGradientMask: id, center, radiusX, radiusY, rotation, feather, invert, enabled, adjustments
+   - MaskAdjustments: All adjustments except toneCurve
+
+**Documents Created**:
+- `docs/research/2026-01-21-local-masks-ui-synthesis.md`
+
+**Status**: Research complete. Creating implementation plan.
+
+---
+
+## 116: 2026-01-21 21:55 EST: Local Masks UI - Implementation Plan Created
+
+**Objective**: Create detailed implementation plan for Local Masks UI (Phase 7).
+
+**Implementation Plan Summary** (8 sub-phases):
+
+| Phase | Description | Complexity |
+|-------|-------------|------------|
+| 7.1 | Edit UI Store Extensions (mask tool state) | Low |
+| 7.2 | EditMaskPanel.vue (mask list, add/delete buttons) | Medium |
+| 7.3 | EditMaskAdjustments.vue (per-mask sliders) | Medium |
+| 7.4 | Integrate into EditControlsPanel accordion | Low |
+| 7.5 | maskUtils.ts (coordinates, hit detection, rendering) | Medium |
+| 7.6 | useMaskOverlay.ts (canvas interaction composable) | High |
+| 7.7 | EditPreviewCanvas integration (overlay canvas layer) | Low |
+| 7.8 | Create mask factory functions | Low |
+
+**Files to Create** (4):
+- `apps/web/app/components/edit/EditMaskPanel.vue`
+- `apps/web/app/components/edit/EditMaskAdjustments.vue`
+- `apps/web/app/composables/maskUtils.ts`
+- `apps/web/app/composables/useMaskOverlay.ts`
+
+**Files to Modify** (3):
+- `apps/web/app/stores/editUI.ts`
+- `apps/web/app/components/edit/EditControlsPanel.vue`
+- `apps/web/app/components/edit/EditPreviewCanvas.vue`
+
+**Documents Created**:
+- `docs/plans/2026-01-21-local-masks-ui-plan.md`
+
+**Status**: Plan created. Ready to begin implementation with Phase 7.1.
+
 ---
 
