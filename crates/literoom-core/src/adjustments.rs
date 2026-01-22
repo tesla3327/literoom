@@ -64,6 +64,42 @@ pub fn apply_all_adjustments(pixels: &mut [u8], adjustments: &BasicAdjustments) 
     }
 }
 
+/// Apply all adjustments to a single pixel.
+///
+/// This is used by the mask module for per-pixel blending of adjusted colors.
+///
+/// # Arguments
+/// * `r`, `g`, `b` - Input RGB values (0.0 to 1.0)
+/// * `adjustments` - The adjustment values to apply
+///
+/// # Returns
+/// Tuple of (r, g, b) with adjustments applied (not clamped)
+#[inline]
+pub fn apply_adjustments_to_pixel(
+    r: f32,
+    g: f32,
+    b: f32,
+    adjustments: &BasicAdjustments,
+) -> (f32, f32, f32) {
+    let (mut r, mut g, mut b) = (r, g, b);
+
+    // Apply adjustments in order
+    (r, g, b) = apply_exposure(r, g, b, adjustments.exposure);
+    (r, g, b) = apply_contrast(r, g, b, adjustments.contrast);
+    (r, g, b) = apply_temperature(r, g, b, adjustments.temperature);
+    (r, g, b) = apply_tint(r, g, b, adjustments.tint);
+
+    let luminance = calculate_luminance(r, g, b);
+    (r, g, b) = apply_highlights(r, g, b, luminance, adjustments.highlights);
+    (r, g, b) = apply_shadows(r, g, b, luminance, adjustments.shadows);
+    (r, g, b) = apply_whites(r, g, b, adjustments.whites);
+    (r, g, b) = apply_blacks(r, g, b, adjustments.blacks);
+    (r, g, b) = apply_saturation(r, g, b, adjustments.saturation);
+    (r, g, b) = apply_vibrance(r, g, b, adjustments.vibrance);
+
+    (r, g, b)
+}
+
 /// Apply exposure adjustment.
 ///
 /// Exposure is measured in stops (-5 to +5).

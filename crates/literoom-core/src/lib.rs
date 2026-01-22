@@ -8,9 +8,11 @@ pub mod curve;
 pub mod decode;
 pub mod encode;
 pub mod histogram;
+pub mod mask;
 pub mod transform;
 
 pub use curve::{apply_tone_curve, evaluate_curve, ToneCurveLut};
+pub use mask::{apply_masked_adjustments, LinearGradientMask, RadialGradientMask};
 pub use transform::{apply_crop, apply_rotation, compute_rotated_bounds, InterpolationFilter};
 
 /// Basic adjustments for image editing

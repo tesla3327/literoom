@@ -278,3 +278,65 @@ Phase 6 integrates the export modal into the catalog page and adds keyboard shor
 
 ---
 
+## 107: 2026-01-21 19:46 EST: Local Masks - Phase 2 Complete (Rust Implementation)
+
+**Objective**: Implement mask evaluation algorithms and masked adjustment application in Rust.
+
+**Background**: Phase 1 added TypeScript types for masks. Phase 2 implements the Rust core functionality for evaluating mask strength at pixel coordinates and applying masked adjustments.
+
+**Implementation**:
+
+1. **Created `crates/literoom-core/src/mask/mod.rs`**:
+   - `smootherstep(t)` function for smooth feathering transitions
+   - Module re-exports for `LinearGradientMask`, `RadialGradientMask`, `apply_masked_adjustments`
+   - Unit tests for smootherstep boundaries, monotonicity, symmetry
+
+2. **Created `crates/literoom-core/src/mask/linear.rs`**:
+   - `LinearGradientMask` struct with `start_x`, `start_y`, `end_x`, `end_y`, `feather`
+   - `evaluate(x, y)` method returns mask strength (0.0-1.0)
+   - Algorithm: projects point onto gradient line, applies feathering centered at midpoint
+   - Helper methods: `length()`, `angle()`
+   - 13 unit tests covering endpoints, diagonals, hard edges, degenerate cases
+
+3. **Created `crates/literoom-core/src/mask/radial.rs`**:
+   - `RadialGradientMask` struct with `center_x`, `center_y`, `radius_x`, `radius_y`, `rotation`, `feather`, `invert`
+   - `evaluate(x, y)` method with rotation support and invert option
+   - `circle()` helper for circular masks
+   - Helper methods: `area()`, `contains()`
+   - 14 unit tests covering circles, ellipses, rotation, inversion
+
+4. **Created `crates/literoom-core/src/mask/apply.rs`**:
+   - `apply_masked_adjustments(pixels, width, height, linear_masks, radial_masks)` function
+   - Iterates over pixels, evaluates each mask, blends adjusted colors
+   - Early exit optimizations for empty masks and zero mask values
+   - 13 unit tests covering exposure, saturation, multiple masks, feathering
+
+5. **Added `apply_adjustments_to_pixel()` to `adjustments.rs`**:
+   - Public function for per-pixel adjustment processing
+   - Used by mask module for blending adjusted colors
+
+6. **Updated `crates/literoom-core/src/lib.rs`**:
+   - Added `pub mod mask;`
+   - Added re-exports: `apply_masked_adjustments`, `LinearGradientMask`, `RadialGradientMask`
+
+**Files Created** (4 files):
+- `crates/literoom-core/src/mask/mod.rs`
+- `crates/literoom-core/src/mask/linear.rs`
+- `crates/literoom-core/src/mask/radial.rs`
+- `crates/literoom-core/src/mask/apply.rs`
+
+**Files Modified** (2 files):
+- `crates/literoom-core/src/lib.rs` - Added mask module export
+- `crates/literoom-core/src/adjustments.rs` - Added `apply_adjustments_to_pixel()` function
+
+**Tests**: All 184 literoom-core tests pass (142 existing + 42 new mask tests).
+
+**Key Algorithms**:
+- **Linear mask**: Project point onto line, normalize position (0=start, 1=end), apply feathering centered at 0.5
+- **Radial mask**: Translate/rotate to local space, compute normalized ellipse distance, apply feathering from inner to edge
+- **Smootherstep**: `6t⁵ - 15t⁴ + 10t³` for zero velocity/acceleration at boundaries
+
+**Status**: Complete. Phase 2 done. Next: Phase 3 (WASM Bindings).
+
+---
+
