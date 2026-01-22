@@ -67,3 +67,38 @@ Launched 4 parallel research agents to investigate:
 
 ---
 
+## 132: 2026-01-22 10:09 EST: Import UX Improvements - Implementation Plan Created
+
+**Objective**: Create an implementation plan for improving the import experience based on completed research.
+
+**Plan Created**: `docs/plans/2026-01-22-import-ux-plan.md`
+
+**Implementation Phases**:
+
+| Phase | Description | Effort |
+|-------|-------------|--------|
+| 1 | Thumbnail Progress Tracking (computed properties in catalog store) | 30 min |
+| 2 | Progress Indicator in FilterBar (visual feedback) | 30 min |
+| 3 | First-Page Thumbnail Wait (wait before showing gallery) | 1 hour |
+| 4 | Fix Priority System (use ThumbnailPriority enum) | 30 min |
+| 5 | Dynamic Priority with IntersectionObserver | 1 hour |
+| 6 | Loading State Enhancement (optional polish) | 30 min |
+
+**Total Estimated Effort**: ~4 hours
+
+**Key Changes**:
+1. Add `thumbnailProgress`, `thumbnailPercent`, `isProcessingThumbnails` computed to catalog store
+2. Show progress indicator in FilterBar during thumbnail generation
+3. Wait for first ~20 thumbnails before transitioning to gallery view
+4. Use proper `ThumbnailPriority` enum values (VISIBLE=0, PRELOAD=2) instead of array indices
+5. Integrate IntersectionObserver with priority updates for scroll-based prioritization
+
+**Success Criteria**:
+- Gallery shows thumbnails, not loading placeholders, when users enter
+- Progress indicator shows during thumbnail generation
+- First-page thumbnails load within 2-3 seconds
+
+**Status**: Complete - Ready for implementation
+
+---
+
