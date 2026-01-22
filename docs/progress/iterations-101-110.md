@@ -340,3 +340,62 @@ Phase 6 integrates the export modal into the catalog page and adds keyboard shor
 
 ---
 
+## 108: 2026-01-21 20:42 EST: Local Masks - Phase 3 Complete (WASM Bindings)
+
+**Objective**: Expose mask operations to JavaScript via WASM bindings.
+
+**Background**: Phase 2 implemented the Rust mask evaluation algorithms. Phase 3 creates the WASM bindings so TypeScript/JavaScript can call `apply_masked_adjustments()`.
+
+**Implementation**:
+
+1. **Created `crates/literoom-wasm/src/mask.rs`**:
+   - `JsMaskStack` struct containing arrays of linear and radial masks
+   - `JsLinearMask` struct with start/end points, feather, enabled flag, adjustments
+   - `JsRadialMask` struct with center, radii, rotation (degrees), feather, invert, enabled, adjustments
+   - `JsAdjustments` struct with all 10 basic adjustments (serde defaults to 0)
+   - `apply_masked_adjustments(image, mask_data)` WASM-bound function
+   - Conversion from JS structs to core mask types
+   - Rotation converted from degrees to radians automatically
+
+2. **Updated `crates/literoom-wasm/src/lib.rs`**:
+   - Added `mod mask;` declaration
+   - Added `pub use mask::apply_masked_adjustments;` re-export
+
+**Files Created** (1 file):
+- `crates/literoom-wasm/src/mask.rs`
+
+**Files Modified** (1 file):
+- `crates/literoom-wasm/src/lib.rs` - Added mask module and re-export
+
+**Tests**: All 44 literoom-wasm tests pass (39 existing + 5 new mask tests).
+
+**WASM Build**: Successfully built and exported to `packages/wasm/`.
+
+**TypeScript Signature**:
+```typescript
+export function apply_masked_adjustments(
+  image: JsDecodedImage,
+  mask_data: any  // JsMaskStack structure
+): JsDecodedImage;
+```
+
+**Usage Example** (TypeScript):
+```typescript
+const maskStack = {
+  linear_masks: [{
+    start_x: 0.0, start_y: 0.5,
+    end_x: 1.0, end_y: 0.5,
+    feather: 0.5,
+    enabled: true,
+    adjustments: { exposure: 1.0 }
+  }],
+  radial_masks: []
+};
+
+const result = apply_masked_adjustments(sourceImage, maskStack);
+```
+
+**Status**: Complete. Phase 3 done. Next: Phase 4 (Worker Integration).
+
+---
+

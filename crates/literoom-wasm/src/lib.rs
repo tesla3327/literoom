@@ -31,6 +31,7 @@ mod curve;
 mod decode;
 mod encode;
 mod histogram;
+mod mask;
 mod transform;
 mod types;
 
@@ -43,6 +44,7 @@ pub use decode::{
 };
 pub use encode::{encode_jpeg, encode_jpeg_from_image};
 pub use histogram::{compute_histogram, JsHistogram};
+pub use mask::apply_masked_adjustments;
 pub use transform::{apply_crop, apply_rotation};
 pub use types::JsDecodedImage;
 
