@@ -5,7 +5,7 @@
  * enabling parallel thumbnail generation across CPU cores.
  */
 
-import type { DecodeRequest, DecodeResponse } from './worker-messages'
+import type { DecodeRequest, DecodeResponse, MaskStackData } from './worker-messages'
 import type {
   DecodedImage,
   DecodeServiceState,
@@ -454,6 +454,26 @@ export class DecodeWorkerPool implements IDecodeService {
       width,
       height,
       quality
+    }, workerId)
+  }
+
+  /**
+   * Apply masked adjustments (local adjustments) to image pixel data.
+   */
+  async applyMaskedAdjustments(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    maskStack: MaskStackData
+  ): Promise<DecodedImage> {
+    const workerId = this.getLeastBusyWorker()
+    return this.sendRequest({
+      id: this.generateId(workerId),
+      type: 'apply-masked-adjustments',
+      pixels,
+      width,
+      height,
+      maskStack
     }, workerId)
   }
 

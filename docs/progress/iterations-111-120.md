@@ -100,3 +100,36 @@ Export "completes" with 100% failure rate (silently)
 
 ---
 
+## 113: 2026-01-21 21:28 EST: Local Masks - Phase 6 (Preview Pipeline Integration)
+
+**Objective**: Integrate mask rendering into the preview pipeline so masks actually affect the displayed image.
+
+**Background**: Phases 1-5 of local masks are complete:
+- Phase 1: TypeScript types and schema (v4)
+- Phase 2: Rust mask evaluation algorithms
+- Phase 3: WASM bindings for `apply_masked_adjustments`
+- Phase 4: Worker integration
+- Phase 5: Edit store state management
+
+The preview pipeline needs to call the mask processing step after global adjustments and tone curve.
+
+**Status**: Complete
+
+**Changes Made**:
+1. **useEditPreview.ts**: Integrated masks into the preview pipeline
+   - Added `MaskStackData` import from `@literoom/core/decode`
+   - Added `hasMasks` check alongside `hasAdjustments` and `hasTransforms`
+   - Added Step 5: Apply masked adjustments after tone curve, converting `editStore.masks` to `MaskStackData` format
+   - Added watcher for `editStore.masks` changes to trigger throttled re-render
+   - Updated pipeline order comment to document the complete flow: Rotate -> Crop -> Adjustments -> Tone Curve -> Masked Adjustments
+
+2. **decode-worker-pool.ts**: Added missing `applyMaskedAdjustments` method
+   - Imported `MaskStackData` type
+   - Implemented load-balanced `applyMaskedAdjustments` matching `IDecodeService` interface
+
+**Testing**: All 362 unit tests pass. The integration connects the existing mask state management (Phase 5) to the WASM mask processing (Phases 2-4).
+
+**Next Steps**: Phase 7 (Mask UI) will add the UI components for creating and editing masks in the edit view.
+
+---
+

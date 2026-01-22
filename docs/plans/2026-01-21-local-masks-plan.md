@@ -1351,7 +1351,7 @@ function pasteSettings(): void {
 | Phase 3 | WASM Bindings | 2 | Complete |
 | Phase 4 | Worker Integration | 5 | Complete |
 | Phase 5 | Edit Store Integration | 1 | Complete |
-| Phase 6 | Preview Pipeline Integration | 1 | Pending |
+| Phase 6 | Preview Pipeline Integration | 2 | Complete |
 | Phase 7 | Mask Editor UI | 7 | Pending |
 | Phase 8 | Copy/Paste Integration | 3 | Pending |
 | Phase 9 | Testing and Polish | 3 | Pending |

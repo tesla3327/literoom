@@ -9,10 +9,11 @@
  *   (first update is immediate, subsequent ones rate-limited)
  * - Provides draft/full render quality indicators
  *
- * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+ * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve -> Masked Adjustments
  */
 import type { Ref } from 'vue'
 import type { Adjustments } from '@literoom/core/catalog'
+import type { MaskStackData } from '@literoom/core/decode'
 import {
   hasModifiedAdjustments,
   isModifiedToneCurve,
@@ -399,7 +400,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /**
    * Render the preview with current transforms and adjustments.
    *
-   * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve
+   * Transform order: Rotate -> Crop -> Adjustments -> Tone Curve -> Masked Adjustments
    *
    * @param quality - 'draft' for fast render during drag, 'full' for high quality
    */
@@ -447,13 +448,17 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         toneCurve: editStore.adjustments.toneCurve,
       }
 
-      // Check if any adjustments or transforms are non-default
+      // Check if any adjustments, transforms, or masks are non-default
       const hasAdjustments = hasModifiedAdjustments(adjustments)
       const hasTransforms = isModifiedCropTransform(editStore.cropTransform)
+      // Check masks separately since editStore.masks is readonly
+      const hasMasks = editStore.masks
+        ? (editStore.masks.linearMasks.length > 0 || editStore.masks.radialMasks.length > 0)
+        : false
 
       let resultUrl: string
 
-      if (!hasAdjustments && !hasTransforms) {
+      if (!hasAdjustments && !hasTransforms && !hasMasks) {
         // No adjustments or transforms, use source directly (borrowed URL)
         resultUrl = sourceUrl.value!
         isPreviewUrlOwned.value = false
@@ -529,11 +534,48 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           currentHeight = curveResult.height
         }
 
-        // ===== STEP 5: Detect clipping for overlay =====
+        // ===== STEP 5: Apply masked adjustments (local adjustments) =====
+        if (hasMasks && editStore.masks) {
+          const maskStack: MaskStackData = {
+            linearMasks: editStore.masks.linearMasks.map(m => ({
+              startX: m.start.x,
+              startY: m.start.y,
+              endX: m.end.x,
+              endY: m.end.y,
+              feather: m.feather,
+              enabled: m.enabled,
+              adjustments: m.adjustments,
+            })),
+            radialMasks: editStore.masks.radialMasks.map(m => ({
+              centerX: m.center.x,
+              centerY: m.center.y,
+              radiusX: m.radiusX,
+              radiusY: m.radiusY,
+              rotation: m.rotation,
+              feather: m.feather,
+              invert: m.invert,
+              enabled: m.enabled,
+              adjustments: m.adjustments,
+            })),
+          }
+
+          console.log('[useEditPreview] Applying masked adjustments:', maskStack)
+          const maskedResult = await $decodeService.applyMaskedAdjustments(
+            currentPixels,
+            currentWidth,
+            currentHeight,
+            maskStack,
+          )
+          currentPixels = maskedResult.pixels
+          currentWidth = maskedResult.width
+          currentHeight = maskedResult.height
+        }
+
+        // ===== STEP 6: Detect clipping for overlay =====
         clippingMap.value = detectClippedPixels(currentPixels, currentWidth, currentHeight)
         previewDimensions.value = { width: currentWidth, height: currentHeight }
 
-        // ===== STEP 6: Store adjusted pixels for histogram =====
+        // ===== STEP 7: Store adjusted pixels for histogram =====
         adjustedPixels.value = currentPixels
         adjustedDimensions.value = { width: currentWidth, height: currentHeight }
 
@@ -606,6 +648,20 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
    */
   watch(
     () => editStore.cropTransform,
+    () => {
+      if (sourceCache.value) {
+        throttledRender()
+      }
+    },
+    { deep: true },
+  )
+
+  /**
+   * Watch for mask changes and trigger throttled render.
+   * Deep watch to catch mask position, adjustments, and enabled state changes.
+   */
+  watch(
+    () => editStore.masks,
     () => {
       if (sourceCache.value) {
         throttledRender()
