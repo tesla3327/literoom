@@ -232,3 +232,49 @@ Phase 6 integrates the export modal into the catalog page and adds keyboard shor
 
 ---
 
+## 106: 2026-01-21 19:42 EST: Local Masks - Phase 1 Complete (TypeScript Types)
+
+**Objective**: Implement Phase 1 of the Local Masks feature - TypeScript types and schema.
+
+**Background**: The implementation plan for local masks was created in iteration 105. Phase 1 adds the core TypeScript types that will be used throughout the feature.
+
+**Implementation**:
+
+1. **Updated `EDIT_SCHEMA_VERSION` to 4**
+   - Added version history comment documenting v4 adds local masks
+
+2. **Added new types to `packages/core/src/catalog/types.ts`**:
+   - `Point2D` - 2D point in normalized coordinates
+   - `MaskAdjustments` - Adjustments applicable to mask regions (no toneCurve)
+   - `LinearGradientMask` - Linear gradient mask with start/end points, feather
+   - `RadialGradientMask` - Radial/elliptical mask with center, radii, rotation, invert
+   - `MaskStack` - Container for all masks on an asset
+
+3. **Added helper functions**:
+   - `createDefaultMaskStack()` - Create empty mask stack
+   - `createLinearMask()` - Create linear mask with defaults
+   - `createRadialMask()` - Create radial mask with defaults
+   - `isModifiedMaskStack()` - Check if masks differ from default
+   - `cloneMaskStack()` - Deep copy mask stack
+   - `cloneLinearMask()` - Deep copy linear mask
+   - `cloneRadialMask()` - Deep copy radial mask
+   - `migrateEditState()` - Migrate from previous schema versions
+
+4. **Updated `EditState` interface**:
+   - Added optional `masks?: MaskStack` field
+
+5. **Added 46 new unit tests**:
+   - Tests for all new types and functions
+   - Migration tests for v1 → v4, v3 → v4
+   - Clone/immutability tests
+
+**Files Modified** (2 files):
+- `packages/core/src/catalog/types.ts` - Added mask types, helpers, migration
+- `packages/core/src/catalog/edit-types.test.ts` - Added 46 new tests
+
+**Tests**: All 362 tests pass (316 existing + 46 new).
+
+**Status**: Complete. Phase 1 done. Next: Phase 2 (Rust Mask Implementation).
+
+---
+

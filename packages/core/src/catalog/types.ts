@@ -540,8 +540,9 @@ export function getFilenameWithoutExtension(filename: string): string {
  * - v1: Initial version with basic adjustments
  * - v2: Added tone curve to adjustments
  * - v3: Added crop transform
+ * - v4: Added local masks (linear gradient, radial gradient)
  */
-export const EDIT_SCHEMA_VERSION = 3
+export const EDIT_SCHEMA_VERSION = 4
 
 /**
  * Basic image adjustments.
@@ -600,8 +601,8 @@ export interface EditState {
   adjustments: Adjustments
   /** Crop and rotation settings */
   cropTransform: CropTransform
-  // Future additions:
-  // masks?: Mask[]
+  /** Local adjustment masks (linear gradient, radial gradient) */
+  masks?: MaskStack
 }
 
 /**
@@ -760,4 +761,269 @@ export function cloneCropTransform(transform: CropTransform): CropTransform {
     crop: transform.crop ? { ...transform.crop } : null,
     rotation: { ...transform.rotation },
   }
+}
+
+// ============================================================================
+// Mask Types
+// ============================================================================
+
+/**
+ * 2D point in normalized coordinates (0-1).
+ */
+export interface Point2D {
+  x: number
+  y: number
+}
+
+/**
+ * Adjustments that can be applied to a mask region.
+ * Uses Partial<Adjustments> without toneCurve since masks don't support curves.
+ */
+export type MaskAdjustments = Partial<Omit<Adjustments, 'toneCurve'>>
+
+/**
+ * Linear gradient mask definition.
+ * Creates a gradient effect between two points with feathering.
+ * Effect is full (1.0) at the start point and zero at the end point.
+ */
+export interface LinearGradientMask {
+  /** Unique identifier (UUID) */
+  id: string
+  /** Start point in normalized coordinates (0-1), where effect is strongest */
+  start: Point2D
+  /** End point in normalized coordinates (0-1), where effect fades to zero */
+  end: Point2D
+  /** Feather amount (0-1, where 0 = hard edge, 1 = full gradient) */
+  feather: number
+  /** Whether mask is enabled */
+  enabled: boolean
+  /** Per-mask adjustments to apply in the masked region */
+  adjustments: MaskAdjustments
+}
+
+/**
+ * Radial gradient mask definition.
+ * Creates an elliptical gradient effect from center outward.
+ */
+export interface RadialGradientMask {
+  /** Unique identifier (UUID) */
+  id: string
+  /** Center point in normalized coordinates (0-1) */
+  center: Point2D
+  /** Horizontal radius (0-1 normalized to image width) */
+  radiusX: number
+  /** Vertical radius (0-1 normalized to image height) */
+  radiusY: number
+  /** Rotation angle in degrees */
+  rotation: number
+  /** Feather amount (0-1, where 0 = hard edge at ellipse boundary) */
+  feather: number
+  /** Whether effect is inside (false) or outside (true) the ellipse */
+  invert: boolean
+  /** Whether mask is enabled */
+  enabled: boolean
+  /** Per-mask adjustments to apply in the masked region */
+  adjustments: MaskAdjustments
+}
+
+/**
+ * Container for all masks on an asset.
+ * Masks are applied sequentially in their array order.
+ */
+export interface MaskStack {
+  /** Linear gradient masks (applied in order) */
+  linearMasks: LinearGradientMask[]
+  /** Radial gradient masks (applied in order) */
+  radialMasks: RadialGradientMask[]
+}
+
+/**
+ * Default empty mask stack.
+ */
+export const DEFAULT_MASK_STACK: Readonly<MaskStack> = Object.freeze({
+  linearMasks: [],
+  radialMasks: [],
+})
+
+/**
+ * Create a new empty mask stack.
+ */
+export function createDefaultMaskStack(): MaskStack {
+  return {
+    linearMasks: [],
+    radialMasks: [],
+  }
+}
+
+/**
+ * Create a new linear gradient mask with default settings.
+ */
+export function createLinearMask(
+  start: Point2D = { x: 0.3, y: 0.5 },
+  end: Point2D = { x: 0.7, y: 0.5 }
+): LinearGradientMask {
+  return {
+    id: crypto.randomUUID(),
+    start: { ...start },
+    end: { ...end },
+    feather: 0.5,
+    enabled: true,
+    adjustments: {},
+  }
+}
+
+/**
+ * Create a new radial gradient mask with default settings.
+ */
+export function createRadialMask(
+  center: Point2D = { x: 0.5, y: 0.5 },
+  radiusX: number = 0.3,
+  radiusY: number = 0.3
+): RadialGradientMask {
+  return {
+    id: crypto.randomUUID(),
+    center: { ...center },
+    radiusX,
+    radiusY,
+    rotation: 0,
+    feather: 0.3,
+    invert: false,
+    enabled: true,
+    adjustments: {},
+  }
+}
+
+/**
+ * Check if mask stack differs from default (i.e., has any masks).
+ */
+export function isModifiedMaskStack(masks: MaskStack | undefined): boolean {
+  if (!masks) return false
+  return masks.linearMasks.length > 0 || masks.radialMasks.length > 0
+}
+
+/**
+ * Create a deep copy of a mask stack.
+ */
+export function cloneMaskStack(masks: MaskStack): MaskStack {
+  return {
+    linearMasks: masks.linearMasks.map(m => ({
+      ...m,
+      start: { ...m.start },
+      end: { ...m.end },
+      adjustments: { ...m.adjustments },
+    })),
+    radialMasks: masks.radialMasks.map(m => ({
+      ...m,
+      center: { ...m.center },
+      adjustments: { ...m.adjustments },
+    })),
+  }
+}
+
+/**
+ * Create a deep copy of a linear gradient mask.
+ */
+export function cloneLinearMask(mask: LinearGradientMask): LinearGradientMask {
+  return {
+    ...mask,
+    start: { ...mask.start },
+    end: { ...mask.end },
+    adjustments: { ...mask.adjustments },
+  }
+}
+
+/**
+ * Create a deep copy of a radial gradient mask.
+ */
+export function cloneRadialMask(mask: RadialGradientMask): RadialGradientMask {
+  return {
+    ...mask,
+    center: { ...mask.center },
+    adjustments: { ...mask.adjustments },
+  }
+}
+
+// ============================================================================
+// Edit State Migration
+// ============================================================================
+
+/**
+ * Migrate edit state from previous schema versions to current version.
+ * Returns a new EditState object without modifying the input.
+ */
+export function migrateEditState(state: unknown): EditState {
+  // Handle null/undefined
+  if (!state || typeof state !== 'object') {
+    return createDefaultEditState()
+  }
+
+  const s = state as Record<string, unknown>
+
+  // Get current version (default to 1 for legacy states without version)
+  const version = typeof s.version === 'number' ? s.version : 1
+
+  // Already at current version
+  if (version === EDIT_SCHEMA_VERSION) {
+    return state as EditState
+  }
+
+  // Build migrated state progressively
+  let migrated: EditState = createDefaultEditState()
+
+  // v1 -> v2: Added tone curve (already in Adjustments)
+  if (version >= 1 && s.adjustments && typeof s.adjustments === 'object') {
+    const adj = s.adjustments as Record<string, unknown>
+    migrated.adjustments = {
+      ...migrated.adjustments,
+      temperature: typeof adj.temperature === 'number' ? adj.temperature : 0,
+      tint: typeof adj.tint === 'number' ? adj.tint : 0,
+      exposure: typeof adj.exposure === 'number' ? adj.exposure : 0,
+      contrast: typeof adj.contrast === 'number' ? adj.contrast : 0,
+      highlights: typeof adj.highlights === 'number' ? adj.highlights : 0,
+      shadows: typeof adj.shadows === 'number' ? adj.shadows : 0,
+      whites: typeof adj.whites === 'number' ? adj.whites : 0,
+      blacks: typeof adj.blacks === 'number' ? adj.blacks : 0,
+      vibrance: typeof adj.vibrance === 'number' ? adj.vibrance : 0,
+      saturation: typeof adj.saturation === 'number' ? adj.saturation : 0,
+    }
+
+    // Migrate tone curve if present
+    if (adj.toneCurve && typeof adj.toneCurve === 'object') {
+      const tc = adj.toneCurve as Record<string, unknown>
+      if (Array.isArray(tc.points)) {
+        migrated.adjustments.toneCurve = { points: tc.points }
+      }
+    }
+  }
+
+  // v3: Added crop transform
+  if (version >= 3 && s.cropTransform && typeof s.cropTransform === 'object') {
+    const ct = s.cropTransform as Record<string, unknown>
+
+    // Migrate crop
+    if (ct.crop && typeof ct.crop === 'object') {
+      const crop = ct.crop as Record<string, unknown>
+      migrated.cropTransform.crop = {
+        left: typeof crop.left === 'number' ? crop.left : 0,
+        top: typeof crop.top === 'number' ? crop.top : 0,
+        width: typeof crop.width === 'number' ? crop.width : 1,
+        height: typeof crop.height === 'number' ? crop.height : 1,
+      }
+    }
+
+    // Migrate rotation
+    if (ct.rotation && typeof ct.rotation === 'object') {
+      const rot = ct.rotation as Record<string, unknown>
+      migrated.cropTransform.rotation = {
+        angle: typeof rot.angle === 'number' ? rot.angle : 0,
+        straighten: typeof rot.straighten === 'number' ? rot.straighten : 0,
+      }
+    }
+  }
+
+  // v4: Added masks (new in current version, just ensure undefined for older states)
+  // Masks are optional and default to undefined
+  migrated.masks = undefined
+
+  return migrated
 }

@@ -3,17 +3,29 @@ import {
   EDIT_SCHEMA_VERSION,
   DEFAULT_ADJUSTMENTS,
   DEFAULT_CROP_TRANSFORM,
+  DEFAULT_MASK_STACK,
   createDefaultEditState,
+  createDefaultMaskStack,
+  createLinearMask,
+  createRadialMask,
   hasModifiedAdjustments,
   isModifiedToneCurve,
   isModifiedCropTransform,
+  isModifiedMaskStack,
   getTotalRotation,
   validateCropRectangle,
   cloneCropTransform,
+  cloneMaskStack,
+  cloneLinearMask,
+  cloneRadialMask,
+  migrateEditState,
   type Adjustments,
   type EditState,
   type CropRectangle,
   type CropTransform,
+  type MaskStack,
+  type LinearGradientMask,
+  type RadialGradientMask,
 } from './types'
 import { DEFAULT_TONE_CURVE } from '../decode/types'
 
@@ -23,8 +35,8 @@ describe('EDIT_SCHEMA_VERSION', () => {
     expect(Number.isInteger(EDIT_SCHEMA_VERSION)).toBe(true)
   })
 
-  it('is currently version 3', () => {
-    expect(EDIT_SCHEMA_VERSION).toBe(3)
+  it('is currently version 4', () => {
+    expect(EDIT_SCHEMA_VERSION).toBe(4)
   })
 })
 
@@ -337,7 +349,7 @@ describe('EditState interface', () => {
       cropTransform: cloneCropTransform(DEFAULT_CROP_TRANSFORM),
     }
 
-    expect(state.version).toBe(3)
+    expect(state.version).toBe(4)
     expect(state.adjustments.exposure).toBe(0)
     expect(state.cropTransform.crop).toBeNull()
     expect(state.cropTransform.rotation.angle).toBe(0)
@@ -499,5 +511,496 @@ describe('cloneCropTransform', () => {
     const cloned = cloneCropTransform(original)
 
     expect(cloned.crop).toBeNull()
+  })
+})
+
+// ============================================================================
+// Mask Types Tests
+// ============================================================================
+
+describe('DEFAULT_MASK_STACK', () => {
+  it('has empty linear masks array', () => {
+    expect(DEFAULT_MASK_STACK.linearMasks).toEqual([])
+  })
+
+  it('has empty radial masks array', () => {
+    expect(DEFAULT_MASK_STACK.radialMasks).toEqual([])
+  })
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(DEFAULT_MASK_STACK)).toBe(true)
+  })
+})
+
+describe('createDefaultMaskStack', () => {
+  it('creates empty mask stack', () => {
+    const stack = createDefaultMaskStack()
+
+    expect(stack.linearMasks).toEqual([])
+    expect(stack.radialMasks).toEqual([])
+  })
+
+  it('creates new copy each time', () => {
+    const stack1 = createDefaultMaskStack()
+    const stack2 = createDefaultMaskStack()
+
+    expect(stack1).not.toBe(stack2)
+    expect(stack1.linearMasks).not.toBe(stack2.linearMasks)
+    expect(stack1.radialMasks).not.toBe(stack2.radialMasks)
+  })
+})
+
+describe('createLinearMask', () => {
+  it('creates mask with default positions', () => {
+    const mask = createLinearMask()
+
+    expect(mask.start).toEqual({ x: 0.3, y: 0.5 })
+    expect(mask.end).toEqual({ x: 0.7, y: 0.5 })
+  })
+
+  it('creates mask with custom positions', () => {
+    const mask = createLinearMask({ x: 0.1, y: 0.2 }, { x: 0.9, y: 0.8 })
+
+    expect(mask.start).toEqual({ x: 0.1, y: 0.2 })
+    expect(mask.end).toEqual({ x: 0.9, y: 0.8 })
+  })
+
+  it('has UUID id', () => {
+    const mask = createLinearMask()
+
+    expect(mask.id).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('creates unique ids each time', () => {
+    const mask1 = createLinearMask()
+    const mask2 = createLinearMask()
+
+    expect(mask1.id).not.toBe(mask2.id)
+  })
+
+  it('has default feather of 0.5', () => {
+    const mask = createLinearMask()
+
+    expect(mask.feather).toBe(0.5)
+  })
+
+  it('is enabled by default', () => {
+    const mask = createLinearMask()
+
+    expect(mask.enabled).toBe(true)
+  })
+
+  it('has empty adjustments by default', () => {
+    const mask = createLinearMask()
+
+    expect(mask.adjustments).toEqual({})
+  })
+
+  it('creates independent copies of positions', () => {
+    const start = { x: 0.1, y: 0.2 }
+    const mask = createLinearMask(start)
+
+    start.x = 0.9
+    expect(mask.start.x).toBe(0.1)
+  })
+})
+
+describe('createRadialMask', () => {
+  it('creates mask with default center', () => {
+    const mask = createRadialMask()
+
+    expect(mask.center).toEqual({ x: 0.5, y: 0.5 })
+  })
+
+  it('creates mask with default radii', () => {
+    const mask = createRadialMask()
+
+    expect(mask.radiusX).toBe(0.3)
+    expect(mask.radiusY).toBe(0.3)
+  })
+
+  it('creates mask with custom values', () => {
+    const mask = createRadialMask({ x: 0.2, y: 0.3 }, 0.4, 0.5)
+
+    expect(mask.center).toEqual({ x: 0.2, y: 0.3 })
+    expect(mask.radiusX).toBe(0.4)
+    expect(mask.radiusY).toBe(0.5)
+  })
+
+  it('has UUID id', () => {
+    const mask = createRadialMask()
+
+    expect(mask.id).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('has default rotation of 0', () => {
+    const mask = createRadialMask()
+
+    expect(mask.rotation).toBe(0)
+  })
+
+  it('has default feather of 0.3', () => {
+    const mask = createRadialMask()
+
+    expect(mask.feather).toBe(0.3)
+  })
+
+  it('is not inverted by default', () => {
+    const mask = createRadialMask()
+
+    expect(mask.invert).toBe(false)
+  })
+
+  it('is enabled by default', () => {
+    const mask = createRadialMask()
+
+    expect(mask.enabled).toBe(true)
+  })
+
+  it('has empty adjustments by default', () => {
+    const mask = createRadialMask()
+
+    expect(mask.adjustments).toEqual({})
+  })
+})
+
+describe('isModifiedMaskStack', () => {
+  it('returns false for undefined masks', () => {
+    expect(isModifiedMaskStack(undefined)).toBe(false)
+  })
+
+  it('returns false for empty mask stack', () => {
+    const stack: MaskStack = { linearMasks: [], radialMasks: [] }
+
+    expect(isModifiedMaskStack(stack)).toBe(false)
+  })
+
+  it('returns true when linear masks exist', () => {
+    const stack: MaskStack = {
+      linearMasks: [createLinearMask()],
+      radialMasks: [],
+    }
+
+    expect(isModifiedMaskStack(stack)).toBe(true)
+  })
+
+  it('returns true when radial masks exist', () => {
+    const stack: MaskStack = {
+      linearMasks: [],
+      radialMasks: [createRadialMask()],
+    }
+
+    expect(isModifiedMaskStack(stack)).toBe(true)
+  })
+
+  it('returns true when both mask types exist', () => {
+    const stack: MaskStack = {
+      linearMasks: [createLinearMask()],
+      radialMasks: [createRadialMask()],
+    }
+
+    expect(isModifiedMaskStack(stack)).toBe(true)
+  })
+})
+
+describe('cloneMaskStack', () => {
+  it('creates deep copy of empty stack', () => {
+    const original: MaskStack = { linearMasks: [], radialMasks: [] }
+    const cloned = cloneMaskStack(original)
+
+    expect(cloned).toEqual(original)
+    expect(cloned).not.toBe(original)
+  })
+
+  it('creates deep copy of linear masks', () => {
+    const linearMask = createLinearMask()
+    linearMask.adjustments = { exposure: 1.5 }
+    const original: MaskStack = {
+      linearMasks: [linearMask],
+      radialMasks: [],
+    }
+    const cloned = cloneMaskStack(original)
+
+    expect(cloned.linearMasks[0]).toEqual(original.linearMasks[0])
+    expect(cloned.linearMasks[0]).not.toBe(original.linearMasks[0])
+    expect(cloned.linearMasks[0].start).not.toBe(original.linearMasks[0].start)
+    expect(cloned.linearMasks[0].adjustments).not.toBe(original.linearMasks[0].adjustments)
+  })
+
+  it('creates deep copy of radial masks', () => {
+    const radialMask = createRadialMask()
+    radialMask.adjustments = { contrast: 25 }
+    const original: MaskStack = {
+      linearMasks: [],
+      radialMasks: [radialMask],
+    }
+    const cloned = cloneMaskStack(original)
+
+    expect(cloned.radialMasks[0]).toEqual(original.radialMasks[0])
+    expect(cloned.radialMasks[0]).not.toBe(original.radialMasks[0])
+    expect(cloned.radialMasks[0].center).not.toBe(original.radialMasks[0].center)
+    expect(cloned.radialMasks[0].adjustments).not.toBe(original.radialMasks[0].adjustments)
+  })
+
+  it('modifications to clone do not affect original', () => {
+    const original: MaskStack = {
+      linearMasks: [createLinearMask()],
+      radialMasks: [createRadialMask()],
+    }
+    const cloned = cloneMaskStack(original)
+
+    cloned.linearMasks[0].start.x = 0.99
+    cloned.radialMasks[0].radiusX = 0.99
+
+    expect(original.linearMasks[0].start.x).toBe(0.3)
+    expect(original.radialMasks[0].radiusX).toBe(0.3)
+  })
+})
+
+describe('cloneLinearMask', () => {
+  it('creates deep copy', () => {
+    const original = createLinearMask()
+    original.adjustments = { exposure: 1.5, contrast: 20 }
+    const cloned = cloneLinearMask(original)
+
+    expect(cloned).toEqual(original)
+    expect(cloned).not.toBe(original)
+    expect(cloned.start).not.toBe(original.start)
+    expect(cloned.end).not.toBe(original.end)
+    expect(cloned.adjustments).not.toBe(original.adjustments)
+  })
+
+  it('preserves all properties', () => {
+    const original: LinearGradientMask = {
+      id: 'test-id',
+      start: { x: 0.1, y: 0.2 },
+      end: { x: 0.8, y: 0.9 },
+      feather: 0.7,
+      enabled: false,
+      adjustments: { exposure: 2.0 },
+    }
+    const cloned = cloneLinearMask(original)
+
+    expect(cloned.id).toBe('test-id')
+    expect(cloned.feather).toBe(0.7)
+    expect(cloned.enabled).toBe(false)
+    expect(cloned.adjustments.exposure).toBe(2.0)
+  })
+})
+
+describe('cloneRadialMask', () => {
+  it('creates deep copy', () => {
+    const original = createRadialMask()
+    original.adjustments = { saturation: -30 }
+    const cloned = cloneRadialMask(original)
+
+    expect(cloned).toEqual(original)
+    expect(cloned).not.toBe(original)
+    expect(cloned.center).not.toBe(original.center)
+    expect(cloned.adjustments).not.toBe(original.adjustments)
+  })
+
+  it('preserves all properties', () => {
+    const original: RadialGradientMask = {
+      id: 'radial-test-id',
+      center: { x: 0.3, y: 0.4 },
+      radiusX: 0.5,
+      radiusY: 0.6,
+      rotation: 45,
+      feather: 0.8,
+      invert: true,
+      enabled: false,
+      adjustments: { highlights: -50 },
+    }
+    const cloned = cloneRadialMask(original)
+
+    expect(cloned.id).toBe('radial-test-id')
+    expect(cloned.radiusX).toBe(0.5)
+    expect(cloned.radiusY).toBe(0.6)
+    expect(cloned.rotation).toBe(45)
+    expect(cloned.feather).toBe(0.8)
+    expect(cloned.invert).toBe(true)
+    expect(cloned.enabled).toBe(false)
+    expect(cloned.adjustments.highlights).toBe(-50)
+  })
+})
+
+describe('migrateEditState', () => {
+  it('returns default state for null input', () => {
+    const migrated = migrateEditState(null)
+
+    expect(migrated.version).toBe(EDIT_SCHEMA_VERSION)
+    expect(migrated.adjustments).toEqual(DEFAULT_ADJUSTMENTS)
+    expect(migrated.cropTransform.crop).toBeNull()
+    expect(migrated.masks).toBeUndefined()
+  })
+
+  it('returns default state for undefined input', () => {
+    const migrated = migrateEditState(undefined)
+
+    expect(migrated.version).toBe(EDIT_SCHEMA_VERSION)
+  })
+
+  it('returns default state for non-object input', () => {
+    expect(migrateEditState('string' as unknown).version).toBe(EDIT_SCHEMA_VERSION)
+    expect(migrateEditState(123 as unknown).version).toBe(EDIT_SCHEMA_VERSION)
+  })
+
+  it('returns unchanged state if already current version', () => {
+    const state: EditState = createDefaultEditState()
+    state.adjustments.exposure = 1.5
+
+    const migrated = migrateEditState(state)
+
+    expect(migrated).toBe(state)
+    expect(migrated.adjustments.exposure).toBe(1.5)
+  })
+
+  it('migrates v1 state to current version', () => {
+    const v1State = {
+      version: 1,
+      adjustments: {
+        exposure: 0.5,
+        contrast: 20,
+        temperature: 0,
+        tint: 0,
+        highlights: 0,
+        shadows: 0,
+        whites: 0,
+        blacks: 0,
+        vibrance: 0,
+        saturation: 0,
+      },
+    }
+
+    const migrated = migrateEditState(v1State)
+
+    expect(migrated.version).toBe(EDIT_SCHEMA_VERSION)
+    expect(migrated.adjustments.exposure).toBe(0.5)
+    expect(migrated.adjustments.contrast).toBe(20)
+    expect(migrated.cropTransform).toBeDefined()
+    expect(migrated.masks).toBeUndefined()
+  })
+
+  it('migrates v3 state to current version', () => {
+    const v3State = {
+      version: 3,
+      adjustments: {
+        exposure: 1.0,
+        contrast: 10,
+        temperature: 15,
+        tint: -5,
+        highlights: 20,
+        shadows: 30,
+        whites: 0,
+        blacks: 0,
+        vibrance: 25,
+        saturation: -10,
+        toneCurve: { points: [{ x: 0, y: 0.1 }, { x: 1, y: 0.9 }] },
+      },
+      cropTransform: {
+        crop: { left: 0.1, top: 0.2, width: 0.5, height: 0.6 },
+        rotation: { angle: 45, straighten: 2 },
+      },
+    }
+
+    const migrated = migrateEditState(v3State)
+
+    expect(migrated.version).toBe(EDIT_SCHEMA_VERSION)
+    expect(migrated.adjustments.exposure).toBe(1.0)
+    expect(migrated.adjustments.toneCurve.points).toHaveLength(2)
+    expect(migrated.cropTransform.crop?.left).toBe(0.1)
+    expect(migrated.cropTransform.rotation.angle).toBe(45)
+    expect(migrated.masks).toBeUndefined()
+  })
+
+  it('preserves existing adjustments during migration', () => {
+    const oldState = {
+      version: 2,
+      adjustments: {
+        temperature: 50,
+        tint: -25,
+        exposure: 2.5,
+        contrast: 100,
+        highlights: -100,
+        shadows: 100,
+        whites: 50,
+        blacks: -50,
+        vibrance: 75,
+        saturation: -75,
+        toneCurve: {
+          points: [
+            { x: 0, y: 0 },
+            { x: 0.25, y: 0.35 },
+            { x: 0.75, y: 0.65 },
+            { x: 1, y: 1 },
+          ],
+        },
+      },
+    }
+
+    const migrated = migrateEditState(oldState)
+
+    expect(migrated.adjustments.temperature).toBe(50)
+    expect(migrated.adjustments.tint).toBe(-25)
+    expect(migrated.adjustments.exposure).toBe(2.5)
+    expect(migrated.adjustments.contrast).toBe(100)
+    expect(migrated.adjustments.highlights).toBe(-100)
+    expect(migrated.adjustments.shadows).toBe(100)
+    expect(migrated.adjustments.whites).toBe(50)
+    expect(migrated.adjustments.blacks).toBe(-50)
+    expect(migrated.adjustments.vibrance).toBe(75)
+    expect(migrated.adjustments.saturation).toBe(-75)
+    expect(migrated.adjustments.toneCurve.points).toHaveLength(4)
+  })
+
+  it('handles missing adjustment fields gracefully', () => {
+    const partialState = {
+      version: 1,
+      adjustments: {
+        exposure: 1.0,
+        // Other fields missing
+      },
+    }
+
+    const migrated = migrateEditState(partialState)
+
+    expect(migrated.adjustments.exposure).toBe(1.0)
+    expect(migrated.adjustments.contrast).toBe(0)
+    expect(migrated.adjustments.temperature).toBe(0)
+  })
+})
+
+describe('EditState with masks', () => {
+  it('supports masks field', () => {
+    const state: EditState = {
+      version: EDIT_SCHEMA_VERSION,
+      adjustments: { ...DEFAULT_ADJUSTMENTS },
+      cropTransform: cloneCropTransform(DEFAULT_CROP_TRANSFORM),
+      masks: {
+        linearMasks: [createLinearMask()],
+        radialMasks: [createRadialMask()],
+      },
+    }
+
+    expect(state.masks).toBeDefined()
+    expect(state.masks?.linearMasks).toHaveLength(1)
+    expect(state.masks?.radialMasks).toHaveLength(1)
+  })
+
+  it('masks field is optional', () => {
+    const state: EditState = {
+      version: EDIT_SCHEMA_VERSION,
+      adjustments: { ...DEFAULT_ADJUSTMENTS },
+      cropTransform: cloneCropTransform(DEFAULT_CROP_TRANSFORM),
+    }
+
+    expect(state.masks).toBeUndefined()
+  })
+
+  it('createDefaultEditState does not include masks', () => {
+    const state = createDefaultEditState()
+
+    expect(state.masks).toBeUndefined()
   })
 })
