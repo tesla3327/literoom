@@ -10,6 +10,10 @@
  */
 import type { ICatalogService, FlagStatus } from '@literoom/core/catalog'
 
+// Loading state for import process
+const isLoading = ref(false)
+const loadingMessage = ref('')
+
 export function useCatalog() {
   const nuxtApp = useNuxtApp()
   const config = useRuntimeConfig()
@@ -35,9 +39,49 @@ export function useCatalog() {
   const selectionStore = useSelectionStore()
 
   /**
+   * Get the number of thumbnails that fit on the first visible page.
+   * Assumes typical grid layout: 5 columns × 4 visible rows = 20 thumbnails.
+   */
+  function getFirstPageCount(): number {
+    // Could be made dynamic based on viewport in future
+    return 20
+  }
+
+  /**
+   * Wait for first page of thumbnails to be ready.
+   * Returns a promise that resolves when enough thumbnails are loaded.
+   */
+  async function waitForFirstPageThumbnails(): Promise<void> {
+    const targetCount = Math.min(getFirstPageCount(), catalogStore.assetIds.length)
+
+    // Nothing to wait for
+    if (targetCount === 0) return
+
+    return new Promise((resolve) => {
+      const unwatch = watch(
+        () => catalogStore.thumbnailProgress.ready,
+        (ready) => {
+          if (ready >= targetCount) {
+            unwatch()
+            resolve()
+          }
+        },
+        { immediate: true },
+      )
+
+      // Timeout fallback after 10 seconds to avoid blocking forever
+      setTimeout(() => {
+        unwatch()
+        resolve()
+      }, 10000)
+    })
+  }
+
+  /**
    * Select a folder and begin scanning.
    * In demo mode, loads the demo catalog automatically.
    * In real mode, uses CatalogService which handles folder picker and persistence.
+   * Waits for first page of thumbnails before returning.
    */
   async function selectFolder(): Promise<void> {
     const service = requireCatalogService()
@@ -50,6 +94,8 @@ export function useCatalog() {
       catalogStore.setFolderPath('Demo Photos')
     }
 
+    isLoading.value = true
+    loadingMessage.value = 'Scanning folder...'
     catalogStore.setScanning(true)
 
     try {
@@ -67,9 +113,15 @@ export function useCatalog() {
 
       // Scan the folder (callbacks wire to stores via plugin)
       await service.scanFolder()
+
+      // Wait for first page of thumbnails so gallery isn't empty
+      loadingMessage.value = 'Preparing gallery...'
+      await waitForFirstPageThumbnails()
     }
     finally {
       catalogStore.setScanning(false)
+      isLoading.value = false
+      loadingMessage.value = ''
     }
   }
 
@@ -79,6 +131,12 @@ export function useCatalog() {
    */
   async function restoreSession(): Promise<boolean> {
     const service = requireCatalogService()
+
+    // If assets are already loaded, skip restoration
+    // This prevents re-scanning when returning to the gallery from edit view
+    if (catalogStore.assetIds.length > 0) {
+      return true
+    }
 
     if (isDemoMode) {
       // Demo mode: auto-load demo catalog
@@ -181,6 +239,10 @@ export function useCatalog() {
     // Services (may be undefined until plugin initializes)
     catalogService,
     isDemoMode,
+
+    // Loading state for import process
+    isLoading,
+    loadingMessage,
 
     // Operations (will throw if service not ready)
     selectFolder,

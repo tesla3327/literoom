@@ -105,6 +105,53 @@ export const useCatalogStore = defineStore('catalog', () => {
     unflagged: unflaggedCount.value,
   }))
 
+  /**
+   * Thumbnail generation progress.
+   * Tracks how many thumbnails are ready vs pending.
+   */
+  const thumbnailProgress = computed(() => {
+    let ready = 0
+    let pending = 0
+    let loading = 0
+    let error = 0
+
+    for (const asset of assets.value.values()) {
+      switch (asset.thumbnailStatus) {
+        case 'ready':
+          ready++
+          break
+        case 'pending':
+          pending++
+          break
+        case 'loading':
+          loading++
+          break
+        case 'error':
+          error++
+          break
+      }
+    }
+
+    const total = ready + pending + loading + error
+    return { ready, pending, loading, error, total }
+  })
+
+  /**
+   * Percentage of thumbnails that are ready (0-100).
+   */
+  const thumbnailPercent = computed(() => {
+    const { ready, total } = thumbnailProgress.value
+    return total > 0 ? Math.round((ready / total) * 100) : 0
+  })
+
+  /**
+   * Whether thumbnails are still being processed.
+   */
+  const isProcessingThumbnails = computed(() => {
+    const { ready, total } = thumbnailProgress.value
+    return total > 0 && ready < total
+  })
+
   // ============================================================================
   // Actions
   // ============================================================================
@@ -119,10 +166,15 @@ export const useCatalogStore = defineStore('catalog', () => {
     // Create new Map with existing + new assets
     const newMap = new Map(assets.value)
     const newIds = [...assetIds.value]
+    const existingIds = new Set(newIds)
 
     for (const asset of newAssets) {
       newMap.set(asset.id, asset)
-      newIds.push(asset.id)
+      // Only add ID if not already in the list (prevents duplicates)
+      if (!existingIds.has(asset.id)) {
+        newIds.push(asset.id)
+        existingIds.add(asset.id)
+      }
     }
 
     // Trigger reactivity by replacing refs
@@ -310,6 +362,9 @@ export const useCatalogStore = defineStore('catalog', () => {
     rejectCount,
     unflaggedCount,
     flagCounts,
+    thumbnailProgress,
+    thumbnailPercent,
+    isProcessingThumbnails,
 
     // Actions
     addAssetBatch,

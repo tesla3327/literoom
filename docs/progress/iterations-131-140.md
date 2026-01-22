@@ -102,3 +102,65 @@ Launched 4 parallel research agents to investigate:
 
 ---
 
+## 133: 2026-01-22 10:15 EST: Import UX Improvements - Phases 1-5 Implementation Complete
+
+**Objective**: Implement the import UX improvements according to the plan.
+
+**Implementation Completed**:
+
+### Phase 1: Thumbnail Progress Tracking
+- Added `thumbnailProgress` computed property to catalog store
+  - Returns `{ ready, pending, loading, error, total }` counts
+- Added `thumbnailPercent` computed for progress bar (0-100)
+- Added `isProcessingThumbnails` computed for UI state
+
+### Phase 2: Progress Indicator in FilterBar
+- Added thumbnail progress indicator section in FilterBar.vue
+- Shows animated photo icon, count (ready/total), and progress bar
+- Only displays when thumbnails are processing and not exporting
+
+### Phase 3: First-Page Thumbnail Wait
+- Added `getFirstPageCount()` helper (returns 20 thumbnails)
+- Added `waitForFirstPageThumbnails()` async function with watch-based waiting
+- Added 10-second timeout fallback to prevent blocking forever
+- Updated `selectFolder()` to:
+  - Set loading message "Scanning folder..."
+  - After scan: Set loading message "Preparing gallery..."
+  - Wait for first page of thumbnails before completing
+- Updated index.vue to use loading state from useCatalog
+- Enhanced loading screen to show dynamic loading message and progress bar during "Preparing gallery..." phase
+
+### Phase 4: Fix Priority System
+- Imported `ThumbnailPriority` enum in CatalogThumbnail.vue
+- Added `getPriorityForIndex()` function:
+  - Index 0-19: VISIBLE priority (highest)
+  - Index 20-39: NEAR_VISIBLE priority
+  - Index 40-79: PRELOAD priority
+  - Index 80+: BACKGROUND priority (lowest)
+- Updated `requestThumbnail()` calls to use proper enum values
+
+### Phase 5: Dynamic Priority with IntersectionObserver
+- Integrated `useIntersectionObserver` composable in CatalogThumbnail
+- Added visibility watcher that updates priority when visibility changes:
+  - Visible → VISIBLE priority
+  - Not visible → BACKGROUND priority
+- Attached elementRef to container div for observation
+
+**Files Modified** (5 files):
+- `apps/web/app/stores/catalog.ts` - Thumbnail progress computed properties
+- `apps/web/app/components/catalog/FilterBar.vue` - Progress indicator UI
+- `apps/web/app/composables/useCatalog.ts` - First-page wait logic, loading state
+- `apps/web/app/pages/index.vue` - Use shared loading state, enhanced loading UI
+- `apps/web/app/components/catalog/CatalogThumbnail.vue` - Priority system fix, IntersectionObserver
+
+**Tests**: All 362 unit tests + 28 E2E tests pass
+
+**Result**: Users will now see:
+1. "Scanning folder..." message during initial scan
+2. "Preparing gallery..." message with progress bar while thumbnails generate
+3. Gallery view only appears after first ~20 thumbnails are ready
+4. Thumbnail progress indicator in FilterBar during ongoing generation
+5. Dynamic priority updates as users scroll (visible items get priority)
+
+---
+

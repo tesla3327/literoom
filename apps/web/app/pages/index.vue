@@ -18,7 +18,7 @@ const catalogStore = useCatalogStore()
 const selectionStore = useSelectionStore()
 const permissionStore = usePermissionRecoveryStore()
 const exportStore = useExportStore()
-const { selectFolder, restoreSession, isDemoMode } = useCatalog()
+const { selectFolder, restoreSession, isDemoMode, isLoading, loadingMessage } = useCatalog()
 
 // Help modal keyboard shortcuts
 useHelpModal()
@@ -27,7 +27,6 @@ useHelpModal()
 // State
 // ============================================================================
 
-const isLoading = ref(false)
 const scanError = ref<string | null>(null)
 
 // ============================================================================
@@ -50,7 +49,6 @@ const folderName = computed(() => {
  * Handle folder selection.
  */
 async function handleSelectFolder() {
-  isLoading.value = true
   scanError.value = null
 
   try {
@@ -63,9 +61,6 @@ async function handleSelectFolder() {
     else {
       scanError.value = error instanceof Error ? error.message : 'Failed to select folder'
     }
-  }
-  finally {
-    isLoading.value = false
   }
 }
 
@@ -227,7 +222,7 @@ onUnmounted(() => {
           class="w-12 h-12 text-gray-600 mb-4"
         />
         <p class="text-gray-400 mb-2">
-          Scanning folder...
+          {{ loadingMessage || 'Loading...' }}
         </p>
         <p
           v-if="catalogStore.scanProgress"
@@ -235,6 +230,21 @@ onUnmounted(() => {
         >
           Found {{ catalogStore.scanProgress.totalFound }} files
         </p>
+        <!-- Thumbnail progress during "Preparing gallery..." phase -->
+        <div
+          v-if="loadingMessage === 'Preparing gallery...' && catalogStore.thumbnailProgress.total > 0"
+          class="mt-4 max-w-xs mx-auto"
+        >
+          <div class="flex items-center justify-center gap-2 text-sm text-gray-500 mb-2">
+            <span>{{ catalogStore.thumbnailProgress.ready }}/{{ catalogStore.thumbnailProgress.total }} thumbnails</span>
+          </div>
+          <div class="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-primary-500 transition-all duration-200"
+              :style="{ width: `${catalogStore.thumbnailPercent}%` }"
+            />
+          </div>
+        </div>
       </div>
     </div>
 

@@ -133,6 +133,27 @@ function setSort(field: SortField, direction: SortDirection): void {
 
     <!-- Right side: Export progress/button + Sort dropdown -->
     <div class="flex items-center gap-2">
+      <!-- Thumbnail progress indicator (shown during thumbnail generation) -->
+      <div
+        v-if="catalogStore.isProcessingThumbnails && !exportStore.isExporting"
+        class="flex items-center gap-2 px-3 py-1 rounded-md bg-gray-800"
+        data-testid="thumbnail-progress"
+      >
+        <UIcon
+          name="i-heroicons-photo"
+          class="w-4 h-4 text-primary-400 animate-pulse"
+        />
+        <span class="text-sm text-gray-300 whitespace-nowrap">
+          {{ catalogStore.thumbnailProgress.ready }}/{{ catalogStore.thumbnailProgress.total }}
+        </span>
+        <div class="w-24 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+          <div
+            class="h-full bg-primary-500 transition-all duration-200"
+            :style="{ width: `${catalogStore.thumbnailPercent}%` }"
+          />
+        </div>
+      </div>
+
       <!-- Export progress indicator (shown during export) -->
       <div
         v-if="exportStore.isExporting"

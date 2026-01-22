@@ -7,6 +7,7 @@
  * Double-click navigates to edit view.
  */
 import type { Asset, ThumbnailStatus } from '@literoom/core/catalog'
+import { ThumbnailPriority } from '@literoom/core/catalog'
 
 interface Props {
   /** The asset to display */
@@ -25,6 +26,73 @@ defineEmits<{
   /** Emitted when the thumbnail is clicked */
   click: [event: MouseEvent]
 }>()
+
+// ============================================================================
+// Thumbnail Loading
+// ============================================================================
+
+const { requestThumbnail, updateThumbnailPriority } = useCatalog()
+
+/**
+ * Determine priority based on index.
+ * First ~20 items (first visible page) get VISIBLE priority.
+ * Items 20-40 get NEAR_VISIBLE priority.
+ * Items 40-80 get PRELOAD priority.
+ * Beyond that get BACKGROUND priority.
+ */
+function getPriorityForIndex(index: number): ThumbnailPriority {
+  if (index < 20) return ThumbnailPriority.VISIBLE
+  if (index < 40) return ThumbnailPriority.NEAR_VISIBLE
+  if (index < 80) return ThumbnailPriority.PRELOAD
+  return ThumbnailPriority.BACKGROUND
+}
+
+// ============================================================================
+// Visibility Tracking
+// ============================================================================
+
+/**
+ * Track visibility with IntersectionObserver to dynamically update priority.
+ * When thumbnail enters viewport, boost its priority to VISIBLE.
+ * When it leaves viewport, reduce priority to BACKGROUND.
+ */
+const { elementRef, isVisible } = useIntersectionObserver(
+  undefined,
+  { threshold: 0.1, rootMargin: '200px' },
+)
+
+/**
+ * Update priority when visibility changes.
+ */
+watch(isVisible, (visible) => {
+  // Only update priority for thumbnails that aren't ready yet
+  if (props.asset.thumbnailStatus !== 'ready') {
+    const priority = visible
+      ? ThumbnailPriority.VISIBLE
+      : ThumbnailPriority.BACKGROUND
+    updateThumbnailPriority(props.asset.id, priority)
+  }
+})
+
+/**
+ * Request thumbnail when component mounts if status is pending.
+ * Uses ThumbnailPriority enum - first page gets VISIBLE priority.
+ */
+onMounted(() => {
+  if (props.asset.thumbnailStatus === 'pending') {
+    requestThumbnail(props.asset.id, getPriorityForIndex(props.index))
+  }
+})
+
+/**
+ * Also watch for asset changes in case the same component
+ * is reused for a different asset (virtual scrolling).
+ */
+watch(() => props.asset.id, (newId, oldId) => {
+  if (newId !== oldId && props.asset.thumbnailStatus === 'pending') {
+    requestThumbnail(props.asset.id, getPriorityForIndex(props.index))
+  }
+})
 
 // ============================================================================
 // Double-click navigation
@@ -57,6 +125,7 @@ const containerClasses = computed(() => {
 
 <template>
   <div
+    ref="elementRef"
     :class="containerClasses"
     data-testid="catalog-thumbnail"
     :data-asset-id="asset.id"
@@ -93,7 +162,10 @@ const containerClasses = computed(() => {
       v-if="isSelected"
       class="absolute top-1.5 right-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-cyan-500"
     >
-      <UIcon name="i-heroicons-check" class="w-3 h-3 text-white" />
+      <UIcon
+        name="i-heroicons-check"
+        class="w-3 h-3 text-white"
+      />
     </div>
 
     <!-- Thumbnail states -->
@@ -105,7 +177,10 @@ const containerClasses = computed(() => {
       v-else-if="asset.thumbnailStatus === 'error'"
       class="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 text-gray-500"
     >
-      <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8" />
+      <UIcon
+        name="i-heroicons-exclamation-triangle"
+        class="w-8 h-8"
+      />
       <span class="text-xs mt-1">Failed</span>
     </div>
     <img
@@ -115,7 +190,7 @@ const containerClasses = computed(() => {
       class="absolute inset-0 w-full h-full object-cover"
       loading="lazy"
       decoding="async"
-    />
+    >
 
     <!-- Filename tooltip on hover (bottom) -->
     <div class="filename-overlay absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-gray-950/80 to-transparent opacity-0 transition-opacity duration-150">
