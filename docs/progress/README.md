@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 07:13 EST
-**Current Phase**: Export Button Bug Fix - Complete
+**Last Updated**: 2026-01-22 09:03 EST
+**Current Phase**: Export Doesn't Apply Edits - Research Complete
 
 ## Project Structure
 
@@ -326,6 +326,7 @@ literoom/
 | [124](./iterations-121-130.md:210) | 2026-01-22 | Keyboard Shortcuts Help Modal - Research Complete |
 | [125](./iterations-121-130.md:276) | 2026-01-22 | Keyboard Shortcuts Help Modal - Implementation Complete |
 | [126](./iterations-121-130.md:321) | 2026-01-22 | Export Button Always Disabled - Fixed |
+| [127](./iterations-121-130.md:347) | 2026-01-22 | Export Doesn't Apply Edits - Research |
 
 ---
 

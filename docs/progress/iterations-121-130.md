@@ -346,3 +346,57 @@ Now the button is enabled whenever there are images in the catalog, allowing use
 
 ---
 
+## 127: 2026-01-22 09:03 EST: Export Doesn't Apply Edits - Research Complete
+
+**Objective**: Fix the critical issue "Export doesn't apply edits" so exported images include all adjustments made in the edit view.
+
+**Problem**: The export feature exports the original image without applying any edits. The exported file should include all adjustments (exposure, contrast, tone curve, crop, masks, etc.).
+
+**Research Findings**:
+
+### Root Causes Identified (2 bugs)
+
+**Bug 1: Edit State Retrieval Fails**
+- `getEditState()` in `useExport.ts` (lines 279-294) only returns edits for `editStore.currentAssetId`
+- All other assets return `null` because database persistence is not implemented
+- Edit store only holds edits for ONE asset at a time
+- On asset switch, edits are reset to defaults (line 160-162 in edit.ts)
+
+**Bug 2: Masked Adjustments Not in Export Pipeline**
+- `ExportEditState` interface has no `masks` field (`export/types.ts:110-119`)
+- `ExportServiceDependencies` has no `applyMaskedAdjustments` method
+- `applyEdits()` in export-service.ts (lines 222-273) never calls masked adjustments
+- Worker and DecodeService HAVE this capability (`decode-worker.ts:416-495`), but it's not wired up
+
+### Data Flow Analysis
+
+**Broken Export Flow**:
+```
+getEditState(assetId) → null (for non-current) → applyEdits() SKIPPED
+```
+
+**Working Preview Flow**:
+```
+renderPreview() → Rotation → Crop → Adjustments → Tone Curve → Masked Adjustments
+```
+
+### Fix Strategy: In-Memory Session Cache
+
+Instead of full database persistence (complex), implement session-based edit caching:
+1. Add `editCache: Map<string, EditState>` to edit store
+2. Save edits to cache on asset switch and dirty changes
+3. Export retrieves from cache
+4. Add masked adjustments to export pipeline
+
+**Files to Modify**:
+1. `packages/core/src/export/types.ts` - Add masks to types
+2. `packages/core/src/export/export-service.ts` - Add masked adjustments step
+3. `apps/web/app/stores/edit.ts` - Add edit cache
+4. `apps/web/app/composables/useExport.ts` - Wire up dependencies
+
+**Documents Created**:
+- `docs/research/2026-01-22-export-apply-edits-synthesis.md`
+- `docs/plans/2026-01-22-export-apply-edits-plan.md`
+
+**Status**: Research and planning complete. Ready for implementation.
+
