@@ -235,6 +235,60 @@ export function useCatalog() {
     service.updatePreviewPriority(assetId, priority)
   }
 
+  /**
+   * Rescan the current folder to detect new and modified files.
+   * Shows a toast notification when complete.
+   */
+  async function rescanFolder(): Promise<void> {
+    const service = requireCatalogService()
+    const toast = useToast()
+
+    // Can't rescan if no folder is loaded
+    if (!catalogStore.folderPath) {
+      toast.add({
+        title: 'No folder selected',
+        description: 'Select a folder first to rescan',
+        color: 'warning',
+      })
+      return
+    }
+
+    catalogStore.setScanning(true)
+
+    try {
+      const previousCount = catalogStore.totalCount
+      await service.rescanFolder()
+
+      const newCount = catalogStore.totalCount
+      const diff = newCount - previousCount
+
+      if (diff > 0) {
+        toast.add({
+          title: 'Catalog updated',
+          description: `Found ${diff} new image${diff === 1 ? '' : 's'}`,
+          color: 'success',
+        })
+      }
+      else {
+        toast.add({
+          title: 'Catalog up to date',
+          description: `${newCount} image${newCount === 1 ? '' : 's'} in catalog`,
+          color: 'success',
+        })
+      }
+    }
+    catch (error) {
+      toast.add({
+        title: 'Rescan failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        color: 'error',
+      })
+    }
+    finally {
+      catalogStore.setScanning(false)
+    }
+  }
+
   return {
     // Services (may be undefined until plugin initializes)
     catalogService,
@@ -255,5 +309,6 @@ export function useCatalog() {
     updateThumbnailPriority,
     requestPreview,
     updatePreviewPriority,
+    rescanFolder,
   }
 }

@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 10:58 EST
-**Current Phase**: Preview Priority on Edit Entry - Implementation Complete
+**Last Updated**: 2026-01-22 11:05 EST
+**Current Phase**: Rescan Folder UI - Implementation Complete
 
 ## Project Structure
 
@@ -350,6 +350,7 @@ literoom/
 | # | Date | Title |
 |---|------|-------|
 | [140](./iterations-141-150.md:3) | 2026-01-22 | Preview Priority on Edit Entry - Implementation Complete |
+| [141](./iterations-141-150.md:41) | 2026-01-22 | Rescan Folder UI - Implementation Complete |
 
 ---
 

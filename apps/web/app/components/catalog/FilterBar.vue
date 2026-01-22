@@ -10,6 +10,7 @@ import type { FilterMode, SortField, SortDirection } from '@literoom/core/catalo
 const catalogStore = useCatalogStore()
 const catalogUIStore = useCatalogUIStore()
 const exportStore = useExportStore()
+const { rescanFolder } = useCatalog()
 
 // Filter mode configuration
 const filterModes = computed(() => [
@@ -135,7 +136,7 @@ function setSort(field: SortField, direction: SortDirection): void {
     <div class="flex items-center gap-2">
       <!-- Thumbnail progress indicator (shown during thumbnail generation) -->
       <div
-        v-if="catalogStore.isProcessingThumbnails && !exportStore.isExporting"
+        v-if="catalogStore.isProcessingThumbnails && !exportStore.isExporting && !catalogStore.isScanning"
         class="flex items-center gap-2 px-3 py-1 rounded-md bg-gray-800"
         data-testid="thumbnail-progress"
       >
@@ -153,6 +154,32 @@ function setSort(field: SortField, direction: SortDirection): void {
           />
         </div>
       </div>
+
+      <!-- Rescan progress indicator (shown during rescan) -->
+      <div
+        v-if="catalogStore.isScanning && catalogStore.folderPath && !exportStore.isExporting"
+        class="flex items-center gap-2 px-3 py-1 rounded-md bg-gray-800"
+        data-testid="rescan-progress"
+      >
+        <UIcon
+          name="i-heroicons-arrow-path"
+          class="w-4 h-4 text-primary-400 animate-spin"
+        />
+        <span class="text-sm text-gray-300">Rescanning...</span>
+      </div>
+
+      <!-- Rescan button (shown when not scanning or exporting) -->
+      <UButton
+        v-if="!catalogStore.isScanning && !exportStore.isExporting && catalogStore.folderPath"
+        variant="ghost"
+        size="sm"
+        icon="i-heroicons-arrow-path"
+        title="Rescan folder for new/modified files"
+        data-testid="rescan-button"
+        @click="rescanFolder"
+      >
+        Rescan
+      </UButton>
 
       <!-- Export progress indicator (shown during export) -->
       <div
