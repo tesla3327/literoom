@@ -473,3 +473,66 @@ const filename = renderTemplate('{orig}_{seq:4}', {
 **Status**: Bug fixed and verified. Issue moved to Solved Issues in docs/issues.md.
 
 ---
+
+## 100: 2026-01-21 19:12 EST: Export Workflow - Phase 4 (Export Service)
+
+**Objective**: Implement the ExportService to coordinate the export pipeline.
+
+**Background**: Phases 1-3 of the export workflow are complete (JPEG encoding in WASM, worker integration, filename template parser). This phase creates the service that orchestrates the complete export process.
+
+**Implementation Summary**:
+
+1. **Created `packages/core/src/export/types.ts`**
+   - `ExportScope` - 'picks' | 'selected' | 'all'
+   - `ExportOptions` - Configuration for export (destination, template, quality, resize)
+   - `ExportProgress` - Progress tracking during export
+   - `ExportResult` - Success/failure counts and details
+   - `ExportEditState` - Simplified edit state for export
+   - `ExportServiceDependencies` - Injectable dependencies for testability
+
+2. **Created `packages/core/src/export/export-service.ts`**
+   - `ExportService` class with `exportAssets()` method
+   - Complete edit pipeline: Rotation → Crop → Adjustments → Tone Curve
+   - Resize option for long-edge pixel limit
+   - JPEG encoding with quality setting
+   - Filename template rendering with date/seq tokens
+   - Collision handling with auto-increment suffix
+   - Progress callback for UI updates
+   - Graceful error handling per asset
+
+3. **Created `packages/core/src/export/export-service.test.ts`**
+   - 19 comprehensive unit tests covering:
+     - Single and multiple asset export
+     - Progress reporting
+     - Error handling
+     - Edit state application (rotation, crop, adjustments, tone curve)
+     - Resize logic
+     - Filename collision handling
+     - Date templating
+
+4. **Updated `packages/core/src/export/index.ts`**
+   - Added exports for ExportService, types, and helper functions
+
+**Export Pipeline**:
+```
+Load image → Decode → Apply Rotation → Apply Crop → Apply Adjustments →
+Apply Tone Curve → Resize (optional) → Encode JPEG → Write file
+```
+
+**Helper Function**:
+- `filterAssetsForExport(assets, scope, selectedIds, includeRejected)` - Filter assets based on export scope
+
+**Files Created** (3 files):
+- `packages/core/src/export/types.ts`
+- `packages/core/src/export/export-service.ts`
+- `packages/core/src/export/export-service.test.ts`
+
+**Files Modified** (2 files):
+- `packages/core/src/export/index.ts`
+- `packages/core/src/export/filename-template.ts` (minor type fixes)
+
+**Tests**: 316 tests passing (19 new export service tests)
+
+**Status**: Phase 4 complete. Ready for Phase 5 (UI Components).
+
+---

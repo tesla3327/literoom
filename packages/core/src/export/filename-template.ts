@@ -84,7 +84,7 @@ export function validateTemplate(template: string): TemplateError[] {
   let match
   while ((match = tokenRegex.exec(template)) !== null) {
     const token = match[1]
-    if (token !== 'orig' && token !== 'date' && !token.match(/^seq(:\d+)?$/)) {
+    if (token && token !== 'orig' && token !== 'date' && !token.match(/^seq(:\d+)?$/)) {
       errors.push({
         message: `Unknown token: {${token}}`,
         position: match.index,
@@ -95,12 +95,15 @@ export function validateTemplate(template: string): TemplateError[] {
   // Validate {seq:N} padding width (1-10)
   const seqPadRegex = /\{seq:(\d+)\}/g
   while ((match = seqPadRegex.exec(template)) !== null) {
-    const width = parseInt(match[1], 10)
-    if (width < 1 || width > 10) {
-      errors.push({
-        message: `Sequence padding must be 1-10 digits, got ${width}`,
-        position: match.index,
-      })
+    const padWidth = match[1]
+    if (padWidth) {
+      const width = parseInt(padWidth, 10)
+      if (width < 1 || width > 10) {
+        errors.push({
+          message: `Sequence padding must be 1-10 digits, got ${width}`,
+          position: match.index,
+        })
+      }
     }
   }
 
@@ -134,5 +137,7 @@ export function extractOriginalFilename(filename: string): string {
  * Format a date as YYYY-MM-DD
  */
 export function formatDateForTemplate(date: Date): string {
-  return date.toISOString().split('T')[0]
+  const isoString = date.toISOString()
+  const datePart = isoString.split('T')[0]
+  return datePart ?? isoString.substring(0, 10)
 }
