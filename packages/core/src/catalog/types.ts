@@ -479,11 +479,39 @@ export interface ICatalogService {
    */
   loadFromDatabase(): Promise<boolean>
 
+  /**
+   * Get a list of recent folders from the database.
+   * Returns folders ordered by lastScanDate descending.
+   */
+  listFolders(limit?: number): Promise<FolderInfo[]>
+
+  /**
+   * Load a specific folder by its database ID.
+   * Returns true if the folder was loaded successfully.
+   */
+  loadFolderById(folderId: number): Promise<boolean>
+
   // Cleanup
   /**
    * Clean up resources and close the service.
    */
   destroy(): void
+}
+
+/**
+ * Information about a folder for the recent folders list.
+ */
+export interface FolderInfo {
+  /** Database ID */
+  id: number
+  /** Display name */
+  name: string
+  /** Folder path */
+  path: string
+  /** Last scan date */
+  lastScanDate: Date
+  /** Whether the folder is currently accessible (permission granted) */
+  isAccessible?: boolean
 }
 
 // ============================================================================

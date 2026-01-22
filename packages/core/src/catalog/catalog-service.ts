@@ -28,6 +28,7 @@ import {
   type AssetUpdatedCallback,
   type ThumbnailReadyCallback,
   type PreviewReadyCallback,
+  type FolderInfo,
   ThumbnailPriority,
   CatalogError,
 } from './types'
@@ -741,6 +742,99 @@ export class CatalogService implements ICatalogService {
       const asset = this.assetRecordToAsset(record)
       this._assets.set(asset.id, asset)
     }
+
+    // Notify listeners
+    if (this._assets.size > 0) {
+      this._onAssetsAdded?.(Array.from(this._assets.values()))
+    }
+
+    return true
+  }
+
+  /**
+   * Get a list of recent folders from the database.
+   * Returns folders ordered by lastScanDate descending.
+   */
+  async listFolders(limit: number = 5): Promise<FolderInfo[]> {
+    const folders = await db.folders
+      .orderBy('lastScanDate')
+      .reverse()
+      .limit(limit)
+      .toArray()
+
+    // Check accessibility for each folder
+    const result: FolderInfo[] = []
+    for (const folder of folders) {
+      let isAccessible = false
+
+      try {
+        const handle = await this.loadHandle(folder.handleKey)
+        if (handle) {
+          const permission = await handle.queryPermission({ mode: 'read' })
+          isAccessible = permission === 'granted'
+        }
+      } catch {
+        // Handle not accessible
+        isAccessible = false
+      }
+
+      result.push({
+        id: folder.id!,
+        name: folder.name,
+        path: folder.path,
+        lastScanDate: folder.lastScanDate,
+        isAccessible,
+      })
+    }
+
+    return result
+  }
+
+  /**
+   * Load a specific folder by its database ID.
+   * Returns true if the folder was loaded successfully.
+   */
+  async loadFolderById(folderId: number): Promise<boolean> {
+    // Get folder from database
+    const folder = await db.folders.get(folderId)
+    if (!folder) {
+      return false
+    }
+
+    // Try to restore the handle
+    const handle = await this.loadHandle(folder.handleKey)
+    if (!handle) {
+      return false
+    }
+
+    // Check permission
+    const permission = await handle.queryPermission({ mode: 'read' })
+    if (permission !== 'granted') {
+      // Try to request permission
+      const requestResult = await handle.requestPermission({ mode: 'read' })
+      if (requestResult !== 'granted') {
+        return false
+      }
+    }
+
+    // Set as current folder
+    this._currentFolder = handle
+    this._currentFolderId = folderId
+
+    // Clear existing assets
+    this._assets.clear()
+
+    // Load assets from database
+    const records = await db.assets.where('folderId').equals(folderId).toArray()
+    for (const record of records) {
+      const asset = this.assetRecordToAsset(record)
+      this._assets.set(asset.id, asset)
+    }
+
+    // Update lastScanDate
+    await db.folders.update(folderId, {
+      lastScanDate: new Date(),
+    })
 
     // Notify listeners
     if (this._assets.size > 0) {

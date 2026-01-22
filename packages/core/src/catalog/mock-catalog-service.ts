@@ -21,6 +21,7 @@ import {
   type AssetUpdatedCallback,
   type ThumbnailReadyCallback,
   type PreviewReadyCallback,
+  type FolderInfo,
   ThumbnailPriority,
   CatalogError,
 } from './types'
@@ -627,6 +628,22 @@ export class MockCatalogService implements ICatalogService {
       await this.scanFolder()
     }
     return this._assets.size > 0
+  }
+
+  /**
+   * Get a list of recent folders (mock mode returns empty array).
+   */
+  async listFolders(_limit: number = 5): Promise<FolderInfo[]> {
+    // Demo mode has no persisted folders
+    return []
+  }
+
+  /**
+   * Load a specific folder by ID (no-op in mock mode).
+   */
+  async loadFolderById(_folderId: number): Promise<boolean> {
+    // Demo mode doesn't support loading specific folders
+    return false
   }
 
   /**

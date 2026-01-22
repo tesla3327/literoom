@@ -44,6 +44,8 @@ export type {
   LinearGradientMask,
   RadialGradientMask,
   MaskStack,
+  // Folder types
+  FolderInfo,
 } from './types'
 
 // Classes and enums
@@ -60,6 +62,7 @@ export {
   createDefaultEditState,
   hasModifiedAdjustments,
   isModifiedToneCurve,
+  migrateEditState,
   // Crop/Transform utilities
   DEFAULT_ROTATION,
   DEFAULT_CROP_TRANSFORM,
@@ -112,7 +115,7 @@ export {
 } from './demo-assets'
 
 // Database
-export type { AssetRecord, FolderRecord, EditRecord, CacheMetadataRecord } from './db'
+export type { AssetRecord, FolderRecord, EditRecord, CacheMetadataRecord, EditStateRecord } from './db'
 
 export {
   LiteroomDB,
@@ -123,4 +126,10 @@ export {
   updateAssetFlags,
   assetExistsByPath,
   getFolderByPath,
+  // Edit state persistence
+  saveEditStateToDb,
+  loadEditStateFromDb,
+  loadAllEditStatesFromDb,
+  deleteEditStateFromDb,
+  deleteEditStatesFromDb,
 } from './db'

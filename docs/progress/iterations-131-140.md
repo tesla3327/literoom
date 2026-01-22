@@ -253,3 +253,73 @@ Change "Select Folder" to "Previously Opened Folders" with a list of recent fold
 
 ---
 
+## 136: 2026-01-22 10:30 EST: Recent Folders Feature - Implementation Complete
+
+**Objective**: Implement the Recent Folders feature according to the plan.
+
+**Implementation Completed**:
+
+### Phase 1: Service Layer Enhancements
+- Added `FolderInfo` interface to types.ts
+- Added `listFolders()` method to CatalogService
+  - Queries folders ordered by lastScanDate descending
+  - Checks accessibility (permission status) for each folder
+  - Returns FolderInfo array with id, name, path, lastScanDate, isAccessible
+- Added `loadFolderById()` method to CatalogService
+  - Loads specific folder by database ID
+  - Handles permission request if needed
+  - Updates lastScanDate on successful load
+- Added mock implementations to MockCatalogService
+- Exported FolderInfo from catalog index
+
+### Phase 2: Create useRecentFolders Composable
+- Created `apps/web/app/composables/useRecentFolders.ts`
+- Provides state: recentFolders, isLoadingFolders, isLoadingFolderId, error
+- Provides actions: loadRecentFolders, openRecentFolder, openNewFolder, checkFolderAccess
+- Provides computed: hasRecentFolders, accessibleFolders, inaccessibleFolders
+
+### Phase 3: Create RecentFoldersDropdown Component
+- Created `apps/web/app/components/catalog/RecentFoldersDropdown.vue`
+- Uses Nuxt UI `UDropdownMenu` component
+- Shows current folder name with dropdown trigger
+- Dropdown shows:
+  - Recent folders with accessibility indicator (lock icon if inaccessible)
+  - Last scan date for each folder
+  - Loading spinner when a folder is being loaded
+  - "Choose New Folder..." action at bottom
+
+### Phase 4: Update Home Page UI
+- Updated welcome screen to show recent folders as clickable cards
+- Cards show folder name, last scan date, and accessibility status
+- Added loading state for recent folders list
+- Changed button text to "Choose Different Folder" when recent folders exist
+- Replaced folder button in header with RecentFoldersDropdown component
+
+### Phase 5: Update Initialization Behavior
+- Modified `initializeApp()` in index.vue:
+  - Demo mode: Still auto-loads demo catalog (preserves existing behavior)
+  - Real mode: Only loads recent folders list, does NOT auto-restore previous folder
+- Edit page middleware unchanged: Still auto-restores for deep links
+
+**Files Created** (2 files):
+- `apps/web/app/composables/useRecentFolders.ts`
+- `apps/web/app/components/catalog/RecentFoldersDropdown.vue`
+
+**Files Modified** (5 files):
+- `packages/core/src/catalog/types.ts` - Added FolderInfo interface, ICatalogService methods
+- `packages/core/src/catalog/catalog-service.ts` - Implemented listFolders, loadFolderById
+- `packages/core/src/catalog/mock-catalog-service.ts` - Added mock implementations
+- `packages/core/src/catalog/index.ts` - Exported FolderInfo
+- `apps/web/app/pages/index.vue` - Updated welcome screen, header, initialization
+
+**Tests**: All 362 unit tests + 28 E2E tests pass
+
+**Result**: The "Previously opened folder auto-loads unexpectedly" issue is now fixed:
+1. Home page no longer auto-loads the previous folder
+2. Welcome screen shows a list of recent folders to choose from
+3. Users can explicitly select which folder to open
+4. Edit page deep links still work (auto-restore preserved)
+5. Demo mode behavior unchanged (auto-loads demo catalog)
+
+---
+

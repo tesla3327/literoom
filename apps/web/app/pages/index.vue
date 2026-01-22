@@ -20,6 +20,17 @@ const permissionStore = usePermissionRecoveryStore()
 const exportStore = useExportStore()
 const { selectFolder, restoreSession, isDemoMode, isLoading, loadingMessage } = useCatalog()
 
+// Recent folders composable
+const {
+  recentFolders,
+  isLoadingFolders,
+  isLoadingFolderId,
+  hasRecentFolders,
+  loadRecentFolders,
+  openRecentFolder,
+  openNewFolder,
+} = useRecentFolders()
+
 // Help modal keyboard shortcuts
 useHelpModal()
 
@@ -84,23 +95,78 @@ function handleContinue() {
 }
 
 // ============================================================================
+// Recent Folders
+// ============================================================================
+
+/**
+ * Format date for display in recent folders list.
+ */
+function formatDate(date: Date): string {
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+
+  if (diff < 60000) return 'Just now'
+  if (diff < 3600000) {
+    const mins = Math.floor(diff / 60000)
+    return `${mins} minute${mins > 1 ? 's' : ''} ago`
+  }
+  if (diff < 86400000) {
+    const hours = Math.floor(diff / 3600000)
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`
+  }
+  if (diff < 604800000) {
+    const days = Math.floor(diff / 86400000)
+    return `${days} day${days > 1 ? 's' : ''} ago`
+  }
+  return date.toLocaleDateString()
+}
+
+/**
+ * Handle selecting a recent folder from the welcome screen.
+ */
+async function handleOpenRecentFolder(folderId: number) {
+  scanError.value = null
+  const folder = recentFolders.value.find(f => f.id === folderId)
+  if (!folder) return
+
+  try {
+    const success = await openRecentFolder(folder)
+    if (!success) {
+      scanError.value = 'Could not access folder. Permission may have been revoked.'
+    }
+  }
+  catch (error) {
+    scanError.value = error instanceof Error ? error.message : 'Failed to open folder'
+  }
+}
+
+// ============================================================================
 // App Initialization
 // ============================================================================
 
 /**
- * Initialize app and restore session if possible.
+ * Initialize app - load recent folders list (don't auto-restore).
+ * In demo mode, auto-load the demo catalog.
  */
 async function initializeApp() {
-  try {
-    const restored = await restoreSession()
-    if (!restored && !isDemoMode) {
-      // Session restoration failed - may need permission recovery
-      // This is handled by the restoreSession function internally
+  // In demo mode, auto-load the demo catalog
+  if (isDemoMode) {
+    try {
+      await restoreSession()
     }
+    catch (error) {
+      console.warn('Demo mode initialization failed:', error)
+    }
+    return
+  }
+
+  // In real mode, just load the recent folders list
+  // DO NOT auto-restore - let user choose which folder to open
+  try {
+    await loadRecentFolders()
   }
   catch (error) {
-    // Start fresh if restoration fails
-    console.warn('Session restoration failed:', error)
+    console.warn('Failed to load recent folders:', error)
   }
 }
 
@@ -165,7 +231,7 @@ onUnmounted(() => {
       class="flex-1 flex items-center justify-center p-8"
       data-testid="welcome-screen"
     >
-      <div class="max-w-md text-center">
+      <div class="max-w-lg text-center">
         <h1 class="text-4xl font-bold">
           Literoom
         </h1>
@@ -184,6 +250,75 @@ onUnmounted(() => {
           </p>
         </div>
 
+        <!-- Recent Folders List (non-demo mode only) -->
+        <div
+          v-if="!isDemoMode && hasRecentFolders"
+          class="mt-8"
+        >
+          <h2 class="text-sm font-medium text-gray-400 mb-3 text-left">
+            Recent Folders
+          </h2>
+          <div class="space-y-2">
+            <button
+              v-for="folder in recentFolders"
+              :key="folder.id"
+              class="w-full flex items-center gap-3 p-3 rounded-lg bg-gray-900 hover:bg-gray-800 transition-colors text-left group"
+              :class="{ 'opacity-50': !folder.isAccessible }"
+              :disabled="!folder.isAccessible || isLoadingFolderId === folder.id"
+              data-testid="recent-folder-item"
+              @click="folder.isAccessible && handleOpenRecentFolder(folder.id)"
+            >
+              <div class="flex-shrink-0">
+                <UIcon
+                  v-if="isLoadingFolderId === folder.id"
+                  name="i-heroicons-arrow-path"
+                  class="w-5 h-5 text-primary-400 animate-spin"
+                />
+                <UIcon
+                  v-else-if="!folder.isAccessible"
+                  name="i-heroicons-lock-closed"
+                  class="w-5 h-5 text-gray-500"
+                />
+                <UIcon
+                  v-else
+                  name="i-heroicons-folder"
+                  class="w-5 h-5 text-gray-400 group-hover:text-primary-400"
+                />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-white truncate">
+                  {{ folder.name }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  <template v-if="!folder.isAccessible">
+                    Permission required
+                  </template>
+                  <template v-else>
+                    {{ formatDate(folder.lastScanDate) }}
+                  </template>
+                </p>
+              </div>
+              <UIcon
+                v-if="folder.isAccessible && isLoadingFolderId !== folder.id"
+                name="i-heroicons-chevron-right"
+                class="w-4 h-4 text-gray-600 group-hover:text-gray-400 flex-shrink-0"
+              />
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading recent folders -->
+        <div
+          v-if="!isDemoMode && isLoadingFolders"
+          class="mt-8 flex items-center justify-center gap-2 text-gray-500"
+        >
+          <UIcon
+            name="i-heroicons-arrow-path"
+            class="w-4 h-4 animate-spin"
+          />
+          <span class="text-sm">Loading recent folders...</span>
+        </div>
+
         <div class="mt-8 space-y-4">
           <UButton
             size="xl"
@@ -191,7 +326,7 @@ onUnmounted(() => {
             data-testid="choose-folder-button"
             @click="handleSelectFolder"
           >
-            Choose Folder
+            {{ hasRecentFolders ? 'Choose Different Folder' : 'Choose Folder' }}
           </UButton>
 
           <p class="text-sm text-gray-500">
@@ -256,14 +391,8 @@ onUnmounted(() => {
       <!-- Header -->
       <header class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
         <div class="flex items-center gap-3">
-          <UButton
-            variant="ghost"
-            icon="i-heroicons-folder"
-            size="sm"
-            @click="handleSelectFolder"
-          >
-            {{ folderName }}
-          </UButton>
+          <!-- Folder dropdown (replaces old folder button) -->
+          <RecentFoldersDropdown @folder-changed="() => {}" />
 
           <!-- Scanning indicator -->
           <div

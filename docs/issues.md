@@ -3,12 +3,13 @@
 ## Table of Contents
 
 ### Open Issues
-- [Previously opened folder auto-loads unexpectedly (Medium)](#previously-opened-folder-auto-loads-unexpectedly)
 - [Import UX feels slow (Medium)](#import-ux-feels-slow)
 - [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail)
 - [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---partially-solved)
 
 ### Recently Solved
+- [Previously opened folder auto-loads unexpectedly (Medium)](#previously-opened-folder-auto-loads-unexpectedly---solved)
+- [Import UX feels slow (Medium)](#import-ux-feels-slow---solved)
 - ["All" count keeps increasing (High)](#all-count-keeps-increasing---solved)
 - [Export doesn't apply edits (Critical)](#export-doesnt-apply-edits---solved)
 - [Export button always disabled (Medium)](#export-button-always-disabled---solved)
@@ -43,35 +44,22 @@
 
 ## Open Issues
 
-### Previously opened folder auto-loads unexpectedly
+### Import UX feels slow - SOLVED
 
-**Severity**: Medium
-
-**Problem**:
-When loading the app or clicking "Select Folder" after previously loading a folder, the app automatically loads the previous folder. This is unexpected UX behavior.
-
-**Suggested Fix**:
-Change "Select Folder" to "Previously Opened Folders" with a list of recent folders, allowing users to quickly jump to a previous folder or select a new one.
-
----
-
-### Import UX feels slow
-
-**Severity**: Medium
+**Severity**: Medium | **Fixed**: 2026-01-22
 
 **Problem**:
 The import experience feels slow and lacks feedback. Users are dropped into a gallery with loading placeholders without knowing the import progress.
 
-**Suggested Improvements**:
-1. Show scanning progress in the toolbar (currently only shows for scanning files, then disappears)
-2. Show progress for the entire import process: scanning → processing thumbnails → processing preview images
-3. Add a progress bar where it says "scanning" in the toolbar
-4. Consider showing an interstitial/modal with "loading" instead of immediately showing the gallery with placeholders
-5. Process the first page of thumbnails before showing the gallery
-6. Ensure thumbnails are loaded when users are dropped into the gallery
-7. Continue processing other thumbnails and previews in the background
+**Fix Applied**:
+1. Added thumbnail progress tracking to catalog store (`thumbnailProgress`, `thumbnailPercent`, `isProcessingThumbnails`)
+2. Added progress indicator in FilterBar showing ready/total count and progress bar
+3. Wait for first page of thumbnails (~20) before showing gallery view
+4. Fixed priority system to use `ThumbnailPriority` enum values
+5. Integrated IntersectionObserver for dynamic priority updates based on visibility
+6. Added loading messages ("Scanning folder...", "Preparing gallery...") with progress bars
 
-**Goal**: When users enter the gallery, it should feel like they can immediately start using the app.
+**Result**: Gallery now shows thumbnails (not loading placeholders) when users enter, with visible progress during thumbnail generation.
 
 ---
 
@@ -135,6 +123,36 @@ Requires implementing thumbnail regeneration pipeline:
 ---
 
 ## Solved Issues
+
+### Previously opened folder auto-loads unexpectedly - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-22
+
+**Problem**:
+When loading the app or clicking "Select Folder" after previously loading a folder, the app automatically loads the previous folder. This is unexpected UX behavior.
+
+**Fix Applied**:
+1. Added `listFolders()` and `loadFolderById()` methods to CatalogService
+2. Created `useRecentFolders` composable for folder management
+3. Created `RecentFoldersDropdown` component for header
+4. Updated welcome screen to show list of recent folders as clickable cards
+5. Changed initialization behavior: home page no longer auto-restores previous folder
+6. Edit page deep links still auto-restore (preserved for bookmarks/shared links)
+
+**Files Created** (2):
+- `apps/web/app/composables/useRecentFolders.ts`
+- `apps/web/app/components/catalog/RecentFoldersDropdown.vue`
+
+**Files Modified** (5):
+- `packages/core/src/catalog/types.ts`
+- `packages/core/src/catalog/catalog-service.ts`
+- `packages/core/src/catalog/mock-catalog-service.ts`
+- `packages/core/src/catalog/index.ts`
+- `apps/web/app/pages/index.vue`
+
+**Result**: Users now see their recent folders on the welcome screen and can choose which to open, rather than having the previous folder auto-load.
+
+---
 
 ### Export doesn't apply edits - SOLVED
 
