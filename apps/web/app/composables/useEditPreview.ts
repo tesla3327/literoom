@@ -26,25 +26,48 @@ import {
 // ============================================================================
 
 /**
+ * Per-channel clipping detection flags.
+ */
+export interface ChannelClipping {
+  r: boolean
+  g: boolean
+  b: boolean
+}
+
+/**
  * Clipping map data for overlay rendering.
- * Each pixel is encoded as a bit field:
- * - 0 = no clipping
- * - 1 = shadow clipping (any channel at 0)
- * - 2 = highlight clipping (any channel at 255)
- * - 3 = both shadow and highlight clipping
+ * Each pixel is encoded as a 6-bit field:
+ * - Bit 0 (1): R shadow (R = 0)
+ * - Bit 1 (2): G shadow (G = 0)
+ * - Bit 2 (4): B shadow (B = 0)
+ * - Bit 3 (8): R highlight (R = 255)
+ * - Bit 4 (16): G highlight (G = 255)
+ * - Bit 5 (32): B highlight (B = 255)
  */
 export interface ClippingMap {
-  /** Clipping data for each pixel (0=none, 1=shadow, 2=highlight, 3=both) */
+  /** Per-channel clipping data (6-bit encoding per pixel) */
   data: Uint8Array
   /** Width of the image */
   width: number
   /** Height of the image */
   height: number
-  /** Whether any shadow clipping exists */
+  /** Per-channel shadow clipping presence (legacy compatibility) */
   hasShadowClipping: boolean
-  /** Whether any highlight clipping exists */
+  /** Per-channel highlight clipping presence (legacy compatibility) */
   hasHighlightClipping: boolean
+  /** Per-channel shadow clipping detection */
+  shadowClipping: ChannelClipping
+  /** Per-channel highlight clipping detection */
+  highlightClipping: ChannelClipping
 }
+
+// Bit masks for per-channel clipping detection
+export const CLIP_SHADOW_R = 1
+export const CLIP_SHADOW_G = 2
+export const CLIP_SHADOW_B = 4
+export const CLIP_HIGHLIGHT_R = 8
+export const CLIP_HIGHLIGHT_G = 16
+export const CLIP_HIGHLIGHT_B = 32
 
 export interface UseEditPreviewReturn {
   /** URL of the current preview (with edits applied when available) */
@@ -217,14 +240,16 @@ async function loadImagePixels(
 }
 
 /**
- * Detect clipped pixels in an RGB image.
- * Shadow clipping: any channel at 0
- * Highlight clipping: any channel at 255
+ * Detect clipped pixels in an RGB image with per-channel tracking.
+ * Uses 6-bit encoding per pixel to track which specific channels are clipped.
+ *
+ * Shadow clipping: channel at 0
+ * Highlight clipping: channel at 255
  *
  * @param pixels - RGB pixel data (3 bytes per pixel)
  * @param width - Image width
  * @param height - Image height
- * @returns ClippingMap with per-pixel clipping info
+ * @returns ClippingMap with per-pixel and per-channel clipping info
  */
 function detectClippedPixels(
   pixels: Uint8Array,
@@ -233,8 +258,8 @@ function detectClippedPixels(
 ): ClippingMap {
   const pixelCount = width * height
   const data = new Uint8Array(pixelCount)
-  let hasShadow = false
-  let hasHighlight = false
+  const shadowClipping: ChannelClipping = { r: false, g: false, b: false }
+  const highlightClipping: ChannelClipping = { r: false, g: false, b: false }
 
   for (let i = 0, idx = 0; i < pixels.length; i += 3, idx++) {
     const r = pixels[i]!
@@ -242,16 +267,32 @@ function detectClippedPixels(
     const b = pixels[i + 2]!
     let clipType = 0
 
-    // Shadow clipping: any channel at minimum
-    if (r === 0 || g === 0 || b === 0) {
-      clipType |= 1
-      hasShadow = true
+    // Per-channel shadow clipping (channel at 0)
+    if (r === 0) {
+      clipType |= CLIP_SHADOW_R
+      shadowClipping.r = true
+    }
+    if (g === 0) {
+      clipType |= CLIP_SHADOW_G
+      shadowClipping.g = true
+    }
+    if (b === 0) {
+      clipType |= CLIP_SHADOW_B
+      shadowClipping.b = true
     }
 
-    // Highlight clipping: any channel at maximum
-    if (r === 255 || g === 255 || b === 255) {
-      clipType |= 2
-      hasHighlight = true
+    // Per-channel highlight clipping (channel at 255)
+    if (r === 255) {
+      clipType |= CLIP_HIGHLIGHT_R
+      highlightClipping.r = true
+    }
+    if (g === 255) {
+      clipType |= CLIP_HIGHLIGHT_G
+      highlightClipping.g = true
+    }
+    if (b === 255) {
+      clipType |= CLIP_HIGHLIGHT_B
+      highlightClipping.b = true
     }
 
     data[idx] = clipType
@@ -261,8 +302,12 @@ function detectClippedPixels(
     data,
     width,
     height,
-    hasShadowClipping: hasShadow,
-    hasHighlightClipping: hasHighlight,
+    // Legacy compatibility
+    hasShadowClipping: shadowClipping.r || shadowClipping.g || shadowClipping.b,
+    hasHighlightClipping: highlightClipping.r || highlightClipping.g || highlightClipping.b,
+    // Per-channel tracking
+    shadowClipping,
+    highlightClipping,
   }
 }
 

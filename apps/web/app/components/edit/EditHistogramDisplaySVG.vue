@@ -4,8 +4,14 @@
  *
  * Uses bezier curves for smooth rendering instead of canvas.
  * Browser handles anti-aliasing natively.
+ *
+ * Clipping triangle indicators use per-channel color coding like Lightroom:
+ * - White = all channels clipped
+ * - Primary colors (R, G, B) = single channel clipped
+ * - Secondary colors (Cyan, Magenta, Yellow) = two channels clipped
  */
 import { SVG_WIDTH, SVG_HEIGHT } from '~/composables/useHistogramDisplaySVG'
+import type { ChannelClipping } from '@literoom/core/decode'
 
 const props = defineProps<{
   assetId: string
@@ -33,6 +39,51 @@ const {
 const editUIStore = useEditUIStore()
 const { showHighlightClipping, showShadowClipping } = storeToRefs(editUIStore)
 const { toggleClippingOverlays, toggleShadowClipping, toggleHighlightClipping } = editUIStore
+
+// ============================================================================
+// Per-Channel Triangle Colors (Lightroom-style)
+// ============================================================================
+
+/**
+ * Get triangle indicator color based on which channels are clipping.
+ * - White = all 3 channels (true blown/crushed)
+ * - Secondary colors = 2 channels
+ * - Primary colors = 1 channel
+ */
+function getTriangleColor(clipping: ChannelClipping | undefined): string {
+  if (!clipping) return 'transparent'
+
+  const { r, g, b } = clipping
+
+  // All channels = white (true detail loss)
+  if (r && g && b) return '#ffffff'
+
+  // Two channels = secondary color
+  if (r && g) return '#ffff00' // Yellow
+  if (r && b) return '#ff00ff' // Magenta
+  if (g && b) return '#00ffff' // Cyan
+
+  // One channel = primary color
+  if (r) return '#ff0000' // Red
+  if (g) return '#00ff00' // Green
+  if (b) return '#0000ff' // Blue
+
+  // No clipping
+  return 'transparent'
+}
+
+// Computed triangle colors based on per-channel clipping info
+const shadowTriangleColor = computed(() =>
+  getTriangleColor(histogram.value?.shadowClipping),
+)
+
+const highlightTriangleColor = computed(() =>
+  getTriangleColor(histogram.value?.highlightClipping),
+)
+
+// Legacy compatibility - check if any clipping exists
+const hasShadowClipping = computed(() => histogram.value?.hasShadowClipping ?? false)
+const hasHighlightClipping = computed(() => histogram.value?.hasHighlightClipping ?? false)
 
 // ============================================================================
 // Keyboard Shortcut (J key)
@@ -126,17 +177,23 @@ onUnmounted(() => {
         />
 
         <!-- Shadow clipping indicator (top-left triangle) -->
+        <!-- Color-coded: white=all channels, primary=single, secondary=two channels -->
         <polygon
-          v-if="histogram?.hasShadowClipping"
-          points="0,0 8,0 0,8"
-          fill="#3b82f6"
+          v-if="hasShadowClipping"
+          points="0,0 10,0 0,10"
+          :fill="shadowTriangleColor"
+          stroke="#333"
+          stroke-width="0.5"
         />
 
         <!-- Highlight clipping indicator (top-right triangle) -->
+        <!-- Color-coded: white=all channels, primary=single, secondary=two channels -->
         <polygon
-          v-if="histogram?.hasHighlightClipping"
-          :points="`${SVG_WIDTH},0 ${SVG_WIDTH - 8},0 ${SVG_WIDTH},8`"
-          fill="#ef4444"
+          v-if="hasHighlightClipping"
+          :points="`${SVG_WIDTH},0 ${SVG_WIDTH - 10},0 ${SVG_WIDTH},10`"
+          :fill="highlightTriangleColor"
+          stroke="#333"
+          stroke-width="0.5"
         />
       </svg>
 
@@ -173,7 +230,7 @@ onUnmounted(() => {
       >
         <span
           class="w-2 h-2 rounded-sm"
-          :class="histogram.hasShadowClipping ? 'bg-blue-500' : 'bg-gray-600'"
+          :style="hasShadowClipping ? { backgroundColor: shadowTriangleColor } : { backgroundColor: '#4b5563' }"
         />
         <span class="text-gray-400">Shadows</span>
       </button>
@@ -186,7 +243,7 @@ onUnmounted(() => {
       >
         <span
           class="w-2 h-2 rounded-sm"
-          :class="histogram.hasHighlightClipping ? 'bg-red-500' : 'bg-gray-600'"
+          :style="hasHighlightClipping ? { backgroundColor: highlightTriangleColor } : { backgroundColor: '#4b5563' }"
         />
         <span class="text-gray-400">Highlights</span>
       </button>

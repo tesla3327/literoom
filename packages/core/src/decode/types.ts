@@ -115,10 +115,19 @@ export interface Adjustments {
 }
 
 /**
+ * Per-channel clipping detection.
+ */
+export interface ChannelClipping {
+  r: boolean
+  g: boolean
+  b: boolean
+}
+
+/**
  * Histogram data for an image.
  *
  * Contains 256-bin histograms for RGB and luminance channels,
- * plus clipping indicators.
+ * plus clipping indicators for both simple (any channel) and per-channel tracking.
  */
 export interface HistogramData {
   /** Red channel histogram (256 bins) */
@@ -131,10 +140,14 @@ export interface HistogramData {
   luminance: Uint32Array
   /** Maximum bin value across RGB channels (for normalization) */
   maxValue: number
-  /** True if any channel has pixels at value 255 */
+  /** True if any channel has pixels at value 255 (legacy compatibility) */
   hasHighlightClipping: boolean
-  /** True if any channel has pixels at value 0 */
+  /** True if any channel has pixels at value 0 (legacy compatibility) */
   hasShadowClipping: boolean
+  /** Per-channel highlight clipping detection */
+  highlightClipping?: ChannelClipping
+  /** Per-channel shadow clipping detection */
+  shadowClipping?: ChannelClipping
 }
 
 /**

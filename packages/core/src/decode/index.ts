@@ -15,6 +15,7 @@ export {
   type ErrorCode,
   type DecodeServiceState,
   type HistogramData,
+  type ChannelClipping,
   type CurvePoint,
   type ToneCurve,
   type Adjustments,

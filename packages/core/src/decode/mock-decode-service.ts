@@ -405,9 +405,21 @@ export class MockDecodeService implements IDecodeService {
       maxValue = Math.max(maxValue, red[i]!, green[i]!, blue[i]!)
     }
 
-    // Check for clipping
-    const hasHighlightClipping = (red[255]! > 0 || green[255]! > 0 || blue[255]! > 0)
-    const hasShadowClipping = (red[0]! > 0 || green[0]! > 0 || blue[0]! > 0)
+    // Per-channel clipping detection
+    const highlightClipping = {
+      r: red[255]! > 0,
+      g: green[255]! > 0,
+      b: blue[255]! > 0,
+    }
+    const shadowClipping = {
+      r: red[0]! > 0,
+      g: green[0]! > 0,
+      b: blue[0]! > 0,
+    }
+
+    // Legacy compatibility flags
+    const hasHighlightClipping = highlightClipping.r || highlightClipping.g || highlightClipping.b
+    const hasShadowClipping = shadowClipping.r || shadowClipping.g || shadowClipping.b
 
     return {
       red,
@@ -416,7 +428,9 @@ export class MockDecodeService implements IDecodeService {
       luminance,
       maxValue,
       hasHighlightClipping,
-      hasShadowClipping
+      hasShadowClipping,
+      highlightClipping,
+      shadowClipping,
     }
   }
 

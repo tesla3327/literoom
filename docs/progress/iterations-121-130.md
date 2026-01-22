@@ -145,3 +145,65 @@
 
 ---
 
+## 123: 2026-01-21 23:26 EST: Clipping Visualization Improvements - Implementation
+
+**Objective**: Implement per-channel clipping visualization like Lightroom, showing which specific channels (R, G, B) are clipped with appropriate color coding.
+
+**Status**: Complete
+
+**Implementation**:
+
+### Phase 1: Updated ClippingMap Data Structure (`useEditPreview.ts`)
+- Added `ChannelClipping` interface for per-channel tracking
+- Expanded `ClippingMap` to use 6-bit encoding per pixel:
+  - Bits 0-2: Shadow clipping (R/G/B = 0)
+  - Bits 3-5: Highlight clipping (R/G/B = 255)
+- Added `shadowClipping` and `highlightClipping` per-channel objects
+- Exported bit mask constants (`CLIP_SHADOW_R`, etc.)
+
+### Phase 2: Updated Clipping Overlay (`useClippingOverlay.ts`)
+- Added `getHighlightColor()` function - shows clipped channels directly:
+  - White = all 3 channels (R+G+B)
+  - Primary colors (Red, Green, Blue) = single channel
+  - Secondary colors (Yellow, Magenta, Cyan) = two channels
+- Added `getShadowColor()` function - shows remaining (non-clipped) channels:
+  - Dark gray = all 3 channels clipped
+  - Cyan = R clipped (G+B remain)
+  - Magenta = G clipped (R+B remain)
+  - Yellow = B clipped (R+G remain)
+
+### Phase 3: Updated Histogram Triangles (`EditHistogramDisplaySVG.vue`)
+- Added `getTriangleColor()` helper function
+- Computed properties for `shadowTriangleColor` and `highlightTriangleColor`
+- Updated triangle polygons to use per-channel colors
+- Updated toggle indicator dots to match per-channel colors
+
+### Phase 4: Updated Types
+- Added `ChannelClipping` interface to `packages/core/src/decode/types.ts`
+- Extended `HistogramData` with optional `shadowClipping` and `highlightClipping` fields
+- Updated `MockDecodeService.computeHistogram()` to return per-channel info
+- Exported `ChannelClipping` from decode index
+
+**Files Modified** (6):
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useClippingOverlay.ts`
+- `apps/web/app/components/edit/EditHistogramDisplaySVG.vue`
+- `packages/core/src/decode/types.ts`
+- `packages/core/src/decode/index.ts`
+- `packages/core/src/decode/mock-decode-service.ts`
+
+**Testing Results**:
+- ✅ All 362 core package tests pass
+- ✅ Browser verification shows per-channel overlay colors working
+- ✅ Histogram triangles show correct per-channel colors
+- ✅ Red-only clipping shows red overlay
+- ✅ All-channel clipping shows white overlay
+- ✅ Shadow clipping shows complementary colors
+
+**Screenshots**:
+- `docs/screenshots/clipping-viz-06-highlights-visible.png` - Red overlay for R-only clipping
+- `docs/screenshots/clipping-viz-07-all-channels.png` - Multi-color overlay showing R, R+G, and R+G+B clipping
+- `docs/screenshots/clipping-viz-08-shadow-clipping.png` - Shadow clipping with complementary colors
+
+---
+

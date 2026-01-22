@@ -3,7 +3,10 @@
 ## Table of Contents
 
 ### Open Issues
-- [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives)
+(None currently)
+
+### Recently Solved
+- [Clipping detection has false positives (Medium)](#clipping-detection-has-false-positives---solved)
 
 ### Solved Issues
 - [Edit view should never use thumbnail (High)](#edit-view-should-never-use-thumbnail---solved)
@@ -32,7 +35,57 @@
 
 ---
 
-## Open Issues
+## Solved Issues
+
+### Clipping detection has false positives - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-21 | **Verified**: 2026-01-21
+
+The clipping visualization now uses per-channel color coding like Lightroom, showing which specific channels (R, G, B) are clipped instead of using a single color for all clipping.
+
+**Original Problem**:
+- Clipping overlay showed all pixels the same way (red for highlights, blue for shadows)
+- No distinction between single-channel clipping (often acceptable) and all-channel clipping (true detail loss)
+- False positives - marking pixels as "clipped" when only one channel reached limits
+
+**Implementation**:
+
+1. **6-bit per-pixel encoding** in `ClippingMap`:
+   - Bits 0-2: Shadow clipping for R/G/B channels
+   - Bits 3-5: Highlight clipping for R/G/B channels
+
+2. **Per-channel highlight colors** (shows clipped channels):
+   - White = all 3 channels (R=255, G=255, B=255) - true blown highlights
+   - Red = only R clipped
+   - Green = only G clipped
+   - Blue = only B clipped
+   - Yellow = R+G clipped
+   - Magenta = R+B clipped
+   - Cyan = G+B clipped
+
+3. **Per-channel shadow colors** (shows remaining channels):
+   - Dark gray = all 3 channels clipped - true crushed shadows
+   - Cyan = R clipped (G+B remain)
+   - Magenta = G clipped (R+B remain)
+   - Yellow = B clipped (R+G remain)
+
+4. **Histogram triangle indicators** use same per-channel color coding
+
+**Files Modified** (6):
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/composables/useClippingOverlay.ts`
+- `apps/web/app/components/edit/EditHistogramDisplaySVG.vue`
+- `packages/core/src/decode/types.ts`
+- `packages/core/src/decode/index.ts`
+- `packages/core/src/decode/mock-decode-service.ts`
+
+**Verification**:
+- ✅ Red-tinted image with increased exposure shows red overlay for R-only clipping
+- ✅ Very bright areas show white overlay for all-channel clipping
+- ✅ Histogram triangles display correct per-channel colors
+- ✅ Toggle buttons show matching per-channel indicator colors
+
+---
 
 ### Crop doesn't update the image - SOLVED
 
@@ -102,80 +155,6 @@ The edit view now shows a loading state until the full 2560px preview is ready, 
 - ✅ Cached previews display immediately (no loading flash)
 - ✅ Works in both demo mode and real mode
 - ✅ All existing tests pass
-
----
-
-### Clipping detection has false positives
-
-**Severity**: Medium | **Status**: Open | **Discovered**: 2026-01-21
-
-The clipping overlay shows false positives - pixels are marked as clipped when they aren't actually losing detail. Additionally, our implementation lacks Lightroom's per-channel clipping visualization.
-
-**Current Algorithm** (`useEditPreview.ts:201-230`):
-```typescript
-// Shadow clipping: any channel at minimum
-if (r === 0 || g === 0 || b === 0) {
-  clipType |= 1  // Mark as shadow clipped
-}
-
-// Highlight clipping: any channel at maximum
-if (r === 255 || g === 255 || b === 255) {
-  clipType |= 2  // Mark as highlight clipped
-}
-```
-
-**Problem**: We show all clipping the same way (red for highlights, blue for shadows), but Lightroom distinguishes between all-channel and per-channel clipping with different colors.
-
----
-
-**How Lightroom Actually Works** (researched 2026-01-21):
-
-#### 1. Histogram Triangle Indicators
-The triangles at the top corners of the histogram show clipping status with **color-coded feedback**:
-- **White triangle** = ALL channels clipped (true highlight/shadow clipping - complete detail loss)
-- **Colored triangle** (cyan, magenta, yellow, red, green, blue) = Only one or two channels clipped
-
-This tells photographers at a glance whether clipping is "real" (all channels) or partial (single channel, often acceptable in saturated colors).
-
-#### 2. Overlay Colors
-When toggling clipping display (`J` key or clicking triangles):
-- **Red overlay** = Highlight clipping in one or more channels
-- **Blue overlay** = Shadow clipping in one or more channels
-
-#### 3. Alt/Option + Slider Drag (Per-Channel View)
-Holding Alt/Option while dragging Whites/Blacks sliders shows detailed per-channel clipping:
-- **White areas** = All channels clipped (complete detail loss)
-- **Black areas** = No clipping
-- **Colored areas** = Specific channel(s) clipped:
-  - Red, Green, Blue = single channel clipped
-  - Cyan (G+B), Magenta (R+B), Yellow (R+G) = two channels clipped
-
----
-
-**Implementation Plan**:
-
-1. **Update overlay to show per-channel clipping colors**:
-   - White/gray = all 3 channels clipped (true blown highlight)
-   - Black = all 3 channels at 0 (true crushed shadow)
-   - Red/Green/Blue = single channel clipped
-   - Cyan/Magenta/Yellow = two channels clipped
-
-2. **Update histogram triangle indicators**:
-   - White triangle = all channels clipping somewhere in image
-   - Colored triangle = partial channel clipping (show the color of most-clipped channel)
-
-3. **Keep current toggle behavior** (`J` key toggles both overlays)
-
-4. **Optional**: Add Alt+drag on sliders for detailed per-channel view
-
-**Files Involved**:
-- `apps/web/app/composables/useEditPreview.ts:201-230` - `detectClippedPixels()` function
-- `apps/web/app/composables/useClippingOverlay.ts` - Overlay rendering (needs color mapping)
-- `apps/web/app/components/edit/EditHistogramDisplay.vue` - Triangle indicator colors
-
-**Sources**:
-- [Adobe Lightroom Classic Help - Image Tone and Color](https://helpx.adobe.com/lightroom-classic/help/image-tone-color.html)
-- [Lightroom Queen Forums - Understanding the clipping triangles](https://www.lightroomqueen.com/community/threads/understanding-the-clipping-triangles-in-the-histogram.42075/)
 
 ---
 
