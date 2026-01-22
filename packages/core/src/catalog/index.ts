@@ -38,6 +38,12 @@ export type {
   CropRectangle,
   RotationParameters,
   CropTransform,
+  // Mask types
+  Point2D,
+  MaskAdjustments,
+  LinearGradientMask,
+  RadialGradientMask,
+  MaskStack,
 } from './types'
 
 // Classes and enums
@@ -61,6 +67,15 @@ export {
   getTotalRotation,
   validateCropRectangle,
   cloneCropTransform,
+  // Mask utilities
+  DEFAULT_MASK_STACK,
+  createDefaultMaskStack,
+  createLinearMask,
+  createRadialMask,
+  isModifiedMaskStack,
+  cloneMaskStack,
+  cloneLinearMask,
+  cloneRadialMask,
 } from './types'
 
 // Services

@@ -11,15 +11,30 @@
  *
  * Edit state is persisted per-asset in the database.
  */
-import type { Adjustments, CropRectangle, CropTransform, EditState, RotationParameters } from '@literoom/core/catalog'
+import type {
+  Adjustments,
+  CropRectangle,
+  CropTransform,
+  EditState,
+  LinearGradientMask,
+  MaskAdjustments,
+  MaskStack,
+  RadialGradientMask,
+  RotationParameters,
+} from '@literoom/core/catalog'
 import {
   DEFAULT_ADJUSTMENTS,
   DEFAULT_CROP_TRANSFORM,
   EDIT_SCHEMA_VERSION,
   cloneCropTransform,
+  cloneLinearMask,
+  cloneMaskStack,
+  cloneRadialMask,
   createDefaultEditState,
+  createDefaultMaskStack,
   hasModifiedAdjustments,
   isModifiedCropTransform,
+  isModifiedMaskStack,
   isModifiedToneCurve,
 } from '@literoom/core/catalog'
 import type { CurvePoint, ToneCurve } from '@literoom/core/decode'
@@ -46,6 +61,16 @@ export const useEditStore = defineStore('edit', () => {
   const cropTransform = ref<CropTransform>(cloneCropTransform(DEFAULT_CROP_TRANSFORM))
 
   /**
+   * Current local adjustment masks.
+   */
+  const masks = ref<MaskStack | null>(null)
+
+  /**
+   * ID of the currently selected mask for editing.
+   */
+  const selectedMaskId = ref<string | null>(null)
+
+  /**
    * Whether the edit state has been modified since loading.
    */
   const isDirty = ref(false)
@@ -65,10 +90,12 @@ export const useEditStore = defineStore('edit', () => {
   // ============================================================================
 
   /**
-   * Whether any adjustments have been modified from defaults.
+   * Whether any edits have been modified from defaults.
    */
   const hasModifications = computed(
-    () => hasModifiedAdjustments(adjustments.value) || isModifiedCropTransform(cropTransform.value),
+    () => hasModifiedAdjustments(adjustments.value) ||
+          isModifiedCropTransform(cropTransform.value) ||
+          isModifiedMaskStack(masks.value ?? undefined),
   )
 
   /**
@@ -82,12 +109,33 @@ export const useEditStore = defineStore('edit', () => {
   const hasCropTransformModifications = computed(() => isModifiedCropTransform(cropTransform.value))
 
   /**
+   * Whether any masks have been added.
+   */
+  const hasMaskModifications = computed(() => isModifiedMaskStack(masks.value ?? undefined))
+
+  /**
+   * The currently selected mask and its type.
+   */
+  const selectedMask = computed(() => {
+    if (!selectedMaskId.value || !masks.value) return null
+
+    const linearMask = masks.value.linearMasks.find(m => m.id === selectedMaskId.value)
+    if (linearMask) return { type: 'linear' as const, mask: linearMask }
+
+    const radialMask = masks.value.radialMasks.find(m => m.id === selectedMaskId.value)
+    if (radialMask) return { type: 'radial' as const, mask: radialMask }
+
+    return null
+  })
+
+  /**
    * Get the full edit state object.
    */
   const editState = computed<EditState>(() => ({
     version: EDIT_SCHEMA_VERSION,
     adjustments: { ...adjustments.value },
     cropTransform: cloneCropTransform(cropTransform.value),
+    masks: masks.value ? cloneMaskStack(masks.value) : undefined,
   }))
 
   // ============================================================================
@@ -111,6 +159,8 @@ export const useEditStore = defineStore('edit', () => {
     // For now, initialize with defaults
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
+    masks.value = null
+    selectedMaskId.value = null
     isDirty.value = false
   }
 
@@ -146,6 +196,8 @@ export const useEditStore = defineStore('edit', () => {
   function reset(): void {
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
+    masks.value = null
+    selectedMaskId.value = null
     isDirty.value = true
     error.value = null
   }
@@ -182,6 +234,8 @@ export const useEditStore = defineStore('edit', () => {
     currentAssetId.value = null
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
+    masks.value = null
+    selectedMaskId.value = null
     isDirty.value = false
     isSaving.value = false
     error.value = null
@@ -322,11 +376,214 @@ export const useEditStore = defineStore('edit', () => {
     error.value = null
   }
 
+  // ============================================================================
+  // Mask Actions
+  // ============================================================================
+
+  /**
+   * Add a linear gradient mask.
+   */
+  function addLinearMask(mask: LinearGradientMask): void {
+    if (!masks.value) {
+      masks.value = createDefaultMaskStack()
+    }
+    masks.value.linearMasks.push(cloneLinearMask(mask))
+    selectedMaskId.value = mask.id
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Add a radial gradient mask.
+   */
+  function addRadialMask(mask: RadialGradientMask): void {
+    if (!masks.value) {
+      masks.value = createDefaultMaskStack()
+    }
+    masks.value.radialMasks.push(cloneRadialMask(mask))
+    selectedMaskId.value = mask.id
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Update a linear mask by ID.
+   */
+  function updateLinearMask(id: string, updates: Partial<Omit<LinearGradientMask, 'id'>>): void {
+    if (!masks.value) return
+
+    const index = masks.value.linearMasks.findIndex(m => m.id === id)
+    if (index !== -1) {
+      const current = masks.value.linearMasks[index]
+      masks.value.linearMasks[index] = {
+        id: current.id,
+        start: updates.start ?? current.start,
+        end: updates.end ?? current.end,
+        feather: updates.feather ?? current.feather,
+        enabled: updates.enabled ?? current.enabled,
+        adjustments: updates.adjustments ?? current.adjustments,
+      }
+      isDirty.value = true
+      error.value = null
+    }
+  }
+
+  /**
+   * Update a radial mask by ID.
+   */
+  function updateRadialMask(id: string, updates: Partial<Omit<RadialGradientMask, 'id'>>): void {
+    if (!masks.value) return
+
+    const index = masks.value.radialMasks.findIndex(m => m.id === id)
+    if (index !== -1) {
+      const current = masks.value.radialMasks[index]
+      masks.value.radialMasks[index] = {
+        id: current.id,
+        center: updates.center ?? current.center,
+        radiusX: updates.radiusX ?? current.radiusX,
+        radiusY: updates.radiusY ?? current.radiusY,
+        rotation: updates.rotation ?? current.rotation,
+        feather: updates.feather ?? current.feather,
+        invert: updates.invert ?? current.invert,
+        enabled: updates.enabled ?? current.enabled,
+        adjustments: updates.adjustments ?? current.adjustments,
+      }
+      isDirty.value = true
+      error.value = null
+    }
+  }
+
+  /**
+   * Delete a mask by ID.
+   */
+  function deleteMask(id: string): void {
+    if (!masks.value) return
+
+    const linearIndex = masks.value.linearMasks.findIndex(m => m.id === id)
+    if (linearIndex !== -1) {
+      masks.value.linearMasks.splice(linearIndex, 1)
+    }
+    else {
+      const radialIndex = masks.value.radialMasks.findIndex(m => m.id === id)
+      if (radialIndex !== -1) {
+        masks.value.radialMasks.splice(radialIndex, 1)
+      }
+    }
+
+    if (selectedMaskId.value === id) {
+      selectedMaskId.value = null
+    }
+
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Toggle mask enabled state.
+   */
+  function toggleMaskEnabled(id: string): void {
+    if (!masks.value) return
+
+    const linearMask = masks.value.linearMasks.find(m => m.id === id)
+    if (linearMask) {
+      linearMask.enabled = !linearMask.enabled
+      isDirty.value = true
+      error.value = null
+      return
+    }
+
+    const radialMask = masks.value.radialMasks.find(m => m.id === id)
+    if (radialMask) {
+      radialMask.enabled = !radialMask.enabled
+      isDirty.value = true
+      error.value = null
+    }
+  }
+
+  /**
+   * Select a mask by ID.
+   */
+  function selectMask(id: string | null): void {
+    selectedMaskId.value = id
+  }
+
+  /**
+   * Set adjustments for a specific mask.
+   */
+  function setMaskAdjustments(id: string, adjustments: MaskAdjustments): void {
+    if (!masks.value) return
+
+    const linearMask = masks.value.linearMasks.find(m => m.id === id)
+    if (linearMask) {
+      linearMask.adjustments = { ...adjustments }
+      isDirty.value = true
+      error.value = null
+      return
+    }
+
+    const radialMask = masks.value.radialMasks.find(m => m.id === id)
+    if (radialMask) {
+      radialMask.adjustments = { ...adjustments }
+      isDirty.value = true
+      error.value = null
+    }
+  }
+
+  /**
+   * Update a single adjustment for a specific mask.
+   */
+  function setMaskAdjustment(id: string, key: keyof MaskAdjustments, value: number): void {
+    if (!masks.value) return
+
+    const linearMask = masks.value.linearMasks.find(m => m.id === id)
+    if (linearMask) {
+      linearMask.adjustments = {
+        ...linearMask.adjustments,
+        [key]: value,
+      }
+      isDirty.value = true
+      error.value = null
+      return
+    }
+
+    const radialMask = masks.value.radialMasks.find(m => m.id === id)
+    if (radialMask) {
+      radialMask.adjustments = {
+        ...radialMask.adjustments,
+        [key]: value,
+      }
+      isDirty.value = true
+      error.value = null
+    }
+  }
+
+  /**
+   * Reset all masks.
+   */
+  function resetMasks(): void {
+    masks.value = null
+    selectedMaskId.value = null
+    isDirty.value = true
+    error.value = null
+  }
+
+  /**
+   * Set the complete mask stack (e.g., from loaded state or paste).
+   */
+  function setMasks(maskStack: MaskStack | null): void {
+    masks.value = maskStack ? cloneMaskStack(maskStack) : null
+    selectedMaskId.value = null
+    isDirty.value = true
+    error.value = null
+  }
+
   return {
     // State
     currentAssetId,
     adjustments,
     cropTransform: readonly(cropTransform),
+    masks: readonly(masks),
+    selectedMaskId: readonly(selectedMaskId),
     isDirty,
     isSaving,
     error,
@@ -335,6 +592,8 @@ export const useEditStore = defineStore('edit', () => {
     hasModifications,
     hasCurveModifications,
     hasCropTransformModifications,
+    hasMaskModifications,
+    selectedMask,
     editState,
 
     // Actions
@@ -359,5 +618,18 @@ export const useEditStore = defineStore('edit', () => {
     setRotationAngle,
     setStraightenAngle,
     resetCropTransform,
+
+    // Mask Actions
+    addLinearMask,
+    addRadialMask,
+    updateLinearMask,
+    updateRadialMask,
+    deleteMask,
+    toggleMaskEnabled,
+    selectMask,
+    setMaskAdjustments,
+    setMaskAdjustment,
+    resetMasks,
+    setMasks,
   }
 })

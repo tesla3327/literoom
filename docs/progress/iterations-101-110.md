@@ -480,3 +480,66 @@ interface MaskStackData {
 
 ---
 
+## 110: 2026-01-21 20:55 EST: Local Masks - Phase 5 Complete (Edit Store Integration)
+
+**Objective**: Add mask state management to the Pinia edit store.
+
+**Background**: Phase 4 completed the worker integration for mask operations. Phase 5 integrates mask state into the edit store so the UI can manage masks through the familiar store pattern.
+
+**Implementation**:
+
+1. **Updated `packages/core/src/catalog/index.ts`**:
+   - Exported all mask types: `Point2D`, `MaskAdjustments`, `LinearGradientMask`, `RadialGradientMask`, `MaskStack`
+   - Exported all mask utilities: `DEFAULT_MASK_STACK`, `createDefaultMaskStack`, `createLinearMask`, `createRadialMask`, `isModifiedMaskStack`, `cloneMaskStack`, `cloneLinearMask`, `cloneRadialMask`
+
+2. **Updated `apps/web/app/stores/edit.ts`**:
+   - Added `masks` ref (MaskStack | null)
+   - Added `selectedMaskId` ref (string | null)
+   - Added `hasMaskModifications` computed (checks if any masks exist)
+   - Added `selectedMask` computed (returns selected mask and its type)
+   - Updated `hasModifications` to include mask modifications
+   - Updated `editState` computed to include masks
+   - Updated `loadForAsset`, `reset`, `clear` to reset mask state
+
+3. **Added Mask Actions to Edit Store**:
+   - `addLinearMask(mask)` - Add a linear gradient mask
+   - `addRadialMask(mask)` - Add a radial gradient mask
+   - `updateLinearMask(id, updates)` - Update linear mask properties
+   - `updateRadialMask(id, updates)` - Update radial mask properties
+   - `deleteMask(id)` - Delete any mask by ID
+   - `toggleMaskEnabled(id)` - Toggle mask enabled state
+   - `selectMask(id)` - Set the selected mask for editing
+   - `setMaskAdjustments(id, adjustments)` - Set all adjustments for a mask
+   - `setMaskAdjustment(id, key, value)` - Set a single adjustment value
+   - `resetMasks()` - Clear all masks
+   - `setMasks(maskStack)` - Set complete mask stack (for paste operations)
+
+**Files Modified** (2 files):
+- `packages/core/src/catalog/index.ts` - Added mask exports
+- `apps/web/app/stores/edit.ts` - Added mask state and actions
+
+**Tests**: All 362 TypeScript tests pass. Build succeeds.
+
+**TypeScript API**:
+```typescript
+const editStore = useEditStore()
+
+// Add masks
+editStore.addLinearMask(createLinearMask())
+editStore.addRadialMask(createRadialMask())
+
+// Select and modify
+editStore.selectMask(maskId)
+editStore.updateLinearMask(maskId, { feather: 0.5 })
+editStore.setMaskAdjustment(maskId, 'exposure', 0.5)
+
+// Query state
+editStore.masks              // MaskStack | null
+editStore.selectedMask       // { type: 'linear' | 'radial', mask: ... } | null
+editStore.hasMaskModifications  // boolean
+```
+
+**Status**: Complete. Phase 5 done. Next: Phase 6 (Preview Pipeline Integration).
+
+---
+
