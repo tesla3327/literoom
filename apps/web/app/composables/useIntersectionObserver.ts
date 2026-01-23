@@ -70,7 +70,7 @@ export interface UseIntersectionObserverReturn {
  */
 export function useIntersectionObserver(
   callback?: (isVisible: boolean) => void,
-  options: UseIntersectionObserverOptions = {}
+  options: UseIntersectionObserverOptions = {},
 ): UseIntersectionObserverReturn {
   const {
     threshold = 0.1,
@@ -123,7 +123,7 @@ export function useIntersectionObserver(
         stop()
       })
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   // Cleanup on unmount
@@ -197,7 +197,7 @@ export interface UseIntersectionObserverBatchReturn {
 }
 
 export function useIntersectionObserverBatch(
-  options: UseIntersectionObserverBatchOptions = {}
+  options: UseIntersectionObserverBatchOptions = {},
 ): UseIntersectionObserverBatchReturn {
   const {
     threshold = 0.1,
@@ -231,7 +231,7 @@ export function useIntersectionObserverBatch(
           }
         }
       },
-      { threshold, rootMargin, root }
+      { threshold, rootMargin, root },
     )
 
     return observer

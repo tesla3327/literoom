@@ -120,7 +120,7 @@ export const useCatalogUIStore = defineStore('catalogUI', () => {
       return sortDirection.value === 'asc' ? comparison : -comparison
     })
 
-    return withAssets.map((pair) => pair[0])
+    return withAssets.map(pair => pair[0])
   })
 
   /**

@@ -109,7 +109,8 @@ export const useSelectionStore = defineStore('selection', () => {
       if (currentId.value === assetId) {
         currentId.value = getFirstFromSet(newSet)
       }
-    } else {
+    }
+    else {
       newSet.add(assetId)
       currentId.value = assetId
     }
@@ -192,18 +193,20 @@ export const useSelectionStore = defineStore('selection', () => {
    */
   function handleClick(
     assetId: string,
-    event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
-    orderedIds: string[]
+    event: { shiftKey: boolean, ctrlKey: boolean, metaKey: boolean },
+    orderedIds: string[],
   ): void {
     const isCtrlOrCmd = event.ctrlKey || event.metaKey
 
     if (event.shiftKey) {
       // Shift+click: range selection
       selectRange(assetId, orderedIds)
-    } else if (isCtrlOrCmd) {
+    }
+    else if (isCtrlOrCmd) {
       // Ctrl/Cmd+click: toggle selection
       toggleSelection(assetId)
-    } else {
+    }
+    else {
       // Plain click: select single
       selectSingle(assetId)
     }
@@ -278,7 +281,7 @@ export const useSelectionStore = defineStore('selection', () => {
    */
   function navigateToNextUnflagged(
     orderedIds: string[],
-    getFlag: (id: string) => 'none' | 'pick' | 'reject' | undefined
+    getFlag: (id: string) => 'none' | 'pick' | 'reject' | undefined,
   ): void {
     if (orderedIds.length === 0) return
 

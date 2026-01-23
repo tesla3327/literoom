@@ -128,7 +128,7 @@ export const usePermissionRecoveryStore = defineStore('permissionRecovery', () =
     folderName: string,
     folderPath: string,
     permissionState: 'prompt' | 'denied',
-    issueError?: string
+    issueError?: string,
   ): void {
     const newIssues = [...folderIssues.value]
 
@@ -196,7 +196,7 @@ export const usePermissionRecoveryStore = defineStore('permissionRecovery', () =
         const newIssues = folderIssues.value.map(issue =>
           issue.folderId === folderId
             ? { ...issue, permissionState: 'denied' as const }
-            : issue
+            : issue,
         )
         folderIssues.value = newIssues
         return null
@@ -210,7 +210,7 @@ export const usePermissionRecoveryStore = defineStore('permissionRecovery', () =
       const newIssues = folderIssues.value.map(issue =>
         issue.folderId === folderId
           ? { ...issue, error: message }
-          : issue
+          : issue,
       )
       folderIssues.value = newIssues
 

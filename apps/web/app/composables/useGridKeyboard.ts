@@ -164,7 +164,7 @@ export function useGridKeyboard(options: UseGridKeyboardOptions): UseGridKeyboar
    * Calculate the next index for grid navigation.
    */
   function getNextIndex(
-    direction: 'left' | 'right' | 'up' | 'down'
+    direction: 'left' | 'right' | 'up' | 'down',
   ): number {
     const current = currentIndex.value
     const cols = columnsCount.value
