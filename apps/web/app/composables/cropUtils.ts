@@ -132,6 +132,12 @@ export function isInsideCrop(
 
 /**
  * Get canvas coordinates from mouse event.
+ *
+ * This function correctly handles CSS transforms (zoom/pan) because
+ * getBoundingClientRect() returns the transformed position and size.
+ * The formula (e.clientX - rect.left) * (canvas.width / rect.width)
+ * correctly converts from screen pixels to canvas pixels regardless
+ * of any CSS transform applied to the canvas or its ancestors.
  */
 export function getCanvasCoords(
   e: MouseEvent,

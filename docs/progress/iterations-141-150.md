@@ -203,3 +203,55 @@ The spec requires (section 3.5 - Zoom/pan behavior):
 - Preview quality switching (using 2x preview at high zoom levels)
 
 ---
+
+## 144: 2026-01-22 19:28 EST: Zoom/Pan Feature - Overlay Verification Complete
+
+**Objective**: Verify that crop and mask overlays work correctly when zoomed.
+
+**Initial Hypothesis**:
+The crop and mask overlay composables calculate coordinates based on the canvas bounding rect, but when the user zooms in, the CSS transform moves the canvas. The mouse coordinates might need to be converted from screen space to image space using the camera transform.
+
+**Investigation**:
+1. Analyzed `getCanvasCoords()` in cropUtils.ts and maskUtils.ts
+2. The formula: `(e.clientX - rect.left) * (canvas.width / rect.width)`
+3. This actually **already handles CSS transforms correctly** because:
+   - `getBoundingClientRect()` returns the transformed position and size
+   - When zoomed 2x, `rect.width = canvas.width * 2` (CSS transform effect)
+   - So `canvas.width / rect.width = 0.5`, correctly scaling screen pixels to canvas pixels
+
+**Browser Testing**:
+1. Loaded demo mode with test images
+2. Opened edit view on a test image
+3. Expanded "Crop & Transform" panel to show crop overlay
+4. Zoomed in using zoom buttons (to 220%)
+5. Performed mouse drag on crop canvas while zoomed
+6. **Result**: Drag created a crop selection that followed the cursor correctly
+
+**Conclusion**: No changes needed! The existing coordinate conversion handles CSS transforms correctly because `getBoundingClientRect()` accounts for the transform.
+
+**Files Modified**: None (only added documentation to cropUtils.ts explaining why it works)
+
+**Updated cropUtils.ts Comment**:
+```typescript
+/**
+ * Get canvas coordinates from mouse event.
+ *
+ * This function correctly handles CSS transforms (zoom/pan) because
+ * getBoundingClientRect() returns the transformed position and size.
+ * The formula (e.clientX - rect.left) * (canvas.width / rect.width)
+ * correctly converts from screen pixels to canvas pixels regardless
+ * of any CSS transform applied to the canvas or its ancestors.
+ */
+```
+
+**Screenshots** (saved for verification):
+- `zoom-test-03-demo-catalog.png` - Demo catalog loaded
+- `zoom-test-05-crop-panel.png` - Crop panel expanded showing overlay
+- `zoom-test-11-zoomed-for-crop.png` - Zoomed in at 220%
+- `zoom-test-12-during-drag.png` - Drag operation creating crop selection
+
+**Remaining Deferred Items**:
+- Preview quality switching (using 2x preview at high zoom levels) - future iteration
+
+---
+
