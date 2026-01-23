@@ -515,3 +515,16 @@ export function resetGPUEditPipeline(): void {
     _gpuEditPipeline = null
   }
 }
+
+/**
+ * Internal exports for testing.
+ * @internal
+ */
+export const _internal = {
+  shouldApplyRotation,
+  shouldApplyAdjustments,
+  shouldApplyToneCurve,
+  shouldApplyMasks,
+  rgbToRgba,
+  rgbaToRgb,
+}
