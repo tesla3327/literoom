@@ -81,3 +81,50 @@ The rescan functionality was fully implemented at the service level but had **no
 **Result**: Users can now click the "Rescan" button in the FilterBar to detect new/modified files in the current folder. A toast notification shows the result.
 
 ---
+
+## 142: 2026-01-22 19:01 EST: Zoom/Pan Feature - Research & Planning Complete
+
+**Objective**: Implement zoom and pan functionality for the edit view preview canvas.
+
+**Background**:
+The spec requires (section 3.5 - Zoom/pan behavior):
+> - Base display uses preview 1x and 2x only.
+> - Interaction rules:
+>   - zooming and panning should be immediate using UI transforms
+>   - after a short delay, app swaps to higher detail if available:
+>     - if zoom level exceeds what 1x can support, and 2x exists, switch source
+> - If 2x preview not ready, continue showing scaled 1x and update once ready.
+
+**Research Completed** (5 parallel sub-agents):
+1. **Codebase Review**: Analyzed EditPreviewCanvas, overlay composables, coordinate systems
+2. **Transform Techniques**: CSS transforms vs Canvas API (CSS selected for GPU acceleration)
+3. **Interaction Patterns**: Mouse wheel, drag pan, trackpad, keyboard shortcuts
+4. **Zoom Level Management**: Fit/fill calculations, presets, state management
+5. **Preview Quality Switching**: Threshold logic, debouncing, memory considerations
+
+**Key Decisions**:
+1. **Transform Approach**: CSS transforms on a container wrapping image + all overlays
+2. **State Management**: Zoom/pan state in editUI.ts with per-image LRU caching
+3. **Interactions**:
+   - Mouse wheel: Zoom toward cursor
+   - Click+drag: Pan when zoomed in
+   - Double-click: Toggle fit/100%
+   - Z key: Toggle fit/100%
+   - Cmd/Ctrl+0/1/+/-: Zoom presets/in/out
+   - Spacebar+drag: Temporary pan mode
+4. **Quality Switching**: Deferred to future iteration (current 1x preview sufficient)
+
+**Files Created** (3 files):
+- `docs/research/2026-01-22-zoom-pan-research-plan.md`
+- `docs/research/2026-01-22-zoom-pan-synthesis.md`
+- `docs/plans/2026-01-22-zoom-pan-plan.md`
+
+**Next Steps** (per implementation plan):
+1. Create `apps/web/app/utils/zoomCalculations.ts` - Pure zoom math functions
+2. Add zoom state to `apps/web/app/stores/editUI.ts`
+3. Create `apps/web/app/composables/useZoomPan.ts` - Main composable
+4. Update `EditPreviewCanvas.vue` with transform container
+5. Update crop/mask overlay coordinate handling
+6. Add keyboard shortcuts and UI controls
+
+---
