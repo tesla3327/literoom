@@ -18,3 +18,15 @@ export {
   createIdentityLut,
   isIdentityLut,
 } from './tone-curve-pipeline'
+
+export {
+  MaskPipeline,
+  getMaskPipeline,
+  resetMaskPipeline,
+  type GPUMaskAdjustments,
+  type LinearMaskData,
+  type RadialMaskData,
+  type MaskStackInput,
+  DEFAULT_GPU_MASK_ADJUSTMENTS,
+  MAX_MASKS,
+} from './mask-pipeline'

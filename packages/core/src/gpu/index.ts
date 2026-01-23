@@ -73,6 +73,15 @@ export {
   type ToneCurveLut,
   createIdentityLut,
   isIdentityLut,
+  MaskPipeline,
+  getMaskPipeline,
+  resetMaskPipeline,
+  type GPUMaskAdjustments,
+  type LinearMaskData,
+  type RadialMaskData,
+  type MaskStackInput,
+  DEFAULT_GPU_MASK_ADJUSTMENTS,
+  MAX_MASKS,
 } from './pipelines'
 
 // Texture utilities

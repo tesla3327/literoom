@@ -1,5 +1,55 @@
 # Iterations 161-170
 
+## 166: 2026-01-23 09:55 EST: GPU Acceleration - Phase 4.2 (Mask Pipeline Wrapper)
+
+**Objective**: Create TypeScript MaskPipeline wrapper class for GPU gradient mask processing.
+
+**Background**:
+Phase 4.1 (WGSL shader) is complete. This iteration implements the TypeScript pipeline wrapper following the established patterns from AdjustmentsPipeline and ToneCurvePipeline.
+
+**Implementation Complete**:
+
+1. **MaskPipeline Class** (`packages/core/src/gpu/pipelines/mask-pipeline.ts`):
+   - Full pipeline for applying gradient masks on GPU
+   - Support for up to 8 linear + 8 radial masks
+   - `apply()` method: CPU→GPU→CPU path with texture upload/download
+   - `applyToTextures()` method: GPU-only path for chaining operations
+   - Uniform buffer packing for mask parameters
+   - Early exit optimization when no enabled masks
+
+2. **Type Definitions**:
+   - `GPUMaskAdjustments`: Per-mask adjustment parameters (8 values)
+   - `LinearMaskData`: Linear gradient mask with geometry + adjustments
+   - `RadialMaskData`: Radial gradient mask with ellipse + rotation + invert
+   - `MaskStackInput`: Container for mask arrays
+   - Renamed to avoid conflict with `MaskAdjustments` from catalog types
+
+3. **Buffer Layout** (matches WGSL structs):
+   - MaskAdjustments: 32 bytes (8 f32)
+   - LinearMask: 64 bytes (geometry + enabled + padding + adjustments)
+   - RadialMask: 64 bytes (geometry + invert + enabled + adjustments)
+   - MaskParams total: 1040 bytes (8*64 + 8*64 + 16)
+
+4. **Singleton Factory**:
+   - `getMaskPipeline()`: Lazy initialization with GPU capability check
+   - `resetMaskPipeline()`: Cleanup for testing
+
+**Files Created** (1):
+- `packages/core/src/gpu/pipelines/mask-pipeline.ts`
+
+**Files Modified** (2):
+- `packages/core/src/gpu/pipelines/index.ts` - Export MaskPipeline
+- `packages/core/src/gpu/index.ts` - Re-export from pipelines
+
+**Verification**:
+- ✅ All 55 shader tests pass
+- ✅ All 67 pipeline tests pass
+- ✅ No type errors in mask-pipeline.ts
+
+**Next**: Phase 4.3 - Create GPUMaskService high-level service layer
+
+---
+
 ## 165: 2026-01-23 09:46 EST: GPU Acceleration - Phase 4.1 (Gradient Mask WGSL Shader)
 
 **Objective**: Implement the WGSL compute shader for linear and radial gradient masks.
