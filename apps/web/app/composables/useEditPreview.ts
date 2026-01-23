@@ -21,7 +21,11 @@ import {
   getTotalRotation,
   ThumbnailPriority,
 } from '@literoom/core/catalog'
-import { applyMaskedAdjustmentsAdaptive, applyRotationAdaptive } from '@literoom/core/gpu'
+import {
+  applyMaskedAdjustmentsAdaptive,
+  applyRotationAdaptive,
+  applyAdjustmentsAdaptive,
+} from '@literoom/core/gpu'
 
 // ============================================================================
 // Types
@@ -568,13 +572,19 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         }
 
         // ===== STEP 3: Apply basic adjustments (exposure, contrast, etc.) =====
+        // Uses GPU-accelerated processing when available, falls back to WASM
         if (hasAdjustments) {
-          const result = await $decodeService.applyAdjustments(
+          const { result, backend, timing } = await applyAdjustmentsAdaptive(
             currentPixels,
             currentWidth,
             currentHeight,
             adjustments,
+            // WASM fallback
+            () => $decodeService.applyAdjustments(
+              currentPixels, currentWidth, currentHeight, adjustments,
+            )
           )
+          console.log(`[useEditPreview] Adjustments via ${backend} in ${timing.toFixed(1)}ms`)
           currentPixels = result.pixels
           currentWidth = result.width
           currentHeight = result.height

@@ -235,3 +235,74 @@ Phases 1-5 of GPU acceleration are complete (Infrastructure, Adjustments, Tone C
 
 ---
 
+## 172: 2026-01-23 13:06 EST: GPU Acceleration - Phase 7 Research (Pipeline Integration)
+
+**Objective**: Research how to create a unified GPU edit pipeline that chains all operations for 60fps preview.
+
+**Status**: In Progress
+
+**Background**:
+Phases 1-6 of GPU acceleration are complete. Each operation (adjustments, tone curve, masks, histogram, rotation) has a GPU implementation, but they currently operate independently with pixel data transferred back to CPU between operations. Phase 7 creates a unified pipeline that keeps data on GPU throughout the pipeline.
+
+**Performance Target**: Full pipeline under 16ms for 60fps preview
+
+**Current Individual Operations**:
+- Adjustments: `GPUAdjustmentsService.applyAdjustments()`
+- Tone Curve: `GPUToneCurveService.applyToneCurve()`
+- Masks: `GPUMaskService.applyMasks()`
+- Histogram: `GPUHistogramService.computeHistogram()`
+- Rotation: `GPUTransformService.applyRotation()`
+
+**Goal**: Chain operations using texture ping-pong to avoid GPU↔CPU transfers between stages.
+
+**Research Areas**:
+1. Current useEditPreview.ts pipeline flow analysis
+2. Existing GPU service texture-to-texture methods
+3. WebGPU texture ping-pong patterns
+4. Optimal operation ordering
+5. Single GPU→CPU transfer at end for display/histogram
+
+**Research Complete** (5 parallel sub-agents):
+
+1. **useEditPreview Pipeline Analysis**: Complete pipeline order (rotation→crop→adjustments→toneCurve→masks), current GPU transfers, data formats
+2. **GPU Texture Chaining**: All pipelines have `applyToTextures()` methods supporting chaining, Histogram is separate (outputs data)
+3. **WebGPU Texture Patterns**: DoubleBufferedTextures and TexturePool exist but unused, ping-pong pattern available
+4. **GPU Service Patterns**: All use singleton pattern, share GPUDevice via GPUCapabilityService, have adaptive fallbacks
+5. **DecodedImage Data Flow**: Always RGB (3 bpp), GPU requires RGBA conversion, clipping detection at histogram stage
+
+**Critical Discovery**: GPU adjustments and tone curve services exist but are NOT used in useEditPreview.ts! Only rotation and masks use GPU adaptively.
+
+**Research Documents**:
+- `docs/research/2026-01-23-gpu-pipeline-integration-synthesis.md`
+
+**Implementation Plan**:
+- `docs/plans/2026-01-23-gpu-pipeline-integration-plan.md`
+
+**Implementation Complete** (Phase 7.1):
+
+1. **Enable GPU Adjustments** (`apps/web/app/composables/useEditPreview.ts`):
+   - Import `applyAdjustmentsAdaptive` from @literoom/core/gpu
+   - Replace WASM `$decodeService.applyAdjustments()` call with GPU adaptive
+   - WASM fallback provided for non-GPU browsers
+   - Console logs backend (webgpu/wasm) and timing
+
+**Files Modified** (1):
+- `apps/web/app/composables/useEditPreview.ts` - GPU adjustments integration
+
+**Verification**:
+- ✅ All 1389 core tests pass
+- ✅ 899/900 web tests pass (1 pre-existing UI test failure)
+- ✅ GPU adjustments now used in preview pipeline
+
+**Phase 7 Status**:
+- ✅ Phase 7.1: Enable GPU adjustments
+- ⏳ Phase 7.2: Enable GPU tone curve (interface mismatch - needs LUT generation)
+- ⏳ Phase 7.3: Create GPUEditPipeline coordinator
+- ⏳ Phase 7.4: Integrate unified pipeline
+
+**GPU Operations Now Active in Preview Pipeline**:
+- ✅ Rotation (GPU adaptive)
+- ✅ Adjustments (GPU adaptive) **NEW**
+- ❌ Tone Curve (still WASM - interface mismatch)
+- ✅ Masks (GPU adaptive)
+
