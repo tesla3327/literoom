@@ -3,6 +3,11 @@
 ## Table of Contents
 
 ### Open Issues
+- [Rotation causes GPU error (Critical)](#rotation-causes-gpu-error)
+- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly)
+- [Zoom sensitivity too high (Medium)](#zoom-sensitivity-too-high)
+- [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying)
+- [Preview generation is slow (Medium)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
@@ -45,6 +50,74 @@
 
 ## Open Issues
 
+### Zoom fit doesn't center or fill correctly
+
+**Severity**: Medium | **Type**: Bug
+
+**Problem**:
+When using the "Fit" zoom option in the edit view:
+1. The image doesn't center properly in the edit pane
+2. The image doesn't fill the available space correctly
+
+**Expected Behavior**:
+- "Fit" should scale the image to fill as much of the edit pane as possible while maintaining aspect ratio
+- Image should be centered both horizontally and vertically in the pane
+
+---
+
+### Zoom sensitivity too high
+
+**Severity**: Medium | **Type**: UX
+
+**Problem**:
+The zoom feature is too sensitive when scrolling/pinching. Small movements cause large zoom changes, making it difficult to achieve the desired zoom level.
+
+**Expected Behavior**:
+Zoom should have a more gradual response to input, allowing for fine-grained control over zoom level.
+
+---
+
+### Crop tool should confirm before applying
+
+**Severity**: Medium | **Type**: UX Enhancement
+
+**Problem**:
+Currently, crop changes are applied immediately as the user drags the crop handles. This makes it difficult to preview the crop before committing.
+
+**Expected Behavior**:
+1. When entering the crop tool, show the full image with the current crop region outlined
+2. Allow the user to adjust the crop region without immediately applying it
+3. Display a "Set Crop" or "Apply Crop" button at the top of the edit pane
+4. Only apply the crop when the user clicks the button or presses Enter
+5. When re-entering the crop tool later, show the full expanded view of the image (including cropped-out areas) so users can easily re-adjust the crop
+
+**Benefits**:
+- Users can preview crop changes before committing
+- Easier to make fine adjustments
+- Can see what was cropped out when re-editing
+
+---
+
+### Preview generation is slow
+
+**Severity**: Medium | **Type**: Performance
+
+**Problem**:
+Preview generation takes a long time, creating UX issues. Users often have to wait for previews to load when navigating between photos.
+
+**Potential Optimizations**:
+1. **Background preview generation**: When the edit pipeline is idle, proactively generate previews for adjacent photos in the filmstrip
+2. **Priority queue tuning**: Ensure visible/near-visible photos get priority
+3. **Lower-resolution intermediate previews**: Show a lower-res preview quickly while generating the full preview
+4. **Preview caching**: Ensure previews are properly cached and reused
+
+**Research Questions**:
+- What is the current bottleneck (decode, GPU processing, encoding)?
+- How many previews can be generated per second?
+- Would generating previews in parallel help?
+
+---
+
 ### Research: Edit operation caching
 
 **Severity**: Low (Research) | **Type**: Performance Investigation
@@ -75,6 +148,38 @@ Research whether staged caching would meaningfully improve performance or if it 
 ---
 
 ## Recently Solved
+
+### Rotation causes GPU error - SOLVED
+
+**Severity**: Critical | **Fixed**: 2026-01-23
+
+**Problem**:
+Rotation didn't work at all. The preview showed a black image with a GPU error about bytesPerRow not being a multiple of 256.
+
+**Root Cause**:
+WebGPU requires `bytesPerRow` to be a multiple of 256 when copying texture data to buffers with `copyTextureToBuffer()`. The implementation used `width * 4` which fails for image widths where this isn't a multiple of 256.
+
+**Fix Applied**:
+1. Added `alignTo256()` utility function in `texture-utils.ts`
+2. Added `removeRowPadding()` utility to strip alignment padding from readback data
+3. Updated `readTexturePixels()` to use aligned bytesPerRow and remove padding
+4. Updated all pipeline `apply()` methods to use alignment:
+   - `rotation-pipeline.ts`
+   - `adjustments-pipeline.ts`
+   - `tone-curve-pipeline.ts`
+
+**Files Modified** (4):
+- `packages/core/src/gpu/texture-utils.ts`
+- `packages/core/src/gpu/pipelines/rotation-pipeline.ts`
+- `packages/core/src/gpu/pipelines/adjustments-pipeline.ts`
+- `packages/core/src/gpu/pipelines/tone-curve-pipeline.ts`
+
+**Tests Added** (14):
+- `alignTo256()` tests for various alignment cases
+- `removeRowPadding()` tests for padding removal
+- `readTexturePixels()` tests for aligned buffer operations
+
+---
 
 ### Preview not ready when clicking thumbnail - SOLVED
 

@@ -8,7 +8,7 @@
 
 import { getGPUCapabilityService } from '../capabilities'
 import { ROTATION_SHADER_SOURCE } from '../shaders'
-import { calculateDispatchSize } from '../texture-utils'
+import { calculateDispatchSize, alignTo256, removeRowPadding } from '../texture-utils'
 
 /**
  * Result of rotation operation.
@@ -276,17 +276,19 @@ export class RotationPipeline {
     pass.dispatchWorkgroups(workgroupsX, workgroupsY, workgroupsZ)
     pass.end()
 
-    // Create staging buffer for readback
+    // Create staging buffer for readback with aligned bytesPerRow
+    const actualBytesPerRow = outDims.width * 4
+    const alignedBytesPerRow = alignTo256(actualBytesPerRow)
     const stagingBuffer = this.device.createBuffer({
       label: 'Rotation Staging Buffer',
-      size: outDims.width * outDims.height * 4,
+      size: alignedBytesPerRow * outDims.height,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     })
 
     // Copy output texture to staging buffer
     encoder.copyTextureToBuffer(
       { texture: outputTexture },
-      { buffer: stagingBuffer, bytesPerRow: outDims.width * 4, rowsPerImage: outDims.height },
+      { buffer: stagingBuffer, bytesPerRow: alignedBytesPerRow, rowsPerImage: outDims.height },
       { width: outDims.width, height: outDims.height, depthOrArrayLayers: 1 }
     )
 
@@ -295,8 +297,11 @@ export class RotationPipeline {
 
     // Wait for GPU to finish and read back results
     await stagingBuffer.mapAsync(GPUMapMode.READ)
-    const resultRgba = new Uint8Array(stagingBuffer.getMappedRange()).slice()
+    const paddedRgba = new Uint8Array(stagingBuffer.getMappedRange()).slice()
     stagingBuffer.unmap()
+
+    // Remove row padding if needed
+    const resultRgba = removeRowPadding(paddedRgba, outDims.width, outDims.height, alignedBytesPerRow)
 
     // Cleanup temporary resources
     inputTexture.destroy()

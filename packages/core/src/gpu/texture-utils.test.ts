@@ -58,6 +58,9 @@ import {
   BufferPool,
   DoubleBufferedTextures,
   calculateDispatchSize,
+  WEBGPU_BYTES_PER_ROW_ALIGNMENT,
+  alignTo256,
+  removeRowPadding,
 } from './texture-utils'
 
 // Re-export for use in tests
@@ -247,6 +250,135 @@ describe('TextureUsage', () => {
 })
 
 // ============================================================================
+// Alignment Utilities Tests
+// ============================================================================
+
+describe('WEBGPU_BYTES_PER_ROW_ALIGNMENT', () => {
+  it('is defined as 256', () => {
+    expect(WEBGPU_BYTES_PER_ROW_ALIGNMENT).toBe(256)
+  })
+})
+
+describe('alignTo256', () => {
+  it('returns same value when already aligned', () => {
+    expect(alignTo256(256)).toBe(256)
+    expect(alignTo256(512)).toBe(512)
+    expect(alignTo256(1024)).toBe(1024)
+    expect(alignTo256(2048)).toBe(2048)
+  })
+
+  it('rounds up to next multiple of 256', () => {
+    expect(alignTo256(1)).toBe(256)
+    expect(alignTo256(100)).toBe(256)
+    expect(alignTo256(255)).toBe(256)
+    expect(alignTo256(257)).toBe(512)
+    expect(alignTo256(400)).toBe(512)
+  })
+
+  it('handles zero', () => {
+    expect(alignTo256(0)).toBe(0)
+  })
+
+  it('handles typical RGBA row widths', () => {
+    // Width 100: 400 bytes -> 512
+    expect(alignTo256(100 * 4)).toBe(512)
+    // Width 512: 2048 bytes -> 2048 (already aligned)
+    expect(alignTo256(512 * 4)).toBe(2048)
+    // Width 3017: 12068 bytes -> 12288 (the case from the bug report)
+    expect(alignTo256(3017 * 4)).toBe(12288)
+    // Width 1920: 7680 bytes -> 7680 (already aligned, 7680/256=30)
+    expect(alignTo256(1920 * 4)).toBe(7680)
+    // Width 1000: 4000 bytes -> 4096
+    expect(alignTo256(1000 * 4)).toBe(4096)
+  })
+})
+
+describe('removeRowPadding', () => {
+  it('returns same data when no padding needed', () => {
+    const data = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])
+    // 2 pixels wide, 1 row, 8 bytes per row = 8 (already 256 multiple is not relevant for small data)
+    const result = removeRowPadding(data, 2, 1, 8)
+    expect(result).toEqual(data)
+  })
+
+  it('removes padding from each row', () => {
+    // 2x2 image: actual bytes per row = 8, aligned = 16
+    // Row 0: [1,2,3,4,5,6,7,8] + [0,0,0,0,0,0,0,0] (padding)
+    // Row 1: [9,10,11,12,13,14,15,16] + [0,0,0,0,0,0,0,0] (padding)
+    const paddedData = new Uint8Array([
+      1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, // Row 0 + padding
+      9, 10, 11, 12, 13, 14, 15, 16, 0, 0, 0, 0, 0, 0, 0, 0, // Row 1 + padding
+    ])
+
+    const result = removeRowPadding(paddedData, 2, 2, 16)
+
+    expect(result).toEqual(
+      new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    )
+  })
+
+  it('handles single row', () => {
+    // 1 pixel wide (4 bytes actual), but aligned to 256 bytes
+    const paddedData = new Uint8Array(256)
+    paddedData[0] = 255
+    paddedData[1] = 128
+    paddedData[2] = 64
+    paddedData[3] = 255
+
+    const result = removeRowPadding(paddedData, 1, 1, 256)
+
+    expect(result.length).toBe(4)
+    expect(result[0]).toBe(255)
+    expect(result[1]).toBe(128)
+    expect(result[2]).toBe(64)
+    expect(result[3]).toBe(255)
+  })
+
+  it('handles multiple rows with large padding', () => {
+    // 100 pixels wide (400 bytes actual), aligned to 512 bytes
+    // 2 rows
+    const actualBytesPerRow = 400
+    const alignedBytesPerRow = 512
+    const paddedData = new Uint8Array(alignedBytesPerRow * 2)
+
+    // Fill row 0 with pattern
+    for (let i = 0; i < actualBytesPerRow; i++) {
+      paddedData[i] = i % 256
+    }
+    // Fill row 1 with different pattern
+    for (let i = 0; i < actualBytesPerRow; i++) {
+      paddedData[alignedBytesPerRow + i] = (i + 100) % 256
+    }
+
+    const result = removeRowPadding(paddedData, 100, 2, alignedBytesPerRow)
+
+    expect(result.length).toBe(actualBytesPerRow * 2)
+
+    // Check row 0
+    for (let i = 0; i < actualBytesPerRow; i++) {
+      expect(result[i]).toBe(i % 256)
+    }
+    // Check row 1
+    for (let i = 0; i < actualBytesPerRow; i++) {
+      expect(result[actualBytesPerRow + i]).toBe((i + 100) % 256)
+    }
+  })
+
+  it('returns original when alignedBytesPerRow equals actual', () => {
+    // Width 64 (256 bytes per row) - already aligned
+    const data = new Uint8Array(256 * 2) // 2 rows
+    for (let i = 0; i < data.length; i++) {
+      data[i] = i % 256
+    }
+
+    const result = removeRowPadding(data, 64, 2, 256)
+
+    // Should return same array since no padding
+    expect(result).toEqual(data)
+  })
+})
+
+// ============================================================================
 // createTextureFromPixels Tests
 // ============================================================================
 
@@ -423,12 +555,15 @@ describe('createOutputTexture', () => {
 // ============================================================================
 
 describe('readTexturePixels', () => {
-  it('creates staging buffer with correct size', async () => {
+  it('creates staging buffer with aligned size', async () => {
     const texture = createdTextures[0] || {
       createView: vi.fn(),
     } as unknown as MockGPUTexture
 
-    mockStagingBufferData = new Uint8Array(100 * 75 * 4)
+    // Width 100 * 4 = 400 bytes, aligned to 512
+    // Buffer size = 512 * 75 = 38400
+    const alignedBytesPerRow = alignTo256(100 * 4)
+    mockStagingBufferData = new Uint8Array(alignedBytesPerRow * 75)
 
     await readTexturePixels(
       mockDevice as unknown as GPUDevice,
@@ -439,25 +574,26 @@ describe('readTexturePixels', () => {
 
     expect(mockDevice.createBuffer).toHaveBeenCalledWith(
       expect.objectContaining({
-        size: 100 * 75 * 4,
+        size: alignedBytesPerRow * 75,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
       })
     )
   })
 
-  it('copies texture to buffer', async () => {
+  it('copies texture to buffer with aligned bytesPerRow', async () => {
     const texture = {
       label: 'Test Texture',
     } as unknown as GPUTexture
 
-    mockStagingBufferData = new Uint8Array(4)
+    // 1 pixel = 4 bytes, aligned to 256
+    mockStagingBufferData = new Uint8Array(256)
 
     await readTexturePixels(mockDevice as unknown as GPUDevice, texture, 1, 1)
 
     const encoder = mockDevice.createCommandEncoder({})
     expect(encoder.copyTextureToBuffer).toHaveBeenCalledWith(
       { texture },
-      expect.objectContaining({ bytesPerRow: 4, rowsPerImage: 1 }),
+      expect.objectContaining({ bytesPerRow: 256, rowsPerImage: 1 }),
       { width: 1, height: 1, depthOrArrayLayers: 1 }
     )
   })
@@ -507,7 +643,7 @@ describe('readTexturePixels', () => {
   })
 
   it('destroys staging buffer after reading', async () => {
-    mockStagingBufferData = new Uint8Array(4)
+    mockStagingBufferData = new Uint8Array(256)
 
     await readTexturePixels(
       mockDevice as unknown as GPUDevice,
@@ -519,6 +655,63 @@ describe('readTexturePixels', () => {
     const buffer = createdBuffers[0]
     expect(buffer.unmap).toHaveBeenCalled()
     expect(buffer.destroy).toHaveBeenCalled()
+  })
+
+  it('removes padding from result when width requires alignment', async () => {
+    // 2 pixels wide (8 bytes actual), but aligned to 256
+    // 2 rows total
+    // Create padded data: 2 rows of 256 bytes each
+    const paddedData = new Uint8Array(256 * 2)
+    // Row 0: pixel data
+    paddedData[0] = 255
+    paddedData[1] = 128
+    paddedData[2] = 64
+    paddedData[3] = 255 // Pixel 0
+    paddedData[4] = 100
+    paddedData[5] = 101
+    paddedData[6] = 102
+    paddedData[7] = 255 // Pixel 1
+    // Row 1: pixel data (at offset 256)
+    paddedData[256] = 10
+    paddedData[257] = 20
+    paddedData[258] = 30
+    paddedData[259] = 255 // Pixel 2
+    paddedData[260] = 40
+    paddedData[261] = 50
+    paddedData[262] = 60
+    paddedData[263] = 255 // Pixel 3
+
+    mockStagingBufferData = paddedData
+
+    const result = await readTexturePixels(
+      mockDevice as unknown as GPUDevice,
+      {} as GPUTexture,
+      2,
+      2
+    )
+
+    // Result should be 2*2*4 = 16 bytes without padding
+    expect(result.length).toBe(16)
+    // Check pixel 0
+    expect(result[0]).toBe(255)
+    expect(result[1]).toBe(128)
+    expect(result[2]).toBe(64)
+    expect(result[3]).toBe(255)
+    // Check pixel 1
+    expect(result[4]).toBe(100)
+    expect(result[5]).toBe(101)
+    expect(result[6]).toBe(102)
+    expect(result[7]).toBe(255)
+    // Check pixel 2
+    expect(result[8]).toBe(10)
+    expect(result[9]).toBe(20)
+    expect(result[10]).toBe(30)
+    expect(result[11]).toBe(255)
+    // Check pixel 3
+    expect(result[12]).toBe(40)
+    expect(result[13]).toBe(50)
+    expect(result[14]).toBe(60)
+    expect(result[15]).toBe(255)
   })
 })
 

@@ -9,6 +9,58 @@
  */
 
 /**
+ * WebGPU alignment constant for buffer operations.
+ * bytesPerRow must be a multiple of this value for copyTextureToBuffer.
+ */
+export const WEBGPU_BYTES_PER_ROW_ALIGNMENT = 256
+
+/**
+ * Align a value to the next multiple of 256.
+ * WebGPU requires bytesPerRow to be a multiple of 256 for texture copies.
+ */
+export function alignTo256(value: number): number {
+  return Math.ceil(value / 256) * 256
+}
+
+/**
+ * Remove row padding from texture readback data.
+ *
+ * When bytesPerRow is padded for alignment, the buffer contains
+ * extra padding bytes at the end of each row that need to be removed.
+ *
+ * @param paddedData - Buffer with padded rows
+ * @param width - Actual image width in pixels
+ * @param height - Image height in rows
+ * @param alignedBytesPerRow - Padded bytes per row (multiple of 256)
+ * @returns Uint8Array with padding removed
+ */
+export function removeRowPadding(
+  paddedData: Uint8Array,
+  width: number,
+  height: number,
+  alignedBytesPerRow: number
+): Uint8Array {
+  const actualBytesPerRow = width * 4
+
+  // If no padding needed, return as-is
+  if (alignedBytesPerRow === actualBytesPerRow) {
+    return paddedData
+  }
+
+  // Strip padding from each row
+  const result = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    const srcOffset = y * alignedBytesPerRow
+    const dstOffset = y * actualBytesPerRow
+    result.set(
+      paddedData.subarray(srcOffset, srcOffset + actualBytesPerRow),
+      dstOffset
+    )
+  }
+  return result
+}
+
+/**
  * Texture usage flags for common operations.
  * Uses lazy evaluation to avoid accessing GPUTextureUsage at module load time,
  * which would fail in environments without WebGPU (e.g., Node.js tests).
@@ -117,7 +169,9 @@ export async function readTexturePixels(
   width: number,
   height: number
 ): Promise<Uint8Array> {
-  const bufferSize = width * height * 4
+  const actualBytesPerRow = width * 4
+  const alignedBytesPerRow = alignTo256(actualBytesPerRow)
+  const bufferSize = alignedBytesPerRow * height
 
   // Create staging buffer for readback
   const stagingBuffer = device.createBuffer({
@@ -133,7 +187,7 @@ export async function readTexturePixels(
 
   encoder.copyTextureToBuffer(
     { texture },
-    { buffer: stagingBuffer, bytesPerRow: width * 4, rowsPerImage: height },
+    { buffer: stagingBuffer, bytesPerRow: alignedBytesPerRow, rowsPerImage: height },
     { width, height, depthOrArrayLayers: 1 }
   )
 
@@ -141,13 +195,14 @@ export async function readTexturePixels(
 
   // Wait for GPU and read data
   await stagingBuffer.mapAsync(GPUMapMode.READ)
-  const data = new Uint8Array(stagingBuffer.getMappedRange()).slice()
+  const paddedData = new Uint8Array(stagingBuffer.getMappedRange()).slice()
   stagingBuffer.unmap()
 
   // Cleanup
   stagingBuffer.destroy()
 
-  return data
+  // Remove padding if needed
+  return removeRowPadding(paddedData, width, height, alignedBytesPerRow)
 }
 
 /**

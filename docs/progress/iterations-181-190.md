@@ -129,3 +129,53 @@ Phase 9 focuses on:
 - Phase 9: Testing complete with 200+ new tests
 
 ---
+
+## 183: 2026-01-23 15:09 EST: Fix Rotation GPU Error (Critical Bug)
+
+**Objective**: Fix the Critical bug where rotation causes GPU error due to bytesPerRow alignment.
+
+**Status**: Complete
+
+**Problem**:
+Rotation didn't work at all. The preview showed a black image with a GPU error:
+```
+[GPUCapabilityService] Uncaptured GPU error: bytesPerRow (12068) is not a multiple of 256.
+```
+
+**Root Cause**:
+WebGPU requires `bytesPerRow` to be a multiple of 256 when copying texture data to buffers. The implementation used `width * 4` which fails for image widths where this isn't a multiple of 256.
+
+**Research** (parallel sub-agents):
+1. WebGPU bytesPerRow alignment requirements (256-byte alignment mandatory)
+2. Current capabilities.ts/texture-utils.ts implementation analysis
+3. Rotation pipeline code flow analysis
+4. Existing alignment patterns in codebase
+
+**Implementation** (parallel sub-agents):
+1. Added alignment utilities to `texture-utils.ts`:
+   - `WEBGPU_BYTES_PER_ROW_ALIGNMENT = 256`
+   - `alignTo256(value)` - Align to next multiple of 256
+   - `removeRowPadding(paddedData, width, height, alignedBytesPerRow)` - Strip padding
+2. Updated `readTexturePixels()` to use aligned bytesPerRow and remove padding
+3. Updated `rotation-pipeline.ts` apply() method
+4. Updated `adjustments-pipeline.ts` apply() method
+5. Updated `tone-curve-pipeline.ts` apply() method
+
+**Files Modified** (4):
+- `packages/core/src/gpu/texture-utils.ts`
+- `packages/core/src/gpu/pipelines/rotation-pipeline.ts`
+- `packages/core/src/gpu/pipelines/adjustments-pipeline.ts`
+- `packages/core/src/gpu/pipelines/tone-curve-pipeline.ts`
+
+**Tests Added** (14 new tests):
+- `WEBGPU_BYTES_PER_ROW_ALIGNMENT` constant test
+- `alignTo256()` tests (6 tests)
+- `removeRowPadding()` tests (5 tests)
+- `readTexturePixels()` alignment tests (2 tests)
+
+**Verification**:
+- ✅ All 74 texture-utils tests pass
+- ✅ All 770 GPU tests pass (1 pre-existing flaky test excluded)
+- ✅ Issue marked as SOLVED in docs/issues.md
+
+---

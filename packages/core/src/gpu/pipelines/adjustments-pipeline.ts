@@ -9,6 +9,7 @@
 
 import { getGPUCapabilityService } from '../capabilities'
 import { ADJUSTMENTS_SHADER_SOURCE } from '../shaders'
+import { alignTo256, removeRowPadding } from '../texture-utils'
 
 /**
  * Basic adjustments parameters matching the Rust BasicAdjustments struct.
@@ -254,17 +255,19 @@ export class AdjustmentsPipeline {
     pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
     pass.end()
 
-    // Create staging buffer for readback
+    // Create staging buffer for readback with aligned bytesPerRow
+    const actualBytesPerRow = width * 4
+    const alignedBytesPerRow = alignTo256(actualBytesPerRow)
     const stagingBuffer = this.device.createBuffer({
       label: 'Adjustments Staging Buffer',
-      size: width * height * 4,
+      size: alignedBytesPerRow * height,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     })
 
     // Copy output texture to staging buffer
     encoder.copyTextureToBuffer(
       { texture: outputTexture },
-      { buffer: stagingBuffer, bytesPerRow: width * 4, rowsPerImage: height },
+      { buffer: stagingBuffer, bytesPerRow: alignedBytesPerRow, rowsPerImage: height },
       { width, height, depthOrArrayLayers: 1 }
     )
 
@@ -273,8 +276,11 @@ export class AdjustmentsPipeline {
 
     // Wait for GPU to finish and read back results
     await stagingBuffer.mapAsync(GPUMapMode.READ)
-    const resultData = new Uint8Array(stagingBuffer.getMappedRange()).slice()
+    const paddedData = new Uint8Array(stagingBuffer.getMappedRange()).slice()
     stagingBuffer.unmap()
+
+    // Remove row padding if needed
+    const resultData = removeRowPadding(paddedData, width, height, alignedBytesPerRow)
 
     // Cleanup temporary resources
     inputTexture.destroy()
