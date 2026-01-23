@@ -7,7 +7,6 @@
  */
 
 import type { ComputedRef, CSSProperties, Ref } from 'vue'
-import { ZOOM_STEP } from '~/utils/zoomCalculations'
 
 // ============================================================================
 // Types
@@ -104,13 +103,22 @@ export function useZoomPan(options: UseZoomPanOptions): UseZoomPanReturn {
     const pivotX = e.clientX - rect.left
     const pivotY = e.clientY - rect.top
 
-    // Determine zoom direction
-    // Pinch-to-zoom on trackpad sends ctrlKey with deltaY
-    const delta = e.deltaY
+    // Proportional zoom based on delta magnitude
+    // Trackpad pinch (ctrlKey) typically has smaller deltas
+    const isPinch = e.ctrlKey
 
-    // Calculate new scale
-    const zoomFactor = delta > 0 ? 1 / ZOOM_STEP : ZOOM_STEP
-    const newScale = editUIStore.camera.scale * zoomFactor
+    // Different sensitivity for pinch vs scroll
+    // Pinch needs higher sensitivity since deltas are smaller
+    const sensitivity = isPinch ? 0.01 : 0.002
+
+    // Use exponential scaling for natural feel
+    // Negative delta = zoom in, positive delta = zoom out
+    const zoomFactor = Math.pow(2, -e.deltaY * sensitivity)
+
+    // Clamp factor to prevent extreme jumps from fast scrolling
+    const clampedFactor = Math.max(0.5, Math.min(2, zoomFactor))
+
+    const newScale = editUIStore.camera.scale * clampedFactor
 
     // Zoom toward cursor position
     editUIStore.zoomToPointAction(newScale, pivotX, pivotY)
@@ -207,15 +215,21 @@ export function useZoomPan(options: UseZoomPanOptions): UseZoomPanReturn {
     const img = imageRef.value
     if (img && img.naturalWidth && img.naturalHeight) {
       editUIStore.setImageDimensions(img.naturalWidth, img.naturalHeight)
-      editUIStore.initializeZoom()
+      // Only initialize if viewport is also set
+      if (editUIStore.viewportDimensions.width > 0 && editUIStore.viewportDimensions.height > 0) {
+        editUIStore.initializeZoom()
+      }
     }
   }
 
   function updateViewportDimensions(): void {
     const container = containerRef.value
-    if (container) {
+    if (container && container.clientWidth > 0 && container.clientHeight > 0) {
       editUIStore.setViewportDimensions(container.clientWidth, container.clientHeight)
-      editUIStore.initializeZoom()
+      // Only initialize if image is also set
+      if (editUIStore.imageDimensions.width > 0 && editUIStore.imageDimensions.height > 0) {
+        editUIStore.initializeZoom()
+      }
     }
   }
 

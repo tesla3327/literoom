@@ -611,7 +611,7 @@ describe('constants', () => {
   })
 
   it('has valid ZOOM_STEP', () => {
-    expect(ZOOM_STEP).toBe(1.25)
+    expect(ZOOM_STEP).toBe(1.1)
     expect(ZOOM_STEP).toBeGreaterThan(1)
   })
 })

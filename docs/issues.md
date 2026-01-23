@@ -3,14 +3,14 @@
 ## Table of Contents
 
 ### Open Issues
-- [Rotation causes GPU error (Critical)](#rotation-causes-gpu-error)
-- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly)
-- [Zoom sensitivity too high (Medium)](#zoom-sensitivity-too-high)
 - [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying)
 - [Preview generation is slow (Medium)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Zoom sensitivity too high (Medium)](#zoom-sensitivity-too-high---solved)
+- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
+- [Rotation causes GPU error (Critical)](#rotation-causes-gpu-error---solved)
 - [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail---solved)
 - [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---solved)
 - [Test coverage metrics (Medium)](#test-coverage-metrics---solved)
@@ -49,33 +49,6 @@
 ---
 
 ## Open Issues
-
-### Zoom fit doesn't center or fill correctly
-
-**Severity**: Medium | **Type**: Bug
-
-**Problem**:
-When using the "Fit" zoom option in the edit view:
-1. The image doesn't center properly in the edit pane
-2. The image doesn't fill the available space correctly
-
-**Expected Behavior**:
-- "Fit" should scale the image to fill as much of the edit pane as possible while maintaining aspect ratio
-- Image should be centered both horizontally and vertically in the pane
-
----
-
-### Zoom sensitivity too high
-
-**Severity**: Medium | **Type**: UX
-
-**Problem**:
-The zoom feature is too sensitive when scrolling/pinching. Small movements cause large zoom changes, making it difficult to achieve the desired zoom level.
-
-**Expected Behavior**:
-Zoom should have a more gradual response to input, allowing for fine-grained control over zoom level.
-
----
 
 ### Crop tool should confirm before applying
 
@@ -148,6 +121,47 @@ Research whether staged caching would meaningfully improve performance or if it 
 ---
 
 ## Recently Solved
+
+### Zoom sensitivity too high - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-23
+
+**Problem**:
+The zoom feature was too sensitive when scrolling/pinching. Small movements caused large zoom changes, making it difficult to achieve the desired zoom level.
+
+**Root Cause**:
+Binary delta mapping in `handleWheel()` treated all deltaY values the same - both gentle scrolls (deltaY=1) and fast scrolls (deltaY=100) produced identical 25% zoom changes.
+
+**Fix Applied**:
+1. Changed `ZOOM_STEP` from 1.25 to 1.1 (10% instead of 25% for button zoom)
+2. Implemented proportional delta mapping in `handleWheel()`:
+   - Uses exponential scaling: `Math.pow(2, -deltaY * sensitivity)`
+   - Different sensitivity for pinch (0.01) vs scroll (0.002)
+   - Clamped factor (0.5-2.0) to prevent extreme jumps
+
+**Files Modified** (2):
+- `apps/web/app/utils/zoomCalculations.ts` - Changed ZOOM_STEP
+- `apps/web/app/composables/useZoomPan.ts` - Proportional delta mapping
+
+---
+
+### Zoom fit doesn't center or fill correctly - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-23
+
+**Problem**:
+When using the "Fit" zoom option in the edit view, the image didn't center properly in the edit pane.
+
+**Root Cause**:
+The `initializeZoom()` function was being called before both image and viewport dimensions were set, causing incorrect centering calculations.
+
+**Fix Applied**:
+Updated `updateImageDimensions()` and `updateViewportDimensions()` to only call `initializeZoom()` when BOTH dimensions are valid (width > 0 and height > 0).
+
+**Files Modified** (1):
+- `apps/web/app/composables/useZoomPan.ts` - Added dimension guards
+
+---
 
 ### Rotation causes GPU error - SOLVED
 

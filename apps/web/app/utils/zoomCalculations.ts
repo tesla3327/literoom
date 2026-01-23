@@ -43,7 +43,7 @@ export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 4.0
 
 /** Zoom step multiplier for incremental zoom */
-export const ZOOM_STEP = 1.25
+export const ZOOM_STEP = 1.1
 
 /** Debounce delay for zoom state caching (ms) */
 export const ZOOM_CACHE_DEBOUNCE = 300
