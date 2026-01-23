@@ -7,7 +7,49 @@
 **Background**:
 Research synthesis is complete. This iteration implements the WGSL shader code following the established patterns from adjustments and tone-curve shaders. The shader must match the Rust implementation exactly for visual consistency.
 
-**In Progress**...
+**Implementation Complete**:
+
+1. **WGSL Mask Shader** (`packages/core/src/gpu/shaders/masks.wgsl`):
+   - Complete compute shader for linear and radial gradient masks
+   - Ken Perlin's smootherstep (5th order polynomial) matching Rust
+   - Linear gradient mask evaluation with feathering
+   - Radial gradient mask with ellipse, rotation, and invert support
+   - Per-mask adjustments (8 adjustment types)
+   - Support for up to 8 linear + 8 radial masks
+   - 16×16 workgroups for parallelization
+
+2. **Shader Export** (`packages/core/src/gpu/shaders/index.ts`):
+   - Added `MASKS_SHADER_SOURCE` constant
+   - Embedded shader as template literal (same pattern as adjustments/tone-curve)
+   - Renamed adjustment functions to avoid collisions (`apply_exposure_m`, etc.)
+   - Main function renamed to `main_masks` to avoid conflicts when composing shaders
+
+**Key Algorithms Implemented**:
+- **Linear Mask**: Project point onto gradient line, apply feathering centered at midpoint
+- **Radial Mask**: Translate to center, apply inverse rotation, calculate normalized ellipse distance
+- **Feathering**: Uses smootherstep for natural transitions
+- **Blending**: `output = original * (1 - mask) + adjusted * mask`
+
+**Struct Layout** (uniform buffer compatible):
+```
+MaskAdjustments: 32 bytes (8 f32)
+LinearMask: 48 bytes (geometry + enabled + padding + adjustments)
+RadialMask: 64 bytes (geometry + rotation + invert + enabled + adjustments)
+MaskParams: ~912 bytes total (8 linear + 8 radial + counts)
+```
+
+**Files Created** (1):
+- `packages/core/src/gpu/shaders/masks.wgsl`
+
+**Files Modified** (1):
+- `packages/core/src/gpu/shaders/index.ts` - Added MASKS_SHADER_SOURCE export
+
+**Verification**:
+- ✅ All 55 shader tests pass
+- ✅ Shader source compiles without errors
+- ✅ Algorithms match Rust implementation in `crates/literoom-core/src/mask/`
+
+**Next**: Phase 4.2 - Create MaskPipeline TypeScript wrapper class
 
 ---
 
