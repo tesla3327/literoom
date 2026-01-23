@@ -6,7 +6,7 @@
  * timeout handling, and proper error propagation.
  */
 
-import type { DecodeRequest, DecodeResponse, MaskStackData } from './worker-messages'
+import type { DecodeRequest, DecodeResponse, MaskStackData, EditedThumbnailEditState } from './worker-messages'
 import type {
   DecodedImage,
   DecodeServiceState,
@@ -97,6 +97,12 @@ export interface IDecodeService {
     height: number,
     maskStack: MaskStackData
   ): Promise<DecodedImage>
+  /** Generate a thumbnail with edits applied */
+  generateEditedThumbnail(
+    bytes: Uint8Array,
+    size: number,
+    editState: EditedThumbnailEditState
+  ): Promise<Uint8Array>
   /** Destroy the service and release resources */
   destroy(): void
 }
@@ -259,6 +265,10 @@ export class DecodeService implements IDecodeService {
       case 'encode-jpeg-result':
         // For encode-jpeg, we return the raw JPEG bytes directly
         // The resolve type is DecodedImage | FileType | HistogramData | Uint8Array
+        (pending.resolve as (value: Uint8Array) => void)(response.bytes)
+        break
+      case 'generate-edited-thumbnail-result':
+        // For edited thumbnail, we return the JPEG bytes
         (pending.resolve as (value: Uint8Array) => void)(response.bytes)
         break
     }
@@ -519,6 +529,29 @@ export class DecodeService implements IDecodeService {
       width,
       height,
       maskStack
+    })
+  }
+
+  /**
+   * Generate a thumbnail with edits applied.
+   * Full pipeline: decode -> rotate -> crop -> adjust -> tone curve -> masks -> resize -> encode
+   *
+   * @param bytes - Raw image bytes (JPEG or RAW)
+   * @param size - Target thumbnail size (longest edge, typically 512)
+   * @param editState - Edit parameters to apply
+   * @returns JPEG-encoded thumbnail bytes with edits applied
+   */
+  async generateEditedThumbnail(
+    bytes: Uint8Array,
+    size: number,
+    editState: EditedThumbnailEditState
+  ): Promise<Uint8Array> {
+    return this.sendRequest({
+      id: this.generateId(),
+      type: 'generate-edited-thumbnail',
+      bytes,
+      size,
+      editState
     })
   }
 

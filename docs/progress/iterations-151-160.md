@@ -169,7 +169,53 @@ Implemented full edit pipeline in `packages/core/src/decode/decode-worker.ts`:
 **Test Results**: 412 tests passing in @literoom/core
 
 **Next Steps**:
-- Phase 3: Add `generateEditedThumbnail()` to DecodeService
+- Phase 4: Add regeneration methods to ThumbnailService
+- Phase 5: CatalogService integration
+- Phase 6+: UI integration
+
+---
+
+## 154: 2026-01-22 21:17 EST: Thumbnail Regeneration - Phase 3 Complete
+
+**Objective**: Add `generateEditedThumbnail()` method to DecodeService per the implementation plan.
+
+**Implementation Status**: Phase 3 Complete
+
+### Phase 3: DecodeService Method
+
+Added `generateEditedThumbnail()` method to DecodeService for generating thumbnails with edits applied.
+
+**IDecodeService interface** - Added new method signature:
+```typescript
+generateEditedThumbnail(
+  bytes: Uint8Array,
+  size: number,
+  editState: EditedThumbnailEditState
+): Promise<Uint8Array>
+```
+
+**DecodeService implementation** - Sends request to worker and returns JPEG bytes:
+- Imports `EditedThumbnailEditState` from worker-messages
+- Sends `generate-edited-thumbnail` request type
+- Handles `generate-edited-thumbnail-result` response type
+- Returns JPEG-encoded bytes
+
+**MockDecodeService implementation** - Full mock pipeline for demo mode:
+1. Generate base thumbnail from bytes
+2. Apply rotation (angle + straighten)
+3. Apply crop (normalized coordinates)
+4. Apply basic adjustments
+5. Apply tone curve
+6. Apply masked adjustments
+7. Encode to JPEG (quality 85)
+
+**Files Modified** (2 files):
+- `packages/core/src/decode/decode-service.ts` - Added interface method and implementation
+- `packages/core/src/decode/mock-decode-service.ts` - Added mock implementation
+
+**Test Results**: 412 tests passing in @literoom/core
+
+**Next Steps**:
 - Phase 4: Add regeneration methods to ThumbnailService
 - Phase 5: CatalogService integration
 - Phase 6+: UI integration

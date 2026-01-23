@@ -120,7 +120,7 @@ async function handleGenerateEditedThumbnail(request: GenerateEditedThumbnailReq
 ---
 
 ### Phase 3: DecodeService Method (30 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Add `generateEditedThumbnail()` method to DecodeService.
 

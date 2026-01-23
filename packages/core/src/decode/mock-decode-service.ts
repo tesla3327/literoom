@@ -11,7 +11,7 @@
  */
 
 import type { IDecodeService } from './decode-service'
-import type { MaskStackData } from './worker-messages'
+import type { MaskStackData, EditedThumbnailEditState } from './worker-messages'
 import type {
   DecodedImage,
   DecodeServiceState,
@@ -826,6 +826,78 @@ export class MockDecodeService implements IDecodeService {
       Math.max(0, Math.min(255, outG)),
       Math.max(0, Math.min(255, outB)),
     ]
+  }
+
+  /**
+   * Generate a thumbnail with edits applied (mock implementation).
+   * For demo mode, applies the edit pipeline and returns mock JPEG bytes.
+   */
+  async generateEditedThumbnail(
+    bytes: Uint8Array,
+    size: number,
+    editState: EditedThumbnailEditState
+  ): Promise<Uint8Array> {
+    await this.simulateOperation()
+
+    // In demo mode, we go through the full mock pipeline:
+    // 1. Generate base thumbnail
+    let image = await this.generateThumbnail(bytes, { size })
+
+    // 2. Apply rotation if specified
+    if (editState.rotation) {
+      const totalAngle = (editState.rotation.angle ?? 0) + (editState.rotation.straightenAngle ?? 0)
+      if (Math.abs(totalAngle) > 0.001) {
+        image = await this.applyRotation(
+          image.pixels,
+          image.width,
+          image.height,
+          totalAngle
+        )
+      }
+    }
+
+    // 3. Apply crop if specified
+    if (editState.crop) {
+      image = await this.applyCrop(
+        image.pixels,
+        image.width,
+        image.height,
+        editState.crop
+      )
+    }
+
+    // 4. Apply basic adjustments if specified
+    if (editState.adjustments) {
+      image = await this.applyAdjustments(
+        image.pixels,
+        image.width,
+        image.height,
+        editState.adjustments
+      )
+    }
+
+    // 5. Apply tone curve if specified and non-default
+    if (editState.toneCurve?.points && editState.toneCurve.points.length > 0) {
+      image = await this.applyToneCurve(
+        image.pixels,
+        image.width,
+        image.height,
+        editState.toneCurve.points
+      )
+    }
+
+    // 6. Apply masked adjustments if specified
+    if (editState.masks) {
+      image = await this.applyMaskedAdjustments(
+        image.pixels,
+        image.width,
+        image.height,
+        editState.masks
+      )
+    }
+
+    // 7. Encode to JPEG
+    return this.encodeJpeg(image.pixels, image.width, image.height, 85)
   }
 
   destroy(): void {
