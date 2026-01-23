@@ -377,14 +377,14 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     color = clamp(color, vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
     textureStore(output_texture, coords, vec4<f32>(color, pixel.a));
 }
-\`
+`
 
 /**
  * Gradient mask application compute shader.
  * Applies linear and radial gradient masks with per-mask adjustments.
  * Supports up to 8 linear masks and 8 radial masks per invocation.
  */
-export const MASKS_SHADER_SOURCE = /* wgsl */ \`
+export const MASKS_SHADER_SOURCE = /* wgsl */ `
 // Gradient mask application compute shader
 // Applies linear and radial gradient masks with per-mask adjustments
 //
@@ -801,4 +801,4 @@ fn main_masks(@builtin(global_invocation_id) global_id: vec3<u32>) {
     color = clamp(color, vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
     textureStore(output_texture, coords, vec4<f32>(color, pixel.a));
 }
-\`
+`
