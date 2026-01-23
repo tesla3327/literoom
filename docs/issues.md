@@ -3,7 +3,7 @@
 ## Table of Contents
 
 ### Open Issues
-_No open issues!_
+- [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
 - [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail---solved)
@@ -45,7 +45,32 @@ _No open issues!_
 
 ## Open Issues
 
-_No open issues at this time!_
+### Research: Edit operation caching
+
+**Severity**: Low (Research) | **Type**: Performance Investigation
+
+**Context**:
+The current edit pipeline re-runs all operations from source pixels on every render:
+```
+Source → Rotation → Crop → Adjustments → Tone Curve → Masks
+```
+
+**Potential Optimization**:
+Cache intermediate results (e.g., post-crop pixels) so subsequent renders only re-run downstream operations:
+```
+Crop/rotation change: Source → Rotation → Crop → [Cache]
+Adjustment change:    [Cached] → Adjustments → Tone Curve → Masks
+```
+
+**Research Questions**:
+1. What is the actual performance impact of the current approach?
+2. How much memory would intermediate caching require?
+3. How complex is cache invalidation when different parameters change?
+4. Is this premature optimization given GPU pipeline already achieves <50ms renders?
+5. Are there simpler wins (e.g., better throttling) that provide more value?
+
+**Decision Needed**:
+Research whether staged caching would meaningfully improve performance or if it adds unnecessary complexity for marginal gains.
 
 ---
 
