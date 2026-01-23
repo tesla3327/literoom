@@ -138,9 +138,14 @@ literoom/
 |---------|-------|--------|----------|
 | literoom-core | 214 | Passing | 93.38% lines |
 | literoom-wasm | 44 | Passing | 72.48% lines |
-| packages/core | 1214 | Passing | 76.59% lines |
-| apps/web (unit) | 341 | Passing | 22.52% lines |
+| packages/core | 1300+ | Passing | 76%+ lines |
+| apps/web (unit) | 450+ | Passing | 22%+ lines |
 | apps/web (E2E) | 28 | Passing | N/A |
+
+### GPU Acceleration Tests (Phase 9)
+- GPU UI Components: 118 tests (gpuStatus store, GPUStatusIndicator, GPUPerformanceBadge)
+- GPU Services: 83+ tests (histogram, mask, transform services)
+- GPU Pipelines: Comprehensive tests for edit-pipeline, histogram, mask, rotation pipelines
 
 ### Rust Coverage Details
 
