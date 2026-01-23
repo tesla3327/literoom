@@ -306,3 +306,72 @@ Phases 1-6 of GPU acceleration are complete. Each operation (adjustments, tone c
 - ❌ Tone Curve (still WASM - interface mismatch)
 - ✅ Masks (GPU adaptive)
 
+**Commit**: `49aeef3` feat(gpu): enable GPU-accelerated adjustments in preview pipeline
+
+**Next**: Phase 7.2 - Enable GPU tone curve (requires LUT generation from curve points), or skip to Phase 7.3 (unified pipeline)
+
+---
+
+## 173: 2026-01-23 13:30 EST: GPU Acceleration - Phase 7.2 (Enable GPU Tone Curve)
+
+**Objective**: Enable GPU-accelerated tone curve in the preview pipeline by implementing LUT generation from curve points.
+
+**Status**: In Progress
+
+**Background**:
+Phase 7.1 enabled GPU adjustments. Phase 7.2 should enable GPU tone curve, but there's an interface mismatch:
+- Current WASM call uses `adjustments.toneCurve.points` (CurvePoint[])
+- GPU service expects `ToneCurveLut` (256-entry Uint8Array)
+
+The solution is to implement the Fritsch-Carlson monotonic cubic hermite spline algorithm in TypeScript to generate a LUT from curve points.
+
+**Implementation Plan**:
+1. Create `generateLutFromPoints()` in gpu-tone-curve-service.ts (Fritsch-Carlson algorithm)
+2. Add `applyToneCurveFromPointsAdaptive()` wrapper that takes curve points
+3. Update useEditPreview.ts to use the new wrapper
+
+**Implementation Complete**:
+
+1. **Fritsch-Carlson LUT Generation** (`packages/core/src/gpu/gpu-tone-curve-service.ts`):
+   - Ported monotonic cubic hermite spline algorithm from Rust to TypeScript
+   - `computeMonotonicTangents()` - weighted harmonic mean for interior points
+   - `evaluateWithTangents()` - hermite basis function evaluation
+   - `generateLutFromCurvePoints()` - produces 256-entry LUT from curve points
+   - `isLinearCurve()` - fast path detection for identity curve
+
+2. **Adaptive Wrapper Function**:
+   - `applyToneCurveFromPointsAdaptive()` - takes curve points directly
+   - Generates LUT internally, applies via GPU when available
+   - Falls back to WASM when GPU unavailable or fails
+   - Returns `{ result, backend, timing }` for logging
+
+3. **useEditPreview.ts Integration**:
+   - Import `applyToneCurveFromPointsAdaptive` from @literoom/core/gpu
+   - Replaced WASM `$decodeService.applyToneCurve()` with GPU adaptive
+   - Console logs backend (webgpu/wasm) and timing
+
+**Files Modified** (3):
+- `packages/core/src/gpu/gpu-tone-curve-service.ts` - LUT generation + wrapper
+- `packages/core/src/gpu/index.ts` - Export new functions
+- `apps/web/app/composables/useEditPreview.ts` - GPU tone curve integration
+
+**Verification**:
+- ✅ All 1406 core tests pass (5 skipped)
+- ✅ 899/900 web tests pass (1 pre-existing UI test failure)
+- ✅ TypeScript compiles without errors
+- ✅ Fritsch-Carlson algorithm ported correctly
+
+**Phase 7 Status**:
+- ✅ Phase 7.1: Enable GPU adjustments
+- ✅ Phase 7.2: Enable GPU tone curve **COMPLETE**
+- ⏳ Phase 7.3: Create GPUEditPipeline coordinator
+- ⏳ Phase 7.4: Integrate unified pipeline
+
+**GPU Operations Now Active in Preview Pipeline**:
+- ✅ Rotation (GPU adaptive)
+- ✅ Adjustments (GPU adaptive)
+- ✅ Tone Curve (GPU adaptive) **NEW**
+- ✅ Masks (GPU adaptive)
+
+**Next**: Commit changes, then Phase 7.3 (GPUEditPipeline for unified texture chaining)
+

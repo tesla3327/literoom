@@ -114,6 +114,9 @@ export {
   getGPUToneCurveService,
   resetGPUToneCurveService,
   applyToneCurveAdaptive,
+  applyToneCurveFromPointsAdaptive,
+  generateLutFromCurvePoints,
+  type ToneCurveAdaptiveResult,
 } from './gpu-tone-curve-service'
 
 // GPU mask service

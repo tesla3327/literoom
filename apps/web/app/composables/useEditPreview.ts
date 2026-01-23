@@ -25,6 +25,7 @@ import {
   applyMaskedAdjustmentsAdaptive,
   applyRotationAdaptive,
   applyAdjustmentsAdaptive,
+  applyToneCurveFromPointsAdaptive,
 } from '@literoom/core/gpu'
 
 // ============================================================================
@@ -591,13 +592,19 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         }
 
         // ===== STEP 4: Apply tone curve if it differs from linear =====
+        // Uses GPU-accelerated processing when available, falls back to WASM
         if (isModifiedToneCurve(adjustments.toneCurve)) {
-          const curveResult = await $decodeService.applyToneCurve(
+          const { result: curveResult, backend, timing } = await applyToneCurveFromPointsAdaptive(
             currentPixels,
             currentWidth,
             currentHeight,
             adjustments.toneCurve.points,
+            // WASM fallback
+            () => $decodeService.applyToneCurve(
+              currentPixels, currentWidth, currentHeight, adjustments.toneCurve.points,
+            )
           )
+          console.log(`[useEditPreview] Tone curve via ${backend} in ${timing.toFixed(1)}ms`)
           currentPixels = curveResult.pixels
           currentWidth = curveResult.width
           currentHeight = curveResult.height
