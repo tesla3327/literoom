@@ -15,6 +15,7 @@
  */
 
 import type { IDecodeService } from '../decode/decode-service'
+import type { EditedThumbnailEditState } from '../decode/worker-messages'
 import {
   type Asset,
   type FlagStatus,
@@ -503,6 +504,48 @@ export class CatalogService implements ICatalogService {
    */
   updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void {
     this.thumbnailService.updatePreviewPriority(assetId, priority)
+  }
+
+  // ==========================================================================
+  // ICatalogService Implementation - Thumbnail Regeneration
+  // ==========================================================================
+
+  /**
+   * Regenerate a thumbnail with edits applied.
+   *
+   * This invalidates the existing thumbnail and generates a new one
+   * with all edit operations applied (rotation, crop, adjustments, tone curve, masks).
+   *
+   * @param assetId - The asset to regenerate
+   * @param editState - Edit state to apply to the thumbnail
+   */
+  async regenerateThumbnail(
+    assetId: string,
+    editState: EditedThumbnailEditState
+  ): Promise<void> {
+    const asset = this._assets.get(assetId)
+    if (!asset) {
+      throw new CatalogError('Asset not found', 'FOLDER_NOT_FOUND')
+    }
+
+    // Create getBytes function for this asset
+    const getBytes = this.createGetBytesFunction(asset)
+
+    // Update asset status to loading
+    const updatedAsset: Asset = {
+      ...asset,
+      thumbnailStatus: 'loading',
+    }
+    this._assets.set(assetId, updatedAsset)
+    this._onAssetUpdated?.(updatedAsset)
+
+    // Delegate to thumbnail service
+    await this.thumbnailService.regenerateThumbnail(
+      assetId,
+      getBytes,
+      editState,
+      ThumbnailPriority.BACKGROUND
+    )
   }
 
   /**

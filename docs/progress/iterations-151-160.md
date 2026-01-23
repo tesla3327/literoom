@@ -220,3 +220,119 @@ generateEditedThumbnail(
 - Phase 5: CatalogService integration
 - Phase 6+: UI integration
 
+---
+
+## 155: 2026-01-22 21:25 EST: Thumbnail Regeneration - Phase 4 Complete
+
+**Objective**: Add regeneration methods to ThumbnailService per the implementation plan.
+
+**Implementation Status**: Phase 4 Complete
+
+### Phase 4: ThumbnailService Integration
+
+Added thumbnail regeneration capabilities to ThumbnailService:
+
+#### 4.1: Generation Tracking
+- Added `generationNumbers: Map<string, number>` to track invalidation generations
+- Generation numbers prevent stale results from being cached when multiple regenerations occur
+
+#### 4.2: Invalidation Method
+```typescript
+async invalidateThumbnail(assetId: string): Promise<void>
+```
+- Increments generation number to invalidate in-flight requests
+- Cancels any pending queue items and active requests
+- Deletes from both memory and OPFS caches
+
+#### 4.3: Regeneration Method
+```typescript
+async regenerateThumbnail(
+  assetId: string,
+  getBytes: () => Promise<Uint8Array>,
+  editState: EditedThumbnailEditState,
+  priority: ThumbnailPriority = ThumbnailPriority.BACKGROUND
+): Promise<void>
+```
+- Invalidates existing thumbnail
+- Queues new generation with edit state attached
+- Uses BACKGROUND priority by default (won't block visible thumbnails)
+
+#### 4.4: Modified processItem for Edit State
+- Updated `fillProcessingSlots()` to pass edit state to `processItem()`
+- Updated `processItem()` to handle both original and edited thumbnails:
+  - If `editState` is provided: calls `decodeService.generateEditedThumbnail()`
+  - Otherwise: uses existing `decodeService.generateThumbnail()` path
+- Added generation number check to discard stale results
+
+#### 4.5: Extended Queue Item Type
+Created `ThumbnailQueueItemWithEditState` interface extending `ThumbnailQueueItem`:
+- `editState?: EditedThumbnailEditState` - Edit state to apply
+- `generation?: number` - Generation number for stale detection
+
+**Also Fixed**:
+- Added `generateEditedThumbnail` method to `DecodeWorkerPool` for worker pool support
+- Fixed `straightenAngle` -> `straighten` property name in MockDecodeService
+- Fixed duplicate `Adjustments` export conflict between decode and catalog modules
+
+**Files Modified** (5 files):
+- `packages/core/src/catalog/thumbnail-service.ts` - Added regeneration methods
+- `packages/core/src/catalog/thumbnail-queue.ts` - Added extended queue item type
+- `packages/core/src/catalog/index.ts` - Export new type
+- `packages/core/src/decode/decode-worker-pool.ts` - Added generateEditedThumbnail
+- `packages/core/src/index.ts` - Fixed duplicate export issue
+
+**Test Results**: 412 tests passing in @literoom/core
+
+**Next Steps**:
+- Phase 5: CatalogService integration
+- Phase 6: useCatalog composable
+- Phase 7+: UI integration
+
+---
+
+## 156: 2026-01-22 21:25 EST: Thumbnail Regeneration - Phase 5 Complete
+
+**Objective**: Add `regenerateThumbnail()` method to CatalogService per the implementation plan.
+
+**Implementation Status**: Phase 5 Complete
+
+### Phase 5: CatalogService Integration
+
+Added thumbnail regeneration method to CatalogService.
+
+#### 5.1: ICatalogService Interface Update
+Added new method signature to `ICatalogService`:
+```typescript
+regenerateThumbnail(assetId: string, editState: EditedThumbnailEditState): Promise<void>
+```
+
+#### 5.2: CatalogService Implementation
+- Retrieves asset from internal map
+- Creates `getBytes` function using `createGetBytesFunction()`
+- Delegates to `thumbnailService.regenerateThumbnail()`
+- Updates asset status to 'loading' during regeneration
+
+#### 5.3: MockCatalogService Implementation
+- Added mock `regenerateThumbnail()` for demo mode
+- Cancels existing thumbnail requests if any
+- Sets thumbnail status to 'loading' and clears old URL
+- Schedules mock thumbnail generation after delay
+- Reuses existing `generateMockThumbnail()` logic
+
+#### Also Fixed: IThumbnailService Interface
+Added missing methods to `IThumbnailService` interface:
+- `invalidateThumbnail(assetId: string): Promise<void>`
+- `regenerateThumbnail(...)` with edit state parameter
+
+**Files Modified** (3 files):
+- `packages/core/src/catalog/types.ts` - Added methods to ICatalogService and IThumbnailService interfaces
+- `packages/core/src/catalog/catalog-service.ts` - Implementation with asset status updates
+- `packages/core/src/catalog/mock-catalog-service.ts` - Mock implementation with proper cleanup
+
+**Test Results**: 412 tests passing in @literoom/core
+
+**Next Steps**:
+- Phase 6: useCatalog composable
+- Phase 7: Edit page integration
+- Phase 8+: Visual feedback and tests
+

@@ -25,6 +25,7 @@ import {
   ThumbnailPriority,
   CatalogError,
 } from './types'
+import type { EditedThumbnailEditState } from '../decode/worker-messages'
 import { createDemoAssets, type DemoAssetOptions } from './demo-assets'
 
 /**
@@ -512,6 +513,50 @@ export class MockCatalogService implements ICatalogService {
     if (queued) {
       queued.priority = priority
     }
+  }
+
+  // ==========================================================================
+  // ICatalogService Implementation - Thumbnail Regeneration
+  // ==========================================================================
+
+  /**
+   * Regenerate a thumbnail with edits applied.
+   * In mock mode, this simulates regeneration by setting status to loading
+   * and scheduling a new thumbnail generation.
+   *
+   * @param assetId - The asset to regenerate
+   * @param _editState - Edit state (not used in mock, just generates same thumbnail)
+   */
+  async regenerateThumbnail(
+    assetId: string,
+    _editState: EditedThumbnailEditState
+  ): Promise<void> {
+    const asset = this._assets.get(assetId)
+    if (!asset) {
+      return
+    }
+
+    // Cancel any existing thumbnail request for this asset
+    const existing = this._thumbnailQueue.get(assetId)
+    if (existing?.timeoutId) {
+      clearTimeout(existing.timeoutId)
+    }
+
+    // Update asset status to loading, clear old thumbnail URL
+    const loadingAsset: Asset = {
+      ...asset,
+      thumbnailStatus: 'loading',
+      thumbnailUrl: null,
+    }
+    this._assets.set(assetId, loadingAsset)
+    this._onAssetUpdated?.(loadingAsset)
+
+    // Schedule thumbnail regeneration (same as regular generation in mock mode)
+    const timeoutId = setTimeout(() => {
+      this.generateMockThumbnail(assetId)
+    }, this.options.thumbnailDelayMs)
+
+    this._thumbnailQueue.set(assetId, { priority: ThumbnailPriority.BACKGROUND, timeoutId })
   }
 
   /**

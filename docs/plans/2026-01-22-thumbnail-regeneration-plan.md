@@ -149,7 +149,7 @@ async generateEditedThumbnail(
 ---
 
 ### Phase 4: ThumbnailService Integration (1 hr)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Add regeneration methods to ThumbnailService.
 
@@ -234,7 +234,7 @@ private async processItem(item: QueueItem): Promise<void> {
 ---
 
 ### Phase 5: CatalogService Integration (30 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Expose regeneration through CatalogService.
 

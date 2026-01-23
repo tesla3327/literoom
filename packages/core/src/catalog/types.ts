@@ -357,6 +357,29 @@ export interface IThumbnailService {
 
   /** Whether the service is currently processing previews */
   readonly isProcessingPreviews: boolean
+
+  // Thumbnail regeneration methods
+
+  /**
+   * Invalidate an existing thumbnail, removing it from both caches.
+   * Also cancels any pending generation.
+   */
+  invalidateThumbnail(assetId: string): Promise<void>
+
+  /**
+   * Regenerate a thumbnail with edits applied.
+   *
+   * @param assetId - The asset to regenerate
+   * @param getBytes - Function to get the source image bytes
+   * @param editState - Edit state to apply to the thumbnail
+   * @param priority - Queue priority (default: BACKGROUND)
+   */
+  regenerateThumbnail(
+    assetId: string,
+    getBytes: () => Promise<Uint8Array>,
+    editState: import('../decode/worker-messages').EditedThumbnailEditState,
+    priority?: ThumbnailPriority
+  ): Promise<void>
 }
 
 /**
@@ -450,6 +473,20 @@ export interface ICatalogService {
    * Update the priority of a preview request.
    */
   updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void
+
+  // Thumbnail regeneration
+  /**
+   * Regenerate a thumbnail with edits applied.
+   * This invalidates the existing thumbnail and generates a new one
+   * with all edit operations (rotation, crop, adjustments, tone curve, masks) applied.
+   *
+   * @param assetId - The asset to regenerate
+   * @param editState - Edit state to apply to the thumbnail
+   */
+  regenerateThumbnail(
+    assetId: string,
+    editState: import('../decode/worker-messages').EditedThumbnailEditState
+  ): Promise<void>
 
   // Events
   /**

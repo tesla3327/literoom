@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 21:17 EST
+**Last Updated**: 2026-01-22 21:30 EST
 **Current Phase**: Thumbnail Regeneration Feature
 
 ## Project Structure
@@ -369,6 +369,8 @@ literoom/
 | [152](./iterations-151-160.md:89) | 2026-01-22 | Thumbnail Regeneration - Implementation Plan Created |
 | [153](./iterations-151-160.md:119) | 2026-01-22 | Thumbnail Regeneration - Phase 1 & 2 Complete |
 | [154](./iterations-151-160.md:177) | 2026-01-22 | Thumbnail Regeneration - Phase 3 Complete |
+| [155](./iterations-151-160.md:223) | 2026-01-22 | Thumbnail Regeneration - Phase 4 Complete |
+| [156](./iterations-151-160.md:291) | 2026-01-22 | Thumbnail Regeneration - Phase 5 Complete |
 
 ---
 
@@ -378,7 +380,7 @@ literoom/
 |---------|-------|--------|----------|
 | literoom-core | 214 | Passing | 93.38% lines |
 | literoom-wasm | 44 | Passing | 72.48% lines |
-| packages/core | 362 | Passing | 32.38% lines |
+| packages/core | 412 | Passing | 32.38% lines |
 | apps/web (unit) | 341 | Passing | 22.52% lines |
 | apps/web (E2E) | 28 | Passing | N/A |
 
