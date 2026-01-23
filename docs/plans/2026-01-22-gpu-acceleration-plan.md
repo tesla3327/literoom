@@ -134,29 +134,31 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 - [ ] Tone curve output matches WASM implementation (pending integration testing)
 - [ ] LUT interpolation is smooth (hardware linear filtering)
 
-### Phase 4: Gradient Mask Shaders
+### Phase 4: Gradient Mask Shaders (In Progress)
 
 **Objective**: Move linear and radial gradient masks to GPU
 
 **Tasks**:
-1. Create WGSL shader for linear gradient evaluation
-2. Create WGSL shader for radial gradient evaluation
-3. Implement mask blending pipeline
-4. Support multiple masks
-5. Benchmark mask processing
+1. ✅ Create WGSL shader for linear gradient evaluation
+2. ✅ Create WGSL shader for radial gradient evaluation
+3. ✅ Implement mask blending pipeline (MaskPipeline)
+4. ✅ Support multiple masks (up to 8 linear + 8 radial)
+5. ✅ Create high-level service (GPUMaskService)
+6. ⏳ Integrate into useEditPreview.ts
+7. ⏳ Benchmark mask processing
 
-**Files to Create**:
-- `crates/literoom-wasm/src/shaders/linear_mask.wgsl`
-- `crates/literoom-wasm/src/shaders/radial_mask.wgsl`
-- `packages/core/src/gpu/pipelines/mask-pipeline.ts`
+**Files Created**:
+- ✅ `packages/core/src/gpu/shaders/masks.wgsl`
+- ✅ `packages/core/src/gpu/pipelines/mask-pipeline.ts`
+- ✅ `packages/core/src/gpu/gpu-mask-service.ts`
 
 **Performance Target**: 100ms → 4ms for 2 masks (25x speedup)
 
 **Acceptance Criteria**:
-- [ ] Linear mask matches WASM implementation
-- [ ] Radial mask matches WASM implementation
-- [ ] Feathering is smooth
-- [ ] Multiple masks composite correctly
+- [ ] Linear mask matches WASM implementation (pending integration testing)
+- [ ] Radial mask matches WASM implementation (pending integration testing)
+- [x] Feathering uses smootherstep (matches Rust)
+- [x] Multiple masks composite correctly (up to 8 each)
 
 ### Phase 5: Histogram Computation
 

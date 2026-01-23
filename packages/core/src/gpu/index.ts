@@ -111,3 +111,11 @@ export {
   resetGPUToneCurveService,
   applyToneCurveAdaptive,
 } from './gpu-tone-curve-service'
+
+// GPU mask service
+export {
+  GPUMaskService,
+  getGPUMaskService,
+  resetGPUMaskService,
+  applyMaskedAdjustmentsAdaptive,
+} from './gpu-mask-service'

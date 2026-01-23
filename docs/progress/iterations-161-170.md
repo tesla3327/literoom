@@ -1,5 +1,54 @@
 # Iterations 161-170
 
+## 167: 2026-01-23 10:02 EST: GPU Acceleration - Phase 4.3 (GPUMaskService)
+
+**Objective**: Create high-level GPUMaskService for GPU-accelerated gradient mask processing.
+
+**Background**:
+Phase 4.2 (MaskPipeline wrapper) is complete. This iteration implements the service layer that provides the same interface as the WASM masked adjustments functions, with automatic type conversion between the WASM and GPU formats.
+
+**Implementation Complete**:
+
+1. **GPUMaskService Class** (`packages/core/src/gpu/gpu-mask-service.ts`):
+   - `initialize()`: Lazy initialization with GPU capability check
+   - `applyMaskedAdjustments()`: RGB pixel interface matching WASM
+   - `applyMaskedAdjustmentsRgba()`: Efficient RGBA path (no conversion)
+   - `destroy()`: Cleanup resources
+   - Early exit optimization when no enabled masks
+
+2. **Type Conversion Functions**:
+   - `toGPUMaskAdjustments()`: Convert Adjustments → GPUMaskAdjustments
+   - `toGPUMaskStack()`: Convert MaskStackData → MaskStackInput
+   - Handles degrees → radians conversion for radial mask rotation
+   - RGB ↔ RGBA conversion functions
+
+3. **Singleton Factory**:
+   - `getGPUMaskService()`: Get or create singleton
+   - `resetGPUMaskService()`: Cleanup for testing
+
+4. **Adaptive Wrapper**:
+   - `applyMaskedAdjustmentsAdaptive()`: Auto-selects GPU/WASM backend
+   - Returns timing and backend info for benchmarking
+   - Falls back to WASM on any GPU error
+
+5. **Type Updates**:
+   - Added `masks` to `GPUOperation` type for combined mask processing
+
+**Files Created** (1):
+- `packages/core/src/gpu/gpu-mask-service.ts`
+
+**Files Modified** (2):
+- `packages/core/src/gpu/index.ts` - Export GPUMaskService and functions
+- `packages/core/src/gpu/types.ts` - Add 'masks' to GPUOperation type
+
+**Verification**:
+- ✅ All 982 tests pass (5 skipped)
+- ✅ Service follows established patterns from GPUAdjustmentsService
+
+**Next**: Phase 4.4 - Integrate GPU masks into useEditPreview.ts
+
+---
+
 ## 166: 2026-01-23 09:55 EST: GPU Acceleration - Phase 4.2 (Mask Pipeline Wrapper)
 
 **Objective**: Create TypeScript MaskPipeline wrapper class for GPU gradient mask processing.

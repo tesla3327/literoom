@@ -138,6 +138,7 @@ export type GPUOperation =
   | 'toneCurve'
   | 'linearMask'
   | 'radialMask'
+  | 'masks' // Combined mask stack processing
   | 'histogram'
   | 'resize'
   | 'rotation'
