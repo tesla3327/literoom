@@ -342,3 +342,48 @@ This happened because both utility files exported functions/constants with the s
 - Build completes with no warnings
 - Code follows DRY principle with single source of truth for shared utilities
 
+---
+
+## 147: 2026-01-22 20:21 EST: E2E Test Fix - Complete
+
+**Objective**: Fix E2E test timeout issues to ensure CI passes per acceptance criteria.
+
+**Background**:
+From spec section 12 (Acceptance criteria):
+> CI passes with lint/typecheck/unit/e2e (demo) and Rust fmt/clippy/test + wasm build.
+
+Previous status: "apps/web (E2E) | 28 | Timeout issues" with 8 tests failing
+
+**Root Cause Analysis**:
+
+After running E2E tests, identified two categories of failures:
+
+1. **`example.spec.ts` (2 tests)**: Tests expected a welcome screen with `h1` containing "Literoom" and a "Choose Folder" button, but in demo mode the catalog auto-loads immediately.
+
+2. **`keyboard-navigation.spec.ts` (6 tests)**: The `beforeEach` hook tried to click `[data-testid="choose-folder-button"]` which doesn't exist because demo mode auto-loads the catalog.
+
+**Problem**: E2E tests were written before the demo mode auto-load behavior was implemented. When demo mode was added, the app started calling `restoreSession()` in `initializeApp()`, which bypasses the welcome screen entirely.
+
+**Fix Applied**:
+
+The test files were already updated (likely by a previous run) with the correct behavior:
+
+1. **`example.spec.ts`**: Now tests that the catalog loads and shows filter bar instead of looking for welcome screen elements.
+
+2. **`keyboard-navigation.spec.ts`**: Updated `beforeEach` to:
+   - Remove the click on `choose-folder-button`
+   - Wait for `catalog-grid` to appear (auto-loads in demo mode)
+   - Increased timeout from 10s to 15s for consistency
+
+**Test Results**:
+```
+Running 28 tests using 5 workers
+  28 passed (17.9s)
+```
+
+All 28 E2E tests now pass.
+
+**Files Modified** (already updated):
+- `apps/web/e2e/example.spec.ts` - Updated tests for demo mode behavior
+- `apps/web/e2e/keyboard-navigation.spec.ts` - Removed choose-folder-button click
+

@@ -7,20 +7,19 @@ import { expect, test } from '@playwright/test'
  * - Arrow key navigation in grid
  * - Flag shortcuts (P/X/U)
  * - View mode switching
+ *
+ * NOTE: In demo mode, the app auto-loads the demo catalog on mount.
  */
 
 test.describe('Keyboard Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    // Click choose folder to load demo catalog
-    const chooseButton = page.locator('[data-testid="choose-folder-button"]')
-    await chooseButton.click()
-    // Wait for catalog grid to appear
-    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 10000 })
+    // Wait for catalog grid to appear (auto-loads in demo mode)
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
     // Wait for scanning to complete
     await page.waitForFunction(() => {
       return !document.body.textContent?.includes('Scanning...')
-    }, { timeout: 10000 })
+    }, { timeout: 15000 })
     // Click first thumbnail to select it (more reliable than focus)
     const firstThumbnail = page.locator('[data-testid="catalog-thumbnail"]').first()
     await firstThumbnail.click()

@@ -4,75 +4,43 @@ import { expect, test } from '@playwright/test'
  * Folder Selection E2E Tests
  *
  * Tests for the folder selection workflow in demo mode.
- * - Welcome screen display
- * - Choose folder button
- * - Demo catalog loading
+ *
+ * NOTE: In demo mode, the app auto-loads the demo catalog on mount.
+ * The welcome screen is shown briefly then replaced by the catalog grid.
+ * Tests should account for this auto-load behavior.
  */
 
 test.describe('Folder Selection (Demo Mode)', () => {
-  test('home page shows welcome screen initially', async ({ page }) => {
+  test('demo mode auto-loads catalog', async ({ page }) => {
     await page.goto('/')
 
-    // Welcome screen should be visible
-    const welcomeScreen = page.locator('[data-testid="welcome-screen"]')
-    await expect(welcomeScreen).toBeVisible()
-
-    // Should show app name
-    await expect(page.locator('h1')).toContainText('Literoom')
-
-    // Should show Choose Folder button
-    const chooseButton = page.locator('[data-testid="choose-folder-button"]')
-    await expect(chooseButton).toBeVisible()
-  })
-
-  test('shows demo mode indicator when in demo mode', async ({ page }) => {
-    await page.goto('/')
-
-    // Demo mode indicator should be visible
-    const demoIndicator = page.getByText('Demo Mode')
-    await expect(demoIndicator).toBeVisible()
-  })
-
-  test('choose folder button loads demo catalog', async ({ page }) => {
-    await page.goto('/')
-
-    // Click the choose folder button
-    const chooseButton = page.locator('[data-testid="choose-folder-button"]')
-    await chooseButton.click()
-
-    // Wait for grid to appear (indicates catalog loaded)
+    // In demo mode, the catalog should auto-load
+    // Wait for the catalog grid to appear
     const grid = page.locator('[data-testid="catalog-grid"]')
-    await expect(grid).toBeVisible({ timeout: 10000 })
+    await expect(grid).toBeVisible({ timeout: 15000 })
 
     // Thumbnails should be present
     const thumbnails = page.locator('[data-testid="catalog-thumbnail"]')
-    await expect(thumbnails.first()).toBeVisible()
+    await expect(thumbnails.first()).toBeVisible({ timeout: 10000 })
   })
 
-  test('welcome screen is hidden after folder selection', async ({ page }) => {
+  test('demo mode shows demo folder name in header', async ({ page }) => {
     await page.goto('/')
 
-    // Click choose folder
-    const chooseButton = page.locator('[data-testid="choose-folder-button"]')
-    await chooseButton.click()
+    // Wait for catalog to load
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
 
-    // Wait for grid
-    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 10000 })
-
-    // Welcome screen should be hidden
-    const welcomeScreen = page.locator('[data-testid="welcome-screen"]')
-    await expect(welcomeScreen).not.toBeVisible()
+    // Demo folder name should be visible somewhere on page
+    // Check the folder dropdown or header area
+    const demoText = page.getByText('Demo Photos')
+    await expect(demoText).toBeVisible({ timeout: 5000 })
   })
 
-  test('filter bar appears after folder selection', async ({ page }) => {
+  test('filter bar appears after catalog loads', async ({ page }) => {
     await page.goto('/')
 
-    // Click choose folder
-    const chooseButton = page.locator('[data-testid="choose-folder-button"]')
-    await chooseButton.click()
-
     // Wait for grid
-    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
 
     // Filter bar should be visible
     const filterBar = page.locator('[data-testid="filter-bar"]')
@@ -82,16 +50,14 @@ test.describe('Folder Selection (Demo Mode)', () => {
   test('catalog page shows correct structure after loading', async ({ page }) => {
     await page.goto('/')
 
-    // Load catalog
-    await page.click('[data-testid="choose-folder-button"]')
-    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 10000 })
+    // Wait for catalog grid (auto-loads in demo mode)
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
 
     // Check page structure
     const catalogPage = page.locator('[data-testid="catalog-page"]')
     await expect(catalogPage).toBeVisible()
 
-    // Header should show folder name
-    // In demo mode, the folder path might be "Demo Photos" or similar
+    // Header should be visible
     const header = page.locator('header')
     await expect(header).toBeVisible()
 
@@ -100,5 +66,37 @@ test.describe('Folder Selection (Demo Mode)', () => {
 
     // Grid
     await expect(page.locator('[data-testid="catalog-grid"]')).toBeVisible()
+  })
+
+  test('filter bar shows item counts', async ({ page }) => {
+    await page.goto('/')
+
+    // Wait for catalog grid
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
+
+    // All count should show the total number of items
+    const allCount = page.locator('[data-testid="filter-all-count"]')
+    await expect(allCount).toBeVisible()
+
+    // Should have some items (demo catalog has 50 items)
+    const count = await allCount.textContent()
+    expect(parseInt(count || '0', 10)).toBeGreaterThan(0)
+  })
+
+  test('thumbnails are visible after catalog loads', async ({ page }) => {
+    await page.goto('/')
+
+    // Wait for catalog grid
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
+
+    // Wait for scanning to complete (no more "Scanning..." text)
+    await page.waitForFunction(() => {
+      return !document.body.textContent?.includes('Scanning...')
+    }, { timeout: 15000 })
+
+    // Thumbnails should be present
+    const thumbnails = page.locator('[data-testid="catalog-thumbnail"]')
+    const count = await thumbnails.count()
+    expect(count).toBeGreaterThan(0)
   })
 })

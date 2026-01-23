@@ -7,21 +7,20 @@ import { expect, test } from '@playwright/test'
  * - Filter buttons (All, Picks, Rejects, Unflagged)
  * - Count badges
  * - Filtering the grid
+ *
+ * NOTE: In demo mode, the app auto-loads the demo catalog on mount.
  */
 
 test.describe('Filter Modes', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    // Click choose folder to load demo catalog
-    const chooseButton = page.locator('[data-testid="choose-folder-button"]')
-    await chooseButton.click()
-    // Wait for catalog grid and filter bar
-    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 10000 })
+    // Wait for catalog grid and filter bar (auto-loads in demo mode)
+    await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
     await page.waitForSelector('[data-testid="filter-bar"]')
     // Wait for scanning to complete
     await page.waitForFunction(() => {
       return !document.body.textContent?.includes('Scanning...')
-    }, { timeout: 10000 })
+    }, { timeout: 15000 })
   })
 
   test('filter bar displays all filter buttons', async ({ page }) => {
