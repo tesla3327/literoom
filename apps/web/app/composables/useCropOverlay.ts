@@ -61,11 +61,14 @@ export interface UseCropOverlayReturn {
 /**
  * Composable for managing crop overlay on the main preview canvas.
  *
+ * Uses pending crop state from editUIStore for the confirmation workflow.
+ * Changes are only committed to editStore when user clicks "Apply".
+ *
  * @param options - Configuration options
  * @returns Crop overlay state and controls
  */
 export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayReturn {
-  const editStore = useEditStore()
+  const editUIStore = useEditUIStore()
   const { canvasRef, displayWidth, displayHeight, imageWidth, imageHeight } = options
 
   // ============================================================================
@@ -160,33 +163,23 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
   }
 
   // ============================================================================
-  // Store Update
+  // Pending Crop Update
   // ============================================================================
 
   /**
-   * Debounced update to the store.
+   * Debounced update to the pending crop state.
+   * This updates the UI store's pending crop, not the edit store directly.
    */
-  const debouncedStoreUpdate = debounce(() => {
-    commitCrop()
+  const debouncedPendingUpdate = debounce(() => {
+    commitToPending()
   }, 32)
 
   /**
-   * Commit crop to store.
+   * Commit local crop to pending state (not directly to edit store).
+   * The actual edit store update happens when user clicks "Apply".
    */
-  function commitCrop(): void {
-    const crop = localCrop.value
-    // If crop is full image, set to null
-    if (
-      Math.abs(crop.left) < 0.001
-      && Math.abs(crop.top) < 0.001
-      && Math.abs(crop.width - 1) < 0.001
-      && Math.abs(crop.height - 1) < 0.001
-    ) {
-      editStore.setCrop(null)
-    }
-    else {
-      editStore.setCrop({ ...crop })
-    }
+  function commitToPending(): void {
+    editUIStore.setPendingCrop({ ...localCrop.value })
   }
 
   // ============================================================================
@@ -365,14 +358,14 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
     if (activeHandle.value) {
       // Resizing
       resizeCrop(activeHandle.value, coords, canvas.width, canvas.height)
-      debouncedStoreUpdate()
+      debouncedPendingUpdate()
       render()
     }
     else if (isMoving.value && lastMousePos.value) {
       // Moving
       moveCrop(coords, canvas.width, canvas.height)
       lastMousePos.value = coords
-      debouncedStoreUpdate()
+      debouncedPendingUpdate()
       render()
     }
     else {
@@ -396,8 +389,8 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
    */
   function handleMouseUp(): void {
     if (activeHandle.value || isMoving.value) {
-      debouncedStoreUpdate.cancel()
-      commitCrop()
+      debouncedPendingUpdate.cancel()
+      commitToPending()
       activeHandle.value = null
       isMoving.value = false
       lastMousePos.value = null
@@ -443,7 +436,7 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
    * Cleanup function for external use.
    */
   function cleanup(): void {
-    debouncedStoreUpdate.cancel()
+    debouncedPendingUpdate.cancel()
     if (canvasRef.value) {
       teardownEvents(canvasRef.value)
     }
@@ -454,22 +447,24 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
   // ============================================================================
 
   /**
-   * Sync local crop with store (when not dragging).
+   * Sync local crop with pending state (when not dragging).
+   * This allows the overlay to reflect changes from the action bar (e.g., Reset).
    */
   watch(
-    () => editStore.cropTransform.crop,
-    (storeCrop) => {
+    () => editUIStore.pendingCrop,
+    (pendingCrop) => {
       if (!isDragging.value) {
-        if (storeCrop) {
-          localCrop.value = { ...storeCrop }
+        if (pendingCrop) {
+          localCrop.value = { ...pendingCrop }
         }
         else {
+          // Fallback to full image if no pending crop
           localCrop.value = { left: 0, top: 0, width: 1, height: 1 }
         }
         render()
       }
     },
-    { immediate: true },
+    { immediate: true, deep: true },
   )
 
   /**

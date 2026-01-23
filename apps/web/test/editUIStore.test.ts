@@ -783,6 +783,63 @@ describe('editUIStore', () => {
         expect(store.isCropToolActive).toBe(false)
       })
     })
+
+    describe('pending crop state', () => {
+      it('should have pendingCrop as null by default', () => {
+        expect(store.pendingCrop).toBe(null)
+        expect(store.hasPendingCrop).toBe(false)
+      })
+
+      it('initializePendingCrop() should initialize with full image when no crop exists', () => {
+        store.activateCropTool()
+        expect(store.pendingCrop).toEqual({ left: 0, top: 0, width: 1, height: 1 })
+        expect(store.hasPendingCrop).toBe(true)
+      })
+
+      it('setPendingCrop() should update pending crop state', () => {
+        store.activateCropTool()
+        store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+        expect(store.pendingCrop).toEqual({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+      })
+
+      it('setPendingCrop(null) should clear pending crop', () => {
+        store.activateCropTool()
+        store.setPendingCrop(null)
+        expect(store.pendingCrop).toBe(null)
+        expect(store.hasPendingCrop).toBe(false)
+      })
+
+      it('applyPendingCrop() should deactivate crop tool and clear pending', () => {
+        store.activateCropTool()
+        store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+        store.applyPendingCrop()
+        expect(store.isCropToolActive).toBe(false)
+        expect(store.pendingCrop).toBe(null)
+      })
+
+      it('cancelPendingCrop() should deactivate crop tool and clear pending', () => {
+        store.activateCropTool()
+        store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+        store.cancelPendingCrop()
+        expect(store.isCropToolActive).toBe(false)
+        expect(store.pendingCrop).toBe(null)
+      })
+
+      it('resetPendingCrop() should set pending crop to full image', () => {
+        store.activateCropTool()
+        store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+        store.resetPendingCrop()
+        expect(store.pendingCrop).toEqual({ left: 0, top: 0, width: 1, height: 1 })
+      })
+
+      it('deactivateCropTool() should clear pending crop', () => {
+        store.activateCropTool()
+        store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+        store.deactivateCropTool()
+        expect(store.pendingCrop).toBe(null)
+        expect(store.isCropToolActive).toBe(false)
+      })
+    })
   })
 
   // ============================================================================

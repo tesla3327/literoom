@@ -3,13 +3,13 @@
 ## Table of Contents
 
 ### Open Issues
-- [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying)
+- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly)
 - [Preview generation is slow (Medium)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying---solved)
 - [Zoom sensitivity too high (Medium)](#zoom-sensitivity-too-high---solved)
-- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
 - [Rotation causes GPU error (Critical)](#rotation-causes-gpu-error---solved)
 - [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail---solved)
 - [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---solved)
@@ -50,24 +50,25 @@
 
 ## Open Issues
 
-### Crop tool should confirm before applying
+### Zoom fit doesn't center or fill correctly
 
-**Severity**: Medium | **Type**: UX Enhancement
+**Severity**: Medium | **Type**: Bug
 
 **Problem**:
-Currently, crop changes are applied immediately as the user drags the crop handles. This makes it difficult to preview the crop before committing.
+When using the "Fit" zoom option in the edit view:
+1. The image doesn't center properly in the edit pane
+2. The image doesn't fill the available space correctly
 
 **Expected Behavior**:
-1. When entering the crop tool, show the full image with the current crop region outlined
-2. Allow the user to adjust the crop region without immediately applying it
-3. Display a "Set Crop" or "Apply Crop" button at the top of the edit pane
-4. Only apply the crop when the user clicks the button or presses Enter
-5. When re-entering the crop tool later, show the full expanded view of the image (including cropped-out areas) so users can easily re-adjust the crop
+- "Fit" should scale the image to fill as much of the edit pane as possible while maintaining aspect ratio
+- Image should be centered both horizontally and vertically in the pane
 
-**Benefits**:
-- Users can preview crop changes before committing
-- Easier to make fine adjustments
-- Can see what was cropped out when re-editing
+**Previous Fix Attempted** (2026-01-23):
+Updated `updateImageDimensions()` and `updateViewportDimensions()` to only call `initializeZoom()` when BOTH dimensions are valid. This did not fully resolve the issue.
+
+**Files to Investigate**:
+- `apps/web/app/composables/useZoomPan.ts`
+- `apps/web/app/utils/zoomCalculations.ts`
 
 ---
 
@@ -122,6 +123,47 @@ Research whether staged caching would meaningfully improve performance or if it 
 
 ## Recently Solved
 
+### Crop tool should confirm before applying - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-23
+
+**Problem**:
+Crop changes were applied immediately as the user dragged crop handles, making it difficult to preview the crop before committing.
+
+**Fix Applied**:
+Implemented a confirmation workflow for the crop tool:
+
+1. **Pending Crop State** (`editUIStore`):
+   - Added `pendingCrop` state that holds uncommitted crop changes
+   - Changes only commit to edit store when user explicitly applies
+
+2. **EditCropActionBar Component**:
+   - Action bar appears at top center when crop tool is active
+   - "Set Crop" button applies changes
+   - "Cancel" button discards changes
+   - "Reset" button clears crop to full image
+
+3. **Keyboard Shortcuts**:
+   - Enter key applies pending crop
+   - Escape key cancels (instead of navigating away)
+
+4. **Accordion Integration**:
+   - Accordion collapses when crop is applied or cancelled
+
+**Files Modified** (6):
+- `apps/web/app/stores/editUI.ts` - Pending crop state and methods
+- `apps/web/app/components/edit/EditCropActionBar.vue` - NEW component
+- `apps/web/app/composables/useCropOverlay.ts` - Use pending state
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Integrate action bar
+- `apps/web/app/pages/edit/[id].vue` - Keyboard shortcuts
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Accordion behavior
+
+**Tests Added** (20):
+- 8 tests for pending crop state in editUIStore
+- 12 tests for EditCropActionBar component
+
+---
+
 ### Zoom sensitivity too high - SOLVED
 
 **Severity**: Medium | **Fixed**: 2026-01-23
@@ -145,18 +187,17 @@ Binary delta mapping in `handleWheel()` treated all deltaY values the same - bot
 
 ---
 
-### Zoom fit doesn't center or fill correctly - SOLVED
+### Zoom fit doesn't center or fill correctly - REOPENED
 
-**Severity**: Medium | **Fixed**: 2026-01-23
+**Severity**: Medium | **Attempted Fix**: 2026-01-23 | **Status**: Reopened
 
 **Problem**:
 When using the "Fit" zoom option in the edit view, the image didn't center properly in the edit pane.
 
-**Root Cause**:
-The `initializeZoom()` function was being called before both image and viewport dimensions were set, causing incorrect centering calculations.
-
-**Fix Applied**:
+**Fix Attempted**:
 Updated `updateImageDimensions()` and `updateViewportDimensions()` to only call `initializeZoom()` when BOTH dimensions are valid (width > 0 and height > 0).
+
+**Result**: Did not fully resolve the issue. See open issue for continued tracking.
 
 **Files Modified** (1):
 - `apps/web/app/composables/useZoomPan.ts` - Added dimension guards

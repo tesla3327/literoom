@@ -121,6 +121,17 @@ function handleKeydown(e: KeyboardEvent) {
   const isMod = e.metaKey || e.ctrlKey
   const key = e.key.toLowerCase()
 
+  // Crop tool shortcuts (Enter = apply, Escape = cancel)
+  if (editUIStore.isCropToolActive) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      editUIStore.applyPendingCrop()
+      return
+    }
+    // Note: Escape is handled below in the switch, but when crop tool is active
+    // it should cancel the crop instead of going back to grid
+  }
+
   // Zoom shortcuts (Cmd/Ctrl + 0, 1, +, -)
   if (isMod && !e.shiftKey) {
     if (key === '0') {
@@ -163,7 +174,13 @@ function handleKeydown(e: KeyboardEvent) {
 
   switch (e.key) {
     case 'Escape':
-      goBack()
+      // If crop tool is active, cancel the crop instead of going back
+      if (editUIStore.isCropToolActive) {
+        editUIStore.cancelPendingCrop()
+      }
+      else {
+        goBack()
+      }
       break
     case 'ArrowLeft':
       navigatePrev()

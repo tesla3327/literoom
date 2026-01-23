@@ -116,19 +116,30 @@ const expandedSections = ref<string[]>(['basic'])
 /**
  * Watch crop accordion expansion to toggle crop tool overlay.
  * When crop section is expanded, show the crop overlay on the main preview.
- * When collapsed, hide the crop overlay.
+ * Note: We don't deactivate on collapse - let Apply/Cancel handle that.
  */
 watch(
   () => expandedSections.value.includes('crop'),
   (isCropExpanded) => {
-    if (isCropExpanded) {
+    if (isCropExpanded && !editUIStore.isCropToolActive) {
       editUIStore.activateCropTool()
-    }
-    else {
-      editUIStore.deactivateCropTool()
     }
   },
   { immediate: true },
+)
+
+/**
+ * Watch crop tool deactivation to collapse accordion.
+ * When user clicks Apply or Cancel, the accordion should also collapse.
+ */
+watch(
+  () => editUIStore.isCropToolActive,
+  (isActive) => {
+    if (!isActive && expandedSections.value.includes('crop')) {
+      // Remove 'crop' from expanded sections
+      expandedSections.value = expandedSections.value.filter(s => s !== 'crop')
+    }
+  },
 )
 
 /**

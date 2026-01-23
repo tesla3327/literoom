@@ -7,6 +7,7 @@
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import type { CropRectangle } from '@literoom/core/catalog'
 import type { Camera, ZoomPreset } from '~/utils/zoomCalculations'
 import {
   calculateCenteredPan,
@@ -296,6 +297,15 @@ export const useEditUIStore = defineStore('editUI', () => {
   /** Whether the crop tool is active (overlay visible on main preview) */
   const isCropToolActive = ref(false)
 
+  /**
+   * Pending crop state - not yet applied to edit store.
+   * This allows users to preview crop changes before committing.
+   */
+  const pendingCrop = ref<CropRectangle | null>(null)
+
+  /** Whether there is a pending crop that differs from the stored crop */
+  const hasPendingCrop = computed(() => pendingCrop.value !== null)
+
   // ============================================================================
   // Mask Tool State
   // ============================================================================
@@ -352,16 +362,83 @@ export const useEditUIStore = defineStore('editUI', () => {
   // ============================================================================
 
   /**
+   * Initialize pending crop from the edit store's current crop value.
+   * Called when activating the crop tool.
+   */
+  function initializePendingCrop(): void {
+    const editStore = useEditStore()
+    const currentCrop = editStore.cropTransform.crop
+    if (currentCrop) {
+      pendingCrop.value = { ...currentCrop }
+    }
+    else {
+      // Default to full image if no crop exists
+      pendingCrop.value = { left: 0, top: 0, width: 1, height: 1 }
+    }
+  }
+
+  /**
+   * Update the pending crop state (called during drag interactions).
+   */
+  function setPendingCrop(crop: CropRectangle | null): void {
+    pendingCrop.value = crop ? { ...crop } : null
+  }
+
+  /**
+   * Apply the pending crop to the edit store and deactivate crop tool.
+   */
+  function applyPendingCrop(): void {
+    const editStore = useEditStore()
+    if (pendingCrop.value) {
+      const crop = pendingCrop.value
+      // Check if it's effectively full image (no crop needed)
+      const isFullImage
+        = Math.abs(crop.left) < 0.001
+        && Math.abs(crop.top) < 0.001
+        && Math.abs(crop.width - 1) < 0.001
+        && Math.abs(crop.height - 1) < 0.001
+
+      if (isFullImage) {
+        editStore.setCrop(null)
+      }
+      else {
+        editStore.setCrop({ ...crop })
+      }
+    }
+    pendingCrop.value = null
+    isCropToolActive.value = false
+  }
+
+  /**
+   * Cancel the pending crop and revert to stored state.
+   */
+  function cancelPendingCrop(): void {
+    pendingCrop.value = null
+    isCropToolActive.value = false
+  }
+
+  /**
+   * Reset pending crop to full image (no crop).
+   */
+  function resetPendingCrop(): void {
+    pendingCrop.value = { left: 0, top: 0, width: 1, height: 1 }
+  }
+
+  /**
    * Activate the crop tool (show overlay on main preview).
+   * Initializes pending crop from current edit state.
    */
   function activateCropTool(): void {
+    initializePendingCrop()
     isCropToolActive.value = true
   }
 
   /**
    * Deactivate the crop tool (hide overlay on main preview).
+   * Note: This does NOT apply pending crop - use applyPendingCrop() or cancelPendingCrop().
    */
   function deactivateCropTool(): void {
+    pendingCrop.value = null
     isCropToolActive.value = false
   }
 
@@ -369,7 +446,12 @@ export const useEditUIStore = defineStore('editUI', () => {
    * Toggle the crop tool active state.
    */
   function toggleCropTool(): void {
-    isCropToolActive.value = !isCropToolActive.value
+    if (isCropToolActive.value) {
+      cancelPendingCrop()
+    }
+    else {
+      activateCropTool()
+    }
   }
 
   // ============================================================================
@@ -445,7 +527,14 @@ export const useEditUIStore = defineStore('editUI', () => {
     resetClippingOverlays,
     // Crop Tool State
     isCropToolActive,
+    pendingCrop,
+    hasPendingCrop,
     // Crop Tool Methods
+    initializePendingCrop,
+    setPendingCrop,
+    applyPendingCrop,
+    cancelPendingCrop,
+    resetPendingCrop,
     activateCropTool,
     deactivateCropTool,
     toggleCropTool,

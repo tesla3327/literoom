@@ -233,6 +233,21 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
       <span>Rendering...</span>
     </div>
 
+    <!-- Crop Action Bar (top-center) - shown when crop tool is active -->
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition-all duration-150 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <EditCropActionBar
+        v-if="editUIStore.isCropToolActive && !isInitialLoading && previewUrl"
+        class="absolute top-4 left-1/2 -translate-x-1/2 z-30"
+      />
+    </Transition>
+
     <!-- Quality indicator (top-left) - only show during draft renders -->
     <div
       v-if="renderQuality === 'draft' && !isInitialLoading"
