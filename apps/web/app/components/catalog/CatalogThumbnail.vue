@@ -172,8 +172,9 @@ const containerClasses = computed(() => {
     </div>
 
     <!-- Thumbnail states -->
+    <!-- Loading skeleton: shown when pending or loading WITHOUT existing thumbnail -->
     <div
-      v-if="asset.thumbnailStatus === 'pending' || asset.thumbnailStatus === 'loading'"
+      v-if="(asset.thumbnailStatus === 'pending' || asset.thumbnailStatus === 'loading') && !asset.thumbnailUrl"
       class="skeleton absolute inset-0 bg-gray-800"
     />
     <div
@@ -186,11 +187,16 @@ const containerClasses = computed(() => {
       />
       <span class="text-xs mt-1">Failed</span>
     </div>
+    <!-- Thumbnail image: show when ready OR when regenerating (loading with existing url) -->
     <img
       v-else-if="asset.thumbnailUrl"
       :src="asset.thumbnailUrl"
       :alt="asset.filename"
-      class="absolute inset-0 w-full h-full object-cover"
+      :class="[
+        'absolute inset-0 w-full h-full object-cover transition-opacity duration-200',
+        // Reduce opacity during regeneration (status=loading but has existing thumbnail)
+        asset.thumbnailStatus === 'loading' && 'opacity-70'
+      ]"
       loading="lazy"
       decoding="async"
     >

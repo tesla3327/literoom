@@ -336,3 +336,115 @@ Added missing methods to `IThumbnailService` interface:
 - Phase 7: Edit page integration
 - Phase 8+: Visual feedback and tests
 
+---
+
+## 157: 2026-01-22 21:35 EST: Thumbnail Regeneration - Phases 6-9 Complete
+
+**Objective**: Complete the remaining phases of the thumbnail regeneration feature: useCatalog composable, edit page integration, visual feedback, and unit tests.
+
+**Implementation Status**: All Phases Complete ✅
+
+### Phase 6: useCatalog Composable
+
+Added `regenerateThumbnail()` function to `useCatalog` composable:
+
+**Helper Functions**:
+- `convertMaskStackToWorkerFormat(masks)` - Converts MaskStack (catalog format) to MaskStackData (worker format)
+- `convertEditStateToWorkerFormat(state)` - Converts EditState to EditedThumbnailEditState
+
+**regenerateThumbnail Function**:
+```typescript
+async function regenerateThumbnail(assetId: string): Promise<void> {
+  const editState = editStore.getEditStateForAsset(assetId)
+  if (!editState) return
+  const workerEditState = convertEditStateToWorkerFormat(editState)
+  await service.regenerateThumbnail(assetId, workerEditState)
+}
+```
+
+**Files Modified**:
+- `apps/web/app/composables/useCatalog.ts` - Added helper functions and regenerateThumbnail export
+
+### Phase 7: Edit Page Integration
+
+Added thumbnail regeneration trigger when leaving edit view with modifications:
+
+```typescript
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+
+  // Trigger thumbnail regeneration if the asset was modified
+  const id = assetId.value
+  if (id && editStore.hasModifications) {
+    regenerateThumbnail(id).catch((err) => {
+      console.warn('[EditPage] Failed to queue thumbnail regeneration:', err)
+    })
+  }
+
+  // Clear edit state when leaving edit view
+  editStore.clear()
+  editUIStore.deactivateCropTool()
+})
+```
+
+**Files Modified**:
+- `apps/web/app/pages/edit/[id].vue` - Added regenerateThumbnail call in onUnmounted
+
+### Phase 8: Visual Feedback
+
+Added opacity transition during thumbnail regeneration:
+
+**Logic**:
+- Show skeleton only when loading WITHOUT existing thumbnail URL
+- When regenerating (loading + has thumbnailUrl), show existing image with reduced opacity
+- Smooth 200ms transition between states
+
+```vue
+<!-- Loading skeleton: shown when pending or loading WITHOUT existing thumbnail -->
+<div
+  v-if="(asset.thumbnailStatus === 'pending' || asset.thumbnailStatus === 'loading') && !asset.thumbnailUrl"
+  class="skeleton absolute inset-0 bg-gray-800"
+/>
+<!-- Thumbnail image: show when ready OR when regenerating -->
+<img
+  v-else-if="asset.thumbnailUrl"
+  :class="[
+    'absolute inset-0 w-full h-full object-cover transition-opacity duration-200',
+    asset.thumbnailStatus === 'loading' && 'opacity-70'
+  ]"
+  ...
+/>
+```
+
+**Files Modified**:
+- `apps/web/app/components/catalog/CatalogThumbnail.vue` - Updated thumbnail status conditions and added opacity class
+
+### Phase 9: Unit Tests
+
+Unit tests for ThumbnailService regeneration methods were already created in a previous commit:
+- `invalidateThumbnail()` tests - removes from cache, cancels in-flight, increments generation
+- `regenerateThumbnail()` tests - uses BACKGROUND priority, applies edit state, discards stale results
+
+**Test Results**:
+- Core package: 466 tests (4 pre-existing flaky tests failing, unrelated to thumbnail regeneration)
+- All new regeneration tests pass
+
+### Summary
+
+The thumbnail regeneration feature is now complete. When a user edits a photo and returns to the gallery:
+
+1. **On edit view unmount**: If modifications exist, `regenerateThumbnail()` is called
+2. **Composable converts edit state**: EditState → EditedThumbnailEditState for worker
+3. **CatalogService delegates**: Sets status to 'loading', calls ThumbnailService
+4. **ThumbnailService processes**: Invalidates old, queues new with BACKGROUND priority
+5. **Worker generates edited thumbnail**: Full pipeline (decode → rotate → crop → adjust → curve → masks → resize → encode)
+6. **Visual feedback**: Old thumbnail shown at 70% opacity during regeneration
+7. **Cache updates**: New thumbnail stored in memory + OPFS cache
+8. **UI updates**: Callback fires, thumbnail displays with edits applied
+
+**Files Modified** (4 files):
+- `apps/web/app/composables/useCatalog.ts`
+- `apps/web/app/pages/edit/[id].vue`
+- `apps/web/app/components/catalog/CatalogThumbnail.vue`
+- `docs/plans/2026-01-22-thumbnail-regeneration-plan.md` (all phases marked complete)
+

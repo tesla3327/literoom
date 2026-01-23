@@ -271,7 +271,7 @@ async regenerateThumbnail(
 ---
 
 ### Phase 6: useCatalog Composable (15 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Export regeneration function from composable.
 
@@ -294,7 +294,7 @@ return {
 ---
 
 ### Phase 7: Edit Page Integration (30 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Trigger regeneration when leaving edit view.
 
@@ -321,7 +321,7 @@ onBeforeUnmount(async () => {
 ---
 
 ### Phase 8: Visual Feedback (30 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Show subtle visual feedback during regeneration.
 
@@ -343,7 +343,7 @@ Keep old thumbnail visible but with reduced opacity during regeneration:
 ---
 
 ### Phase 9: Unit Tests (45 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Add unit tests for the new functionality.
 

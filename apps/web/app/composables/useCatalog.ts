@@ -8,11 +8,53 @@
  * Pages that use this composable should apply the 'ensure-catalog' middleware
  * to guarantee $catalogService is available.
  */
-import type { ICatalogService, FlagStatus } from '@literoom/core/catalog'
+import type { ICatalogService, FlagStatus, EditState, MaskStack } from '@literoom/core/catalog'
+import type { EditedThumbnailEditState, MaskStackData } from '@literoom/core/decode'
 
 // Loading state for import process
 const isLoading = ref(false)
 const loadingMessage = ref('')
+
+/**
+ * Convert MaskStack (catalog format) to MaskStackData (worker format).
+ */
+function convertMaskStackToWorkerFormat(masks: MaskStack): MaskStackData {
+  return {
+    linearMasks: masks.linearMasks.map(m => ({
+      startX: m.start.x,
+      startY: m.start.y,
+      endX: m.end.x,
+      endY: m.end.y,
+      feather: m.feather,
+      enabled: m.enabled,
+      adjustments: m.adjustments,
+    })),
+    radialMasks: masks.radialMasks.map(m => ({
+      centerX: m.center.x,
+      centerY: m.center.y,
+      radiusX: m.radiusX,
+      radiusY: m.radiusY,
+      rotation: m.rotation,
+      feather: m.feather,
+      invert: m.invert,
+      enabled: m.enabled,
+      adjustments: m.adjustments,
+    })),
+  }
+}
+
+/**
+ * Convert EditState to EditedThumbnailEditState for regeneration.
+ */
+function convertEditStateToWorkerFormat(state: EditState): EditedThumbnailEditState {
+  return {
+    adjustments: state.adjustments,
+    toneCurve: state.adjustments.toneCurve,
+    crop: state.cropTransform.crop,
+    rotation: state.cropTransform.rotation,
+    masks: state.masks ? convertMaskStackToWorkerFormat(state.masks) : undefined,
+  }
+}
 
 export function useCatalog() {
   const nuxtApp = useNuxtApp()
@@ -289,6 +331,28 @@ export function useCatalog() {
     }
   }
 
+  /**
+   * Regenerate thumbnail for an asset with its current edits applied.
+   * Used to update gallery thumbnails after editing.
+   */
+  async function regenerateThumbnail(assetId: string): Promise<void> {
+    const service = requireCatalogService()
+    const editStore = useEditStore()
+
+    // Get edit state for this asset
+    const editState = editStore.getEditStateForAsset(assetId)
+    if (!editState) {
+      console.warn('[useCatalog] No edit state found for asset:', assetId)
+      return
+    }
+
+    // Convert to worker format
+    const workerEditState = convertEditStateToWorkerFormat(editState)
+
+    // Trigger regeneration via catalog service
+    await service.regenerateThumbnail(assetId, workerEditState)
+  }
+
   return {
     // Services (may be undefined until plugin initializes)
     catalogService,
@@ -310,5 +374,6 @@ export function useCatalog() {
     requestPreview,
     updatePreviewPriority,
     rescanFolder,
+    regenerateThumbnail,
   }
 }

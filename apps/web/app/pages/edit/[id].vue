@@ -28,6 +28,7 @@ const selectionStore = useSelectionStore()
 const editStore = useEditStore()
 const editUIStore = useEditUIStore()
 const { openCopyModal, pasteSettings, canPaste } = useCopyPasteSettings()
+const { regenerateThumbnail } = useCatalog()
 
 // Help modal keyboard shortcuts
 useHelpModal()
@@ -210,6 +211,16 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+
+  // Trigger thumbnail regeneration if the asset was modified
+  // This runs async in the background so it won't block navigation
+  const id = assetId.value
+  if (id && editStore.hasModifications) {
+    regenerateThumbnail(id).catch((err) => {
+      console.warn('[EditPage] Failed to queue thumbnail regeneration:', err)
+    })
+  }
+
   // Clear edit state when leaving edit view
   editStore.clear()
   // Deactivate crop tool when leaving edit view
