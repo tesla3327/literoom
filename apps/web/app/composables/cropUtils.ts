@@ -77,7 +77,7 @@ export function findHandleAt(
   for (const handle of HANDLES) {
     const pos = positions[handle]
     const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= CROP_HANDLE_HIT_RADIUS) return handle
+    if (dist <= CROP_CROP_HANDLE_HIT_RADIUS) return handle
   }
   return null
 }
@@ -194,7 +194,7 @@ export function drawHandles(
   activeHandle: HandlePosition | null,
 ): void {
   const positions = getHandlePositions(crop, w, h)
-  const half = CROP_HANDLE_SIZE / 2
+  const half = CROP_CROP_HANDLE_SIZE / 2
 
   ctx.lineWidth = 1
 
@@ -204,11 +204,11 @@ export function drawHandles(
 
     // Handle fill
     ctx.fillStyle = isActive ? COLORS.handleActive : COLORS.handle
-    ctx.fillRect(pos.x - half, pos.y - half, CROP_HANDLE_SIZE, CROP_HANDLE_SIZE)
+    ctx.fillRect(pos.x - half, pos.y - half, CROP_CROP_HANDLE_SIZE, CROP_CROP_HANDLE_SIZE)
 
     // Handle border
     ctx.strokeStyle = '#000'
-    ctx.strokeRect(pos.x - half, pos.y - half, CROP_HANDLE_SIZE, CROP_HANDLE_SIZE)
+    ctx.strokeRect(pos.x - half, pos.y - half, CROP_CROP_HANDLE_SIZE, CROP_CROP_HANDLE_SIZE)
   }
 }
 
