@@ -169,15 +169,37 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 
 **Objective**: Move histogram computation to GPU
 
+**Status**: In Progress (Research Complete)
+
+**Research Findings** (from `docs/research/2026-01-23-gpu-histogram-synthesis.md`):
+- Global atomics cause 10-25x slowdown due to memory contention
+- Workgroup privatization with shared memory atomics gives 7-25x speedup
+- Two-phase approach: workgroup-local histogram → parallel reduction merge
+- Small readback (4KB) makes GPU→CPU transfer efficient
+
 **Tasks**:
-1. Create WGSL compute shader with atomic histogram bins
-2. Implement workgroup privatization for performance
-3. Read back histogram data to CPU
-4. Update histogram display component
+1. ✅ Research GPU histogram patterns and WGSL capabilities
+2. Create WGSL histogram shader with workgroup privatization
+3. Create HistogramPipeline TypeScript wrapper
+4. Create GPUHistogramService high-level service
+5. Integrate with edit preview pipeline
 
 **Files to Create**:
-- `crates/literoom-wasm/src/shaders/histogram.wgsl`
-- `packages/core/src/gpu/pipelines/histogram-pipeline.ts`
+- `packages/core/src/gpu/shaders/histogram.wgsl` - WGSL compute shader
+- `packages/core/src/gpu/pipelines/histogram-pipeline.ts` - Pipeline wrapper
+- `packages/core/src/gpu/gpu-histogram-service.ts` - High-level service
+
+**Files to Modify**:
+- `packages/core/src/gpu/shaders/index.ts` - Export shader source
+- `packages/core/src/gpu/pipelines/index.ts` - Export pipeline
+- `packages/core/src/gpu/index.ts` - Export service
+
+**Key Implementation Details**:
+- Workgroup size: 16×16 (256 threads)
+- Shared memory: 4×256 atomic<u32> bins (4KB per workgroup)
+- Output buffer: 4×256×4 = 4KB storage buffer
+- Luminance: ITU-R BT.709 coefficients (R=0.2126, G=0.7152, B=0.0722)
+- Clipping: Check bins[0] > 0 (shadow) and bins[255] > 0 (highlight)
 
 **Performance Target**: 12ms → 1ms (12x speedup)
 
@@ -185,6 +207,8 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 - [ ] Histogram values match WASM implementation
 - [ ] Per-channel (RGB) histograms correct
 - [ ] Luminance histogram correct
+- [ ] Clipping detection works correctly
+- [ ] Automatic fallback to WASM when GPU unavailable
 
 ### Phase 6: Transform Operations
 

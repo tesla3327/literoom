@@ -30,3 +30,10 @@ export {
   DEFAULT_GPU_MASK_ADJUSTMENTS,
   MAX_MASKS,
 } from './mask-pipeline'
+
+export {
+  HistogramPipeline,
+  getHistogramPipeline,
+  resetHistogramPipeline,
+  type HistogramResult,
+} from './histogram-pipeline'

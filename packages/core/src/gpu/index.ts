@@ -82,6 +82,10 @@ export {
   type MaskStackInput,
   DEFAULT_GPU_MASK_ADJUSTMENTS,
   MAX_MASKS,
+  HistogramPipeline,
+  getHistogramPipeline,
+  resetHistogramPipeline,
+  type HistogramResult,
 } from './pipelines'
 
 // Texture utilities
@@ -119,3 +123,11 @@ export {
   resetGPUMaskService,
   applyMaskedAdjustmentsAdaptive,
 } from './gpu-mask-service'
+
+// GPU histogram service
+export {
+  GPUHistogramService,
+  getGPUHistogramService,
+  resetGPUHistogramService,
+  computeHistogramAdaptive,
+} from './gpu-histogram-service'
