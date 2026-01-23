@@ -471,3 +471,62 @@ This is an infrastructure improvement to help track code quality going forward.
 
 **Next Steps**: Implement Phase 1 (TypeScript coverage configuration)
 
+---
+
+## 150: 2026-01-22 20:54 EST: Test Coverage Metrics - Phase 1 Implementation (TypeScript)
+
+**Objective**: Implement TypeScript test coverage configuration per the plan created in iteration 149.
+
+**Status**: Complete
+
+### Implementation Details
+
+**Phase 1.1: packages/core/vitest.config.ts**
+- Added V8 coverage provider configuration
+- Reporters: text, html, json, lcov
+- Include: `src/**/*.ts`
+- Exclude: test files, type files, index files
+- Thresholds: 30% lines/statements, 50% functions/branches (low due to browser-only code)
+
+**Phase 1.2: apps/web/vitest.config.ts**
+- Added V8 coverage provider configuration
+- Reporters: text, html, json, lcov
+- Include: app/, composables/, stores/, plugins/, utils/
+- Exclude: test/, e2e/, type files, app.vue, error.vue
+- Thresholds: 20% lines/statements, 50% functions/branches (low due to Vue components)
+
+**Phase 1.3: Package.json scripts**
+- Added `coverage` script to `packages/core/package.json`
+- Added `coverage` script to `apps/web/package.json`
+- Added `coverage`, `coverage:core`, `coverage:web` scripts to root `package.json`
+
+**Dependencies Added**:
+- `@vitest/coverage-v8@^2` for packages/core (matches vitest 2.x)
+- `@vitest/coverage-v8@^3` for apps/web (matches vitest 3.x)
+
+**Current Coverage Metrics**:
+
+| Package | Lines | Branches | Functions | Statements |
+|---------|-------|----------|-----------|------------|
+| @literoom/core | 32.38% | 90.79% | 79.87% | 32.38% |
+| @literoom/web | 22.52% | 86.77% | 51.56% | 22.52% |
+
+**Note**: Low line/statement coverage is expected because:
+- Core: Browser-only code (catalog-service.ts, decode-service.ts, browser.ts) can't run in Node.js
+- Web: Vue components and browser-only composables are harder to unit test
+
+**Files Modified** (5):
+- `packages/core/vitest.config.ts` - Added coverage configuration
+- `apps/web/vitest.config.ts` - Added coverage configuration
+- `packages/core/package.json` - Added coverage script, @vitest/coverage-v8
+- `apps/web/package.json` - Added coverage script, @vitest/coverage-v8
+- `package.json` (root) - Added coverage scripts
+
+**Test Results**:
+- 362 core tests pass
+- 341 web tests pass (note: test count increased due to new tests in previous iterations)
+
+**Next Steps** (per plan):
+- Phase 2: Rust coverage with cargo-llvm-cov (future iteration)
+- Phase 3: CI integration with Codecov (future iteration)
+

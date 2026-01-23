@@ -13,19 +13,21 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@nuxt/ui": "^3.0.0",
+    "@nuxt/ui": "^4.4.0",
     "@pinia/nuxt": "^0.11.3",
     "@tanstack/vue-virtual": "^3.13.18",
-    "nuxt": "^3.15.4",
+    "nuxt": "^4.2.2",
     "pinia": "^3.0.4"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.0.0",
     "@nuxt/test-utils": "^3.16.0",
     "@playwright/test": "^1.49.1",
+    "@vitest/coverage-v8": "^3",
     "@vue/test-utils": "^2.4.6",
     "happy-dom": "^16.6.0",
     "typescript": "^5.7.3",

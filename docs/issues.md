@@ -3,11 +3,11 @@
 ## Table of Contents
 
 ### Open Issues
-- [Import UX feels slow (Medium)](#import-ux-feels-slow)
 - [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail)
 - [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---partially-solved)
 
 ### Recently Solved
+- [Test coverage metrics (Medium)](#test-coverage-metrics---solved)
 - [Previously opened folder auto-loads unexpectedly (Medium)](#previously-opened-folder-auto-loads-unexpectedly---solved)
 - [Import UX feels slow (Medium)](#import-ux-feels-slow---solved)
 - ["All" count keeps increasing (High)](#all-count-keeps-increasing---solved)
@@ -124,6 +124,36 @@ Requires implementing thumbnail regeneration pipeline:
 
 ## Solved Issues
 
+### Test coverage metrics - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-22
+
+**Problem**:
+No test coverage tracking existed for the project, making it difficult to track code quality progress.
+
+**Fix Applied**:
+1. Added V8 coverage provider configuration to `packages/core/vitest.config.ts`
+2. Added V8 coverage provider configuration to `apps/web/vitest.config.ts`
+3. Added `coverage` scripts to package.json files
+4. Installed `@vitest/coverage-v8` dependencies
+
+**Current Coverage**:
+| Package | Lines | Branches | Functions | Statements |
+|---------|-------|----------|-----------|------------|
+| @literoom/core | 32.38% | 90.79% | 79.87% | 32.38% |
+| @literoom/web | 22.52% | 86.77% | 51.56% | 22.52% |
+
+**Usage**:
+```bash
+pnpm coverage       # Run all coverage
+pnpm coverage:core  # Run core package only
+pnpm coverage:web   # Run web app only
+```
+
+**Note**: Thresholds are set low initially due to browser-only code that can't be tested in Node.js. CI integration with Codecov deferred to future iteration.
+
+---
+
 ### Previously opened folder auto-loads unexpectedly - SOLVED
 
 **Severity**: Medium | **Fixed**: 2026-01-22
@@ -180,7 +210,7 @@ The export feature exported the original image without applying any edits.
 - `apps/web/app/stores/edit.ts`
 - `apps/web/app/composables/useExport.ts`
 
-**Note**: Edits are session-cached only (lost on page refresh). Database persistence can be added in a future iteration.
+**Note**: ~~Edits are session-cached only (lost on page refresh). Database persistence can be added in a future iteration.~~ **UPDATE 2026-01-22**: Edits now persist to IndexedDB and survive page refresh. Fixed by calling `editStore.initializeFromDb()` on app startup.
 
 ---
 
