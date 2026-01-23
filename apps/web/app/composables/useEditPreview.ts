@@ -21,6 +21,7 @@ import {
   getTotalRotation,
   ThumbnailPriority,
 } from '@literoom/core/catalog'
+import { applyMaskedAdjustmentsAdaptive } from '@literoom/core/gpu'
 
 // ============================================================================
 // Types
@@ -588,6 +589,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         }
 
         // ===== STEP 5: Apply masked adjustments (local adjustments) =====
+        // Uses GPU-accelerated processing when available, falls back to WASM
         if (hasMasks && editStore.masks) {
           const maskStack: MaskStackData = {
             linearMasks: editStore.masks.linearMasks.map(m => ({
@@ -612,13 +614,15 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             })),
           }
 
-          console.log('[useEditPreview] Applying masked adjustments:', maskStack)
-          const maskedResult = await $decodeService.applyMaskedAdjustments(
+          // Use adaptive GPU/WASM processing for masked adjustments
+          const { result: maskedResult, backend, timing } = await applyMaskedAdjustmentsAdaptive(
             currentPixels,
             currentWidth,
             currentHeight,
             maskStack,
+            () => $decodeService.applyMaskedAdjustments(currentPixels, currentWidth, currentHeight, maskStack),
           )
+          console.log(`[useEditPreview] Masked adjustments via ${backend} in ${timing.toFixed(1)}ms`)
           currentPixels = maskedResult.pixels
           currentWidth = maskedResult.width
           currentHeight = maskedResult.height

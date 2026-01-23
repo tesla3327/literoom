@@ -10,24 +10,35 @@
 
 /**
  * Texture usage flags for common operations.
+ * Uses lazy evaluation to avoid accessing GPUTextureUsage at module load time,
+ * which would fail in environments without WebGPU (e.g., Node.js tests).
  */
 export const TextureUsage = {
   /** For use as input to shaders */
-  INPUT:
-    GPUTextureUsage.TEXTURE_BINDING |
-    GPUTextureUsage.COPY_DST |
-    GPUTextureUsage.COPY_SRC,
+  get INPUT(): GPUTextureUsageFlags {
+    return (
+      GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.COPY_SRC
+    )
+  },
   /** For use as output from compute shaders */
-  OUTPUT:
-    GPUTextureUsage.STORAGE_BINDING |
-    GPUTextureUsage.COPY_SRC |
-    GPUTextureUsage.TEXTURE_BINDING,
+  get OUTPUT(): GPUTextureUsageFlags {
+    return (
+      GPUTextureUsage.STORAGE_BINDING |
+      GPUTextureUsage.COPY_SRC |
+      GPUTextureUsage.TEXTURE_BINDING
+    )
+  },
   /** For use as both input and output (ping-pong) */
-  PINGPONG:
-    GPUTextureUsage.TEXTURE_BINDING |
-    GPUTextureUsage.STORAGE_BINDING |
-    GPUTextureUsage.COPY_DST |
-    GPUTextureUsage.COPY_SRC,
+  get PINGPONG(): GPUTextureUsageFlags {
+    return (
+      GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.STORAGE_BINDING |
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.COPY_SRC
+    )
+  },
 } as const
 
 /**

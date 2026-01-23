@@ -1,5 +1,72 @@
 # Iterations 161-170
 
+## 168: 2026-01-23 10:06 EST: GPU Acceleration - Phase 4.4 (GPU Mask Integration)
+
+**Objective**: Integrate GPUMaskService into useEditPreview.ts for GPU-accelerated mask processing in the edit view.
+
+**Status**: Complete
+
+**Background**:
+Phase 4.3 (GPUMaskService) is complete. This iteration integrates the GPU mask service into the edit preview pipeline, enabling automatic GPU/WASM backend selection for masked adjustments.
+
+**Implementation Complete**:
+
+1. **Import Addition** (`apps/web/app/composables/useEditPreview.ts`):
+   - Added import for `applyMaskedAdjustmentsAdaptive` from `@literoom/core/gpu`
+
+2. **Pipeline Integration** (Lines 590-628):
+   - Replaced direct `$decodeService.applyMaskedAdjustments()` call with `applyMaskedAdjustmentsAdaptive()`
+   - WASM fallback provided as lambda function
+   - Added console logging of backend used and timing for debugging/telemetry
+
+3. **Lazy GPU Module Loading** (`packages/core/src/gpu/texture-utils.ts`):
+   - Fixed `TextureUsage` constant to use getter functions instead of static initialization
+   - Prevents `GPUTextureUsage is not defined` error in non-WebGPU test environments
+
+**Code Change**:
+
+```typescript
+// Before
+const maskedResult = await $decodeService.applyMaskedAdjustments(
+  currentPixels, currentWidth, currentHeight, maskStack,
+)
+
+// After
+const { result: maskedResult, backend, timing } = await applyMaskedAdjustmentsAdaptive(
+  currentPixels, currentWidth, currentHeight, maskStack,
+  () => $decodeService.applyMaskedAdjustments(currentPixels, currentWidth, currentHeight, maskStack),
+)
+console.log(`[useEditPreview] Masked adjustments via ${backend} in ${timing.toFixed(1)}ms`)
+```
+
+**Files Modified** (2):
+- `apps/web/app/composables/useEditPreview.ts` - GPU mask integration
+- `packages/core/src/gpu/texture-utils.ts` - Lazy GPU constant initialization
+
+**Research Document**: `docs/research/2026-01-23-gpu-mask-integration-synthesis.md`
+
+**Verification**:
+- ✅ All 982 core package tests pass (5 skipped)
+- ✅ TextureUsage getter pattern prevents runtime errors in test environment
+- ✅ Automatic GPU/WASM backend selection working
+
+**Performance Expectations**:
+| Backend | Expected Time (2560x1440, 2 masks) |
+|---------|-----------------------------------|
+| WASM | ~100ms |
+| WebGPU | ~4ms |
+| Speedup | 25x |
+
+**Phase 4 Status**: Complete
+- ✅ Phase 4.1: WGSL shader for linear/radial gradient evaluation
+- ✅ Phase 4.2: MaskPipeline TypeScript wrapper
+- ✅ Phase 4.3: GPUMaskService high-level service
+- ✅ Phase 4.4: Integration into useEditPreview.ts
+
+**Next**: Phase 5 - Histogram Computation (GPU compute shader)
+
+---
+
 ## 167: 2026-01-23 10:02 EST: GPU Acceleration - Phase 4.3 (GPUMaskService)
 
 **Objective**: Create high-level GPUMaskService for GPU-accelerated gradient mask processing.
