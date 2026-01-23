@@ -3,10 +3,11 @@
 ## Table of Contents
 
 ### Open Issues
-- [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail)
-- [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---partially-solved)
+_No open issues!_
 
 ### Recently Solved
+- [Preview not ready when clicking thumbnail (Medium)](#preview-not-ready-when-clicking-thumbnail---solved)
+- [Gallery loading state after returning from edit (High)](#gallery-loading-state-after-returning-from-edit---solved)
 - [Test coverage metrics (Medium)](#test-coverage-metrics---solved)
 - [Previously opened folder auto-loads unexpectedly (Medium)](#previously-opened-folder-auto-loads-unexpectedly---solved)
 - [Import UX feels slow (Medium)](#import-ux-feels-slow---solved)
@@ -44,21 +45,46 @@
 
 ## Open Issues
 
-### Preview not ready when clicking thumbnail
-
-**Severity**: Medium
-
-**Problem**:
-When a thumbnail is visible (appears loaded), users may double-click to enter edit view, but the preview is still generating. This creates confusion.
-
-**Suggested Fixes**:
-1. Process everything up front and wait before dropping users into the gallery
-2. If user enters edit view before preview is ready, prioritize generating that preview
-3. Implement a processing queue with priority jumping based on user actions
+_No open issues at this time!_
 
 ---
 
 ## Recently Solved
+
+### Preview not ready when clicking thumbnail - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-22
+
+**Problem**:
+When a thumbnail is visible (appears loaded), users may double-click to enter edit view, but the preview is still generating. This creates confusion.
+
+**Fix Applied** (3 phases in iteration 140):
+
+1. **Early preview request on double-click** (CatalogThumbnail.vue):
+   - Added `requestPreview(props.asset.id, ThumbnailPriority.VISIBLE)` before `router.push()`
+   - Preview generation starts during navigation transition
+
+2. **Early preview request on keyboard navigation** (CatalogGrid.vue):
+   - Added `requestPreview(currentId, ThumbnailPriority.VISIBLE)` before `navigateTo()`
+   - E/Enter/D key navigation also triggers early preview generation
+
+3. **Preview-first priority in edit view** (useEditPreview.ts):
+   - Preview requested at `ThumbnailPriority.VISIBLE` (Priority 0 - highest)
+   - Thumbnail requested at `ThumbnailPriority.PRELOAD` (Priority 2 - lower)
+   - In edit view, preview is the primary display (2560px) - thumbnail only a fallback
+
+**Files Modified** (3 files):
+- `apps/web/app/components/catalog/CatalogThumbnail.vue`
+- `apps/web/app/components/catalog/CatalogGrid.vue`
+- `apps/web/app/composables/useEditPreview.ts`
+
+**Result**: When users click or keyboard-navigate to edit view:
+- Preview generation starts immediately (before navigation)
+- Preview gets highest priority in the queue
+- Thumbnail gets lower priority (only needed as fallback)
+- Perceived loading time is reduced
+
+---
 
 ### Gallery loading state after returning from edit - SOLVED
 

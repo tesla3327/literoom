@@ -374,6 +374,12 @@ literoom/
 | [157](./iterations-151-160.md:337) | 2026-01-22 | Thumbnail Regeneration - Phases 6-9 Complete |
 | [158](./iterations-151-160.md:452) | 2026-01-22 | Documentation Updates - Gallery Loading Issue Marked Solved |
 
+### [Iterations 161-170](./iterations-161-170.md)
+
+| # | Date | Title |
+|---|------|-------|
+| [159](./iterations-161-170.md:3) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
+
 ---
 
 ## Test Status
