@@ -12,6 +12,7 @@
 
 import type { DecodedImage } from '../decode/types'
 import type { IDecodeService } from '../decode/decode-service'
+import type { EditedThumbnailEditState } from '../decode/worker-messages'
 import {
   ThumbnailPriority,
   type IThumbnailService,
@@ -21,7 +22,7 @@ import {
   type PreviewErrorCallback,
   CatalogError,
 } from './types'
-import { ThumbnailQueue } from './thumbnail-queue'
+import { ThumbnailQueue, type ThumbnailQueueItemWithEditState } from './thumbnail-queue'
 import { ThumbnailCache, PreviewCache, type IThumbnailCache, type IPreviewCache } from './thumbnail-cache'
 
 // ============================================================================
@@ -88,6 +89,9 @@ export class ThumbnailService implements IThumbnailService {
 
   /** Set of assetIds currently being processed or requested */
   private activeRequests = new Set<string>()
+
+  /** Generation numbers for tracking stale thumbnail regeneration results */
+  private generationNumbers = new Map<string, number>()
 
   // Preview generation (larger images for edit view)
   private readonly previewQueue: ThumbnailQueue
@@ -221,6 +225,70 @@ export class ThumbnailService implements IThumbnailService {
    */
   clearMemoryCache(): void {
     this.cache.clearMemory()
+  }
+
+  /**
+   * Invalidate an existing thumbnail, removing it from both caches.
+   * Also cancels any pending generation and increments the generation number.
+   */
+  async invalidateThumbnail(assetId: string): Promise<void> {
+    // Increment generation number to invalidate in-flight requests
+    const gen = (this.generationNumbers.get(assetId) ?? 0) + 1
+    this.generationNumbers.set(assetId, gen)
+
+    // Cancel any in-flight requests
+    this.queue.remove(assetId)
+    this.activeRequests.delete(assetId)
+
+    // Delete from both caches
+    await this.cache.delete(assetId)
+  }
+
+  /**
+   * Regenerate a thumbnail with edits applied.
+   *
+   * This method:
+   * 1. Invalidates the existing thumbnail
+   * 2. Queues a new generation with the edit state applied
+   * 3. Uses BACKGROUND priority by default to not block visible thumbnails
+   *
+   * @param assetId - The asset to regenerate
+   * @param getBytes - Function to get the source image bytes
+   * @param editState - Edit state to apply to the thumbnail
+   * @param priority - Queue priority (default: BACKGROUND)
+   */
+  async regenerateThumbnail(
+    assetId: string,
+    getBytes: () => Promise<Uint8Array>,
+    editState: EditedThumbnailEditState,
+    priority: ThumbnailPriority = ThumbnailPriority.BACKGROUND
+  ): Promise<void> {
+    // Get current generation (before invalidation)
+    const currentGen = this.generationNumbers.get(assetId) ?? 0
+
+    // Invalidate existing thumbnail
+    await this.invalidateThumbnail(assetId)
+
+    // The new generation number after invalidation
+    const newGen = this.generationNumbers.get(assetId) ?? 1
+
+    // Mark as active and add to queue with edit state
+    this.activeRequests.add(assetId)
+
+    // Create extended queue item with edit state
+    const queueItem: ThumbnailQueueItemWithEditState = {
+      assetId,
+      priority,
+      getBytes,
+      editState,
+      generation: newGen,
+    }
+
+    // Enqueue for processing (the queue accepts ThumbnailQueueItem but we extend it)
+    this.queue.enqueue(queueItem)
+
+    // Start processing if not already running
+    this.processQueue()
   }
 
   /**
@@ -405,14 +473,14 @@ export class ThumbnailService implements IThumbnailService {
    */
   private fillProcessingSlots(): void {
     while (this._activeCount < this.concurrency && !this.queue.isEmpty) {
-      const item = this.queue.dequeue()
+      const item = this.queue.dequeue() as ThumbnailQueueItemWithEditState | undefined
       if (!item) {
         break
       }
 
       this._activeCount++
       // Process without awaiting - completion is handled in processItem
-      this.processItem(item.assetId, item.getBytes)
+      this.processItem(item.assetId, item.getBytes, item.editState, item.generation)
     }
 
     // If no items are being processed and queue is empty, we're done
@@ -424,22 +492,51 @@ export class ThumbnailService implements IThumbnailService {
   /**
    * Process a single thumbnail request.
    * Handles its own completion signaling for parallel processing.
+   *
+   * @param assetId - The asset to process
+   * @param getBytes - Function to get the source image bytes
+   * @param editState - Optional edit state to apply (for regeneration)
+   * @param generation - Optional generation number for stale result detection
    */
   private async processItem(
     assetId: string,
-    getBytes: () => Promise<Uint8Array>
+    getBytes: () => Promise<Uint8Array>,
+    editState?: EditedThumbnailEditState,
+    generation?: number
   ): Promise<void> {
     try {
       // Get image bytes
       const bytes = await getBytes()
 
-      // Generate thumbnail using decode service
-      const decoded = await this.decodeService.generateThumbnail(bytes, {
-        size: this.thumbnailSize,
-      })
+      let blob: Blob
 
-      // Convert to blob for caching
-      const blob = await this.decodedImageToBlob(decoded)
+      if (editState) {
+        // Generate edited thumbnail using the full edit pipeline
+        const jpegBytes = await this.decodeService.generateEditedThumbnail(
+          bytes,
+          this.thumbnailSize,
+          editState
+        )
+
+        // Check if result is stale (generation changed during processing)
+        if (generation !== undefined) {
+          const currentGen = this.generationNumbers.get(assetId) ?? 0
+          if (generation !== currentGen) {
+            // Result is stale, discard it
+            return
+          }
+        }
+
+        blob = new Blob([new Uint8Array(jpegBytes)], { type: 'image/jpeg' })
+      } else {
+        // Generate original thumbnail (no edits)
+        const decoded = await this.decodeService.generateThumbnail(bytes, {
+          size: this.thumbnailSize,
+        })
+
+        // Convert to blob for caching
+        blob = await this.decodedImageToBlob(decoded)
+      }
 
       // Store in cache
       const url = await this.cache.set(assetId, blob)

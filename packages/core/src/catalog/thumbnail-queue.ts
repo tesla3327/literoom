@@ -6,7 +6,22 @@
  * visible thumbnails are generated before off-screen ones.
  */
 
+import type { EditedThumbnailEditState } from '../decode/worker-messages'
 import { ThumbnailPriority, type ThumbnailQueueItem } from './types'
+
+// ============================================================================
+// Extended Queue Item with Edit State
+// ============================================================================
+
+/**
+ * Queue item with optional edit state for regenerating edited thumbnails.
+ */
+export interface ThumbnailQueueItemWithEditState extends ThumbnailQueueItem {
+  /** Edit state to apply when generating the thumbnail */
+  editState?: EditedThumbnailEditState
+  /** Generation number for stale result detection */
+  generation?: number
+}
 
 // ============================================================================
 // Constants
