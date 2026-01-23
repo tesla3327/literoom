@@ -549,7 +549,91 @@ Phase 7.3 created GPUEditPipeline which chains all operations (rotation, adjustm
 - Phase 5: Histogram Computation ✅
 - Phase 6: Transform Operations ✅
 - Phase 7: Pipeline Integration ✅ **COMPLETE**
-- Phase 8: UI Integration & Polish (next)
+- Phase 8: UI Integration & Polish (in progress)
 - Phase 9: Testing & Documentation
 
-**Next**: Phase 8 - UI Integration & Polish (performance monitoring, error handling UI)
+**Next**: Continue Phase 8 - complete remaining UI components
+
+---
+
+## 176: 2026-01-23 14:32 EST: GPU Acceleration - Phase 8 (UI Integration)
+
+**Objective**: Add user-facing UI for GPU acceleration status, performance monitoring, and error handling.
+
+**Status**: Complete
+
+**Background**:
+GPU acceleration infrastructure (Phases 1-7) is fully built but invisible to users. There are no status indicators, performance metrics, or error notifications. Phase 8 adds UI components to surface this information.
+
+**Research Conducted** (2 parallel sub-agents):
+1. **GPU UI Integration Research**: Identified 10 gaps in current UI, recommended 3-tier implementation approach
+2. **V1 Acceptance Criteria Verification**: All 9 v1 acceptance criteria confirmed COMPLETE
+
+**Implementation Complete** (4 parallel sub-agents):
+
+1. **gpuStatus Pinia Store** (`apps/web/app/stores/gpuStatus.ts`):
+   - State: isAvailable, isInitialized, hasErrors, deviceName, lastError, lastRenderTiming, backend
+   - Getters: statusIcon, statusColor, statusText, totalRenderTime
+   - Actions: setAvailable, setError, clearError, setRenderTiming
+   - Follows existing store patterns (composition API with defineStore)
+
+2. **GPUStatusIndicator Component** (`apps/web/app/components/gpu/GPUStatusIndicator.vue`):
+   - Small icon button with tooltip showing GPU status
+   - Color coding: green=active, gray=unavailable, amber=error
+   - Icons: bolt (active), bolt-slash (unavailable), exclamation-triangle (error)
+
+3. **GPUPerformanceBadge Component** (`apps/web/app/components/gpu/GPUPerformanceBadge.vue`):
+   - Displays render timing and backend in edit view header
+   - Format: "25ms GPU" or "180ms WASM"
+   - Green for GPU, gray for WASM
+
+4. **Plugin Integration** (`apps/web/app/plugins/catalog.client.ts`):
+   - Imports useGpuStatusStore
+   - Updates store after GPU initialization success/failure
+   - Passes device name from adapter info
+
+5. **UI Integration**:
+   - FilterBar: Added GPUStatusIndicator next to rescan/export buttons
+   - Edit page header: Added GPUPerformanceBadge next to navigation arrows
+   - useEditPreview: Emits timing to gpuStatus store after GPU pipeline render
+
+**Files Created** (5):
+- `apps/web/app/stores/gpuStatus.ts`
+- `apps/web/app/components/gpu/GPUStatusIndicator.vue`
+- `apps/web/app/components/gpu/GPUPerformanceBadge.vue`
+- `docs/research/2026-01-23-gpu-ui-integration-synthesis.md`
+- `docs/plans/2026-01-23-gpu-ui-integration-plan.md`
+
+**Files Modified** (4):
+- `apps/web/app/plugins/catalog.client.ts` - GPU status store updates
+- `apps/web/app/components/catalog/FilterBar.vue` - Added status indicator
+- `apps/web/app/composables/useEditPreview.ts` - Timing emission
+- `apps/web/app/pages/edit/[id].vue` - Added performance badge
+
+**Verification**:
+- ✅ 899/900 web tests pass (1 pre-existing UI test failure)
+- ✅ No type errors in new files
+- ✅ Store follows existing patterns
+- ✅ Components use Nuxt UI 4 APIs correctly
+
+**Phase 8 Status**: Complete (Core UI)
+- ✅ Phase 8.1: GPU status store
+- ✅ Phase 8.2: GPU status indicator component
+- ✅ Phase 8.3: GPU performance badge component
+- ✅ Phase 8.4: Plugin integration
+- ✅ Phase 8.5: FilterBar integration
+- ✅ Phase 8.6: Edit page integration
+- ⏳ Phase 8.7: GPU preferences panel (deferred to future iteration)
+
+**GPU Acceleration Status**:
+- Phase 1: Infrastructure & Detection ✅
+- Phase 2: Basic Adjustments Shader ✅
+- Phase 3: Tone Curve Shader ✅
+- Phase 4: Gradient Mask Shaders ✅
+- Phase 5: Histogram Computation ✅
+- Phase 6: Transform Operations ✅
+- Phase 7: Pipeline Integration ✅
+- Phase 8: UI Integration & Polish ✅ **COMPLETE**
+- Phase 9: Testing & Documentation (next)
+
+**Next**: Phase 9 - Testing & Documentation (add tests for GPU UI components)

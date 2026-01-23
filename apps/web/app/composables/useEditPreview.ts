@@ -31,6 +31,7 @@ import {
   type MaskStackInput,
   type BasicAdjustments,
 } from '@literoom/core/gpu'
+import { useGpuStatusStore } from '~/stores/gpuStatus'
 
 // ============================================================================
 // Types
@@ -721,6 +722,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             )
 
             console.log(`[useEditPreview] GPU Pipeline: ${JSON.stringify(result.timing)}`)
+
+            // Update GPU status store with timing
+            const gpuStatus = useGpuStatusStore()
+            gpuStatus.setRenderTiming(result.timing)
 
             currentPixels = result.pixels
             currentWidth = result.width

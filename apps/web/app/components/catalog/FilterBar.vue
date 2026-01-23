@@ -132,8 +132,10 @@ function setSort(field: SortField, direction: SortDirection): void {
       </UButton>
     </div>
 
-    <!-- Right side: Export progress/button + Sort dropdown -->
+    <!-- Right side: GPU status + Export progress/button + Sort dropdown -->
     <div class="flex items-center gap-2">
+      <!-- GPU Status Indicator -->
+      <GPUStatusIndicator />
       <!-- Thumbnail progress indicator (shown during thumbnail generation) -->
       <div
         v-if="catalogStore.isProcessingThumbnails && !exportStore.isExporting && !catalogStore.isScanning"

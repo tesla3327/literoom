@@ -247,8 +247,9 @@ onUnmounted(() => {
         {{ asset?.filename }}.{{ asset?.extension }}
       </span>
 
-      <!-- Navigation arrows -->
-      <div class="flex items-center gap-1 ml-auto">
+      <!-- GPU Performance Badge + Navigation arrows -->
+      <div class="flex items-center gap-2 ml-auto">
+        <GPUPerformanceBadge />
         <UButton
           variant="ghost"
           icon="i-heroicons-chevron-left"

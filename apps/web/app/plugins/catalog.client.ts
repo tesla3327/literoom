@@ -17,6 +17,7 @@
 import type { ICatalogService } from '@literoom/core/catalog'
 import type { IDecodeService } from '@literoom/core/decode'
 import type { AdaptiveProcessor, GPUCapabilities } from '@literoom/core'
+import { useGpuStatusStore } from '~/stores/gpuStatus'
 
 // Type augmentation for the provided functions
 declare module '#app' {
@@ -58,8 +59,23 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     if (gpuCapabilities.available && gpuCapabilities.adapterInfo) {
       console.log(`[catalog.client] GPU: ${gpuCapabilities.adapterInfo.vendor} ${gpuCapabilities.adapterInfo.device}`)
     }
-  }).catch((error: unknown) => {
-    console.warn('[catalog.client] GPU initialization failed (using WASM):', error)
+
+    // Update GPU status store
+    const gpuStatus = useGpuStatusStore()
+    if (gpuCapabilities.available) {
+      const deviceName = gpuCapabilities.adapterInfo?.device || 'WebGPU'
+      gpuStatus.setAvailable(true, deviceName)
+    }
+    else {
+      gpuStatus.setAvailable(false)
+    }
+  }).catch((err: unknown) => {
+    console.warn('[catalog.client] GPU initialization failed (using WASM):', err)
+
+    // Update GPU status store with error
+    const gpuStatus = useGpuStatusStore()
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    gpuStatus.setError(errorMessage)
   })
 
   // Get stores for callback wiring
