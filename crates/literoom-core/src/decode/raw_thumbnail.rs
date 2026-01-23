@@ -485,4 +485,692 @@ mod tests {
 
     // Note: Tests with actual ARW files would require test fixtures.
     // These can be added later with sample ARW files in a test_fixtures directory.
+
+    #[test]
+    fn test_get_raw_camera_info_invalid_data() {
+        // Random bytes that aren't valid TIFF/EXIF should return CorruptedFile error
+        let invalid = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+        let result = get_raw_camera_info(&invalid);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_raw_camera_info_empty_data() {
+        // Empty slice should return error
+        let result = get_raw_camera_info(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_raw_camera_info_jpeg_without_exif() {
+        // Minimal JPEG header without EXIF data should return error
+        // JPEG SOI marker + APP0 (JFIF) marker without EXIF APP1 segment
+        let jpeg_no_exif = vec![
+            0xFF, 0xD8, // SOI marker
+            0xFF, 0xE0, // APP0 marker (JFIF, not EXIF)
+            0x00, 0x10, // Length: 16 bytes
+            0x4A, 0x46, 0x49, 0x46, 0x00, // "JFIF\0"
+            0x01, 0x01, // Version 1.1
+            0x00, // Aspect ratio units
+            0x00, 0x01, // X density
+            0x00, 0x01, // Y density
+            0x00, 0x00, // No thumbnail
+            0xFF, 0xD9, // EOI marker
+        ];
+        let result = get_raw_camera_info(&jpeg_no_exif);
+        assert!(result.is_err());
+    }
+
+    /// Helper to create a little-endian TIFF header with given IFD0 offset.
+    fn make_tiff_header_le(ifd0_offset: u32) -> Vec<u8> {
+        let mut data = vec![0x49, 0x49, 0x2A, 0x00]; // Little-endian TIFF magic
+        data.extend_from_slice(&ifd0_offset.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn test_extract_raw_thumbnail_valid_tiff_no_jpeg() {
+        // Valid TIFF header pointing to IFD at offset 8
+        let mut data = make_tiff_header_le(8);
+        // IFD at offset 8 with 0 entries
+        data.extend_from_slice(&0u16.to_le_bytes()); // 0 entries
+        data.extend_from_slice(&0u32.to_le_bytes()); // no next IFD
+
+        let result = extract_raw_thumbnail(&data);
+        assert!(
+            matches!(result, Err(DecodeError::NoThumbnail)),
+            "Expected NoThumbnail error for valid TIFF with no JPEG entries, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_extract_raw_thumbnail_truncated_ifd() {
+        // Valid TIFF header pointing to IFD at offset 8
+        let mut data = make_tiff_header_le(8);
+        // Only add 1 byte of IFD data (entry count needs 2 bytes)
+        data.push(0x00);
+
+        let result = extract_raw_thumbnail(&data);
+        assert!(
+            result.is_err(),
+            "Expected error for truncated IFD, got {:?}",
+            result
+        );
+        // Should be a CorruptedFile error since we can't read the IFD
+        assert!(
+            matches!(result, Err(DecodeError::CorruptedFile(_))),
+            "Expected CorruptedFile error for truncated IFD, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_extract_raw_thumbnail_ifd_offset_past_eof() {
+        // Valid TIFF header pointing to IFD at offset 1000 (way past EOF)
+        let data = make_tiff_header_le(1000);
+        // File is only 8 bytes (header), but IFD0 offset points to byte 1000
+
+        let result = extract_raw_thumbnail(&data);
+        assert!(
+            result.is_err(),
+            "Expected error for IFD offset past EOF, got {:?}",
+            result
+        );
+        // Should be a CorruptedFile error since we can't seek to the IFD
+        assert!(
+            matches!(result, Err(DecodeError::CorruptedFile(_))),
+            "Expected CorruptedFile error for IFD offset past EOF, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_finds_large_jpeg() {
+        // Create a 70KB buffer with JPEG markers after offset 8192
+        let mut bytes = vec![0u8; 70_000];
+        // Place JPEG start marker at offset 10000 (after 8192)
+        bytes[10_000] = 0xFF;
+        bytes[10_001] = 0xD8;
+        // Place JPEG end marker at offset 65000 (gives >50KB JPEG)
+        bytes[65_000] = 0xFF;
+        bytes[65_001] = 0xD9;
+
+        let result = scan_for_jpeg(&bytes);
+        assert!(result.is_some());
+        let jpeg = result.unwrap();
+        // Should extract from 10000 to 65002 (inclusive of end marker)
+        assert_eq!(jpeg.len(), 65_002 - 10_000);
+        assert_eq!(jpeg[0], 0xFF);
+        assert_eq!(jpeg[1], 0xD8);
+        assert_eq!(jpeg[jpeg.len() - 2], 0xFF);
+        assert_eq!(jpeg[jpeg.len() - 1], 0xD9);
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_ignores_small_jpeg() {
+        // Create buffer with a small JPEG (< 50KB)
+        let mut bytes = vec![0u8; 70_000];
+        // Place JPEG start marker at offset 10000
+        bytes[10_000] = 0xFF;
+        bytes[10_001] = 0xD8;
+        // Place JPEG end marker at offset 40000 (gives ~30KB JPEG, under 50KB threshold)
+        bytes[40_000] = 0xFF;
+        bytes[40_001] = 0xD9;
+
+        let result = scan_for_jpeg(&bytes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_no_start_marker() {
+        // Create buffer without JPEG start marker
+        let mut bytes = vec![0u8; 70_000];
+        // Only place end marker, no start marker
+        bytes[65_000] = 0xFF;
+        bytes[65_001] = 0xD9;
+
+        let result = scan_for_jpeg(&bytes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_no_end_marker() {
+        // Create buffer with start marker but no end marker
+        let mut bytes = vec![0u8; 70_000];
+        // Place JPEG start marker
+        bytes[10_000] = 0xFF;
+        bytes[10_001] = 0xD8;
+        // No end marker
+
+        let result = scan_for_jpeg(&bytes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_marker_before_8192() {
+        // JPEG markers before offset 8192 should be ignored
+        let mut bytes = vec![0u8; 70_000];
+        // Place JPEG markers before 8192 offset
+        bytes[1_000] = 0xFF;
+        bytes[1_001] = 0xD8;
+        bytes[60_000] = 0xFF;
+        bytes[60_001] = 0xD9;
+
+        let result = scan_for_jpeg(&bytes);
+        // Should not find this JPEG because start marker is before 8192
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_empty_input() {
+        let bytes: Vec<u8> = vec![];
+        let result = scan_for_jpeg(&bytes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_scan_for_jpeg_small_input() {
+        // Input smaller than 8192 bytes - start_offset becomes bytes.len()
+        let mut bytes = vec![0u8; 5_000];
+        // Place markers - but since input is < 8192, start_offset = 5000
+        // and there's nothing to scan after that
+        bytes[1_000] = 0xFF;
+        bytes[1_001] = 0xD8;
+        bytes[4_000] = 0xFF;
+        bytes[4_001] = 0xD9;
+
+        let result = scan_for_jpeg(&bytes);
+        // Should return None because scanning starts at bytes.len() (5000)
+        // and there's nothing after that
+        assert!(result.is_none());
+    }
+
+    // Helper function to create an IFD entry in little-endian format
+    fn make_ifd_entry_le(tag: u16, value: u32) -> Vec<u8> {
+        let mut entry = Vec::new();
+        entry.extend_from_slice(&tag.to_le_bytes());
+        entry.extend_from_slice(&4u16.to_le_bytes()); // type LONG
+        entry.extend_from_slice(&1u32.to_le_bytes()); // count
+        entry.extend_from_slice(&value.to_le_bytes());
+        entry
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_ifd_valid_jpeg() {
+        // Build file bytes with:
+        // - IFD at offset 100 with 2 entries (JPEG_OFFSET and JPEG_LENGTH)
+        // - JPEG data at offset 200
+
+        let ifd_offset: u32 = 100;
+        let jpeg_offset: u32 = 200;
+        let jpeg_data = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]; // JPEG header
+        let jpeg_length: u32 = jpeg_data.len() as u32;
+
+        // Create file bytes large enough to hold everything
+        let mut file_bytes = vec![0u8; 300];
+
+        // Write IFD at offset 100
+        // IFD format: u16 entry_count, then entries (12 bytes each), then u32 next_ifd
+        let entry_count: u16 = 2;
+        file_bytes[ifd_offset as usize..ifd_offset as usize + 2]
+            .copy_from_slice(&entry_count.to_le_bytes());
+
+        // Entry 1: TAG_JPEG_OFFSET (0x0201) pointing to offset 200
+        let entry1 = make_ifd_entry_le(TAG_JPEG_OFFSET, jpeg_offset);
+        let entry1_start = ifd_offset as usize + 2;
+        file_bytes[entry1_start..entry1_start + 12].copy_from_slice(&entry1);
+
+        // Entry 2: TAG_JPEG_LENGTH (0x0202) with the length
+        let entry2 = make_ifd_entry_le(TAG_JPEG_LENGTH, jpeg_length);
+        let entry2_start = entry1_start + 12;
+        file_bytes[entry2_start..entry2_start + 12].copy_from_slice(&entry2);
+
+        // Next IFD offset (0 = no more IFDs)
+        let next_ifd_offset = entry2_start + 12;
+        file_bytes[next_ifd_offset..next_ifd_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+
+        // Write JPEG data at offset 200
+        file_bytes[jpeg_offset as usize..jpeg_offset as usize + jpeg_data.len()]
+            .copy_from_slice(&jpeg_data);
+
+        // Test extraction
+        let mut cursor = Cursor::new(&file_bytes[..]);
+        let result = extract_jpeg_from_ifd(&mut cursor, ifd_offset, true, &file_bytes);
+
+        assert!(result.is_ok());
+        let extracted = result.unwrap();
+        assert_eq!(extracted, jpeg_data);
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_ifd_seek_error() {
+        // Create small file bytes but use an IFD offset past the end
+        let file_bytes = vec![0u8; 50];
+        let ifd_offset: u32 = 1000; // Way past end of file_bytes
+
+        let mut cursor = Cursor::new(&file_bytes[..]);
+        let result = extract_jpeg_from_ifd(&mut cursor, ifd_offset, true, &file_bytes);
+
+        assert!(result.is_err());
+        match result {
+            Err(DecodeError::CorruptedFile(msg)) => {
+                assert!(msg.contains("seek") || msg.contains("Failed"));
+            }
+            _ => panic!("Expected CorruptedFile error for seek past end"),
+        }
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_ifd_no_jpeg_in_entries() {
+        // Build file bytes with valid IFD but entries that don't point to JPEG
+        let ifd_offset: u32 = 100;
+
+        // Create file bytes
+        let mut file_bytes = vec![0u8; 200];
+
+        // Write IFD at offset 100 with 1 entry (not a JPEG tag)
+        let entry_count: u16 = 1;
+        file_bytes[ifd_offset as usize..ifd_offset as usize + 2]
+            .copy_from_slice(&entry_count.to_le_bytes());
+
+        // Entry: Some random tag (not JPEG_OFFSET or JPEG_LENGTH)
+        let random_tag: u16 = 0x0100; // ImageWidth tag
+        let entry = make_ifd_entry_le(random_tag, 1024);
+        let entry_start = ifd_offset as usize + 2;
+        file_bytes[entry_start..entry_start + 12].copy_from_slice(&entry);
+
+        // Next IFD offset (0 = no more IFDs)
+        let next_ifd_offset = entry_start + 12;
+        file_bytes[next_ifd_offset..next_ifd_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+
+        // Test extraction - should fail with NoThumbnail
+        let mut cursor = Cursor::new(&file_bytes[..]);
+        let result = extract_jpeg_from_ifd(&mut cursor, ifd_offset, true, &file_bytes);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_jpeg_interchange_format() {
+        // Create synthetic file bytes with JPEG data at offset 100
+        let mut file_bytes = vec![0u8; 200];
+        // Place JPEG markers at offset 100
+        file_bytes[100] = 0xFF;
+        file_bytes[101] = 0xD8;
+        // Add some content and end marker
+        file_bytes[110] = 0xFF;
+        file_bytes[111] = 0xD9;
+
+        let entries = vec![
+            IfdEntry {
+                tag: TAG_JPEG_OFFSET,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 100,
+            },
+            IfdEntry {
+                tag: TAG_JPEG_LENGTH,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 12, // Length of JPEG data
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_ok());
+        let jpeg_data = result.unwrap();
+        assert_eq!(jpeg_data.len(), 12);
+        assert_eq!(jpeg_data[0], 0xFF);
+        assert_eq!(jpeg_data[1], 0xD8);
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_strip_based_jpeg() {
+        // Create synthetic file bytes with JPEG data at offset 50
+        let mut file_bytes = vec![0u8; 150];
+        // Place JPEG markers at offset 50
+        file_bytes[50] = 0xFF;
+        file_bytes[51] = 0xD8;
+        // Add end marker
+        file_bytes[68] = 0xFF;
+        file_bytes[69] = 0xD9;
+
+        let entries = vec![
+            IfdEntry {
+                tag: TAG_STRIP_OFFSETS,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 50,
+            },
+            IfdEntry {
+                tag: TAG_STRIP_BYTE_COUNTS,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 20, // Length of strip data
+            },
+            IfdEntry {
+                tag: TAG_COMPRESSION,
+                typ: 3, // SHORT
+                count: 1,
+                value_offset: COMPRESSION_JPEG as u32,
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_ok());
+        let jpeg_data = result.unwrap();
+        assert_eq!(jpeg_data.len(), 20);
+        assert_eq!(jpeg_data[0], 0xFF);
+        assert_eq!(jpeg_data[1], 0xD8);
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_strip_based_old_compression() {
+        // Create synthetic file bytes with JPEG data at offset 50
+        let mut file_bytes = vec![0u8; 150];
+        // Place JPEG markers at offset 50
+        file_bytes[50] = 0xFF;
+        file_bytes[51] = 0xD8;
+        // Add end marker
+        file_bytes[68] = 0xFF;
+        file_bytes[69] = 0xD9;
+
+        let entries = vec![
+            IfdEntry {
+                tag: TAG_STRIP_OFFSETS,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 50,
+            },
+            IfdEntry {
+                tag: TAG_STRIP_BYTE_COUNTS,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 20, // Length of strip data
+            },
+            IfdEntry {
+                tag: TAG_COMPRESSION,
+                typ: 3, // SHORT
+                count: 1,
+                value_offset: COMPRESSION_JPEG_OLD as u32, // Old-style JPEG compression (7)
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_ok());
+        let jpeg_data = result.unwrap();
+        assert_eq!(jpeg_data.len(), 20);
+        assert_eq!(jpeg_data[0], 0xFF);
+        assert_eq!(jpeg_data[1], 0xD8);
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_invalid_jpeg_magic() {
+        // Create file bytes with data that doesn't start with JPEG magic
+        let mut file_bytes = vec![0u8; 200];
+        // Place invalid magic bytes at offset 100 (not 0xFF 0xD8)
+        file_bytes[100] = 0x00;
+        file_bytes[101] = 0x00;
+
+        let entries = vec![
+            IfdEntry {
+                tag: TAG_JPEG_OFFSET,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 100,
+            },
+            IfdEntry {
+                tag: TAG_JPEG_LENGTH,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 50,
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_offset_out_of_bounds() {
+        // Create small file bytes
+        let file_bytes = vec![0u8; 50];
+
+        // Set offset + length to exceed file size
+        let entries = vec![
+            IfdEntry {
+                tag: TAG_JPEG_OFFSET,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 40, // Offset near end of file
+            },
+            IfdEntry {
+                tag: TAG_JPEG_LENGTH,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 20, // Length that exceeds file bounds (40 + 20 > 50)
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_zero_length() {
+        // Create file bytes with valid JPEG magic
+        let mut file_bytes = vec![0u8; 200];
+        file_bytes[100] = 0xFF;
+        file_bytes[101] = 0xD8;
+
+        let entries = vec![
+            IfdEntry {
+                tag: TAG_JPEG_OFFSET,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 100,
+            },
+            IfdEntry {
+                tag: TAG_JPEG_LENGTH,
+                typ: 4, // LONG
+                count: 1,
+                value_offset: 0, // Zero length
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_no_jpeg_tags() {
+        // Create file bytes
+        let file_bytes = vec![0u8; 200];
+
+        // Entries without any JPEG-related tags
+        let entries = vec![
+            IfdEntry {
+                tag: 0x0100, // ImageWidth - not a JPEG tag
+                typ: 3,     // SHORT
+                count: 1,
+                value_offset: 1920,
+            },
+            IfdEntry {
+                tag: 0x0101, // ImageLength - not a JPEG tag
+                typ: 3,     // SHORT
+                count: 1,
+                value_offset: 1080,
+            },
+        ];
+
+        let result = extract_jpeg_from_entries(&entries, &file_bytes);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
+    }
+
+    #[test]
+    fn test_parse_ifd_single_entry_le() {
+        // Create a synthetic little-endian IFD with one entry
+        // IFD structure:
+        // - 2 bytes: entry count (1)
+        // - 12 bytes: entry (tag=0x0111, type=0x0003, count=1, value_offset=0x1000)
+        // - 4 bytes: next IFD offset (0)
+        let mut data = Vec::new();
+
+        // Entry count: 1 (little-endian)
+        data.extend_from_slice(&1u16.to_le_bytes());
+
+        // Entry 1: tag=0x0111 (StripOffsets), type=0x0003 (SHORT), count=1, value_offset=0x1000
+        data.extend_from_slice(&0x0111u16.to_le_bytes()); // tag
+        data.extend_from_slice(&0x0003u16.to_le_bytes()); // type
+        data.extend_from_slice(&1u32.to_le_bytes()); // count
+        data.extend_from_slice(&0x1000u32.to_le_bytes()); // value_offset
+
+        // Next IFD offset: 0
+        data.extend_from_slice(&0u32.to_le_bytes());
+
+        let mut cursor = Cursor::new(&data[..]);
+        let file_size = 0x2000; // Large enough to include the offset
+
+        let (entries, next_ifd) = parse_ifd(&mut cursor, true, file_size).unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].tag, 0x0111);
+        assert_eq!(entries[0].typ, 0x0003);
+        assert_eq!(entries[0].count, 1);
+        assert_eq!(entries[0].value_offset, 0x1000);
+        assert_eq!(next_ifd, 0);
+    }
+
+    #[test]
+    fn test_parse_ifd_multiple_entries_be() {
+        // Create a synthetic big-endian IFD with 3 entries
+        let mut data = Vec::new();
+
+        // Entry count: 3 (big-endian)
+        data.extend_from_slice(&3u16.to_be_bytes());
+
+        // Entry 1: tag=0x0100 (ImageWidth), type=0x0003, count=1, value_offset=4000
+        data.extend_from_slice(&0x0100u16.to_be_bytes());
+        data.extend_from_slice(&0x0003u16.to_be_bytes());
+        data.extend_from_slice(&1u32.to_be_bytes());
+        data.extend_from_slice(&4000u32.to_be_bytes());
+
+        // Entry 2: tag=0x0101 (ImageLength), type=0x0003, count=1, value_offset=3000
+        data.extend_from_slice(&0x0101u16.to_be_bytes());
+        data.extend_from_slice(&0x0003u16.to_be_bytes());
+        data.extend_from_slice(&1u32.to_be_bytes());
+        data.extend_from_slice(&3000u32.to_be_bytes());
+
+        // Entry 3: tag=0x0111 (StripOffsets), type=0x0004, count=1, value_offset=8192
+        data.extend_from_slice(&0x0111u16.to_be_bytes());
+        data.extend_from_slice(&0x0004u16.to_be_bytes());
+        data.extend_from_slice(&1u32.to_be_bytes());
+        data.extend_from_slice(&8192u32.to_be_bytes());
+
+        // Next IFD offset: 0
+        data.extend_from_slice(&0u32.to_be_bytes());
+
+        let mut cursor = Cursor::new(&data[..]);
+        let file_size = 0x10000;
+
+        let (entries, next_ifd) = parse_ifd(&mut cursor, false, file_size).unwrap();
+
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].tag, 0x0100);
+        assert_eq!(entries[0].value_offset, 4000);
+        assert_eq!(entries[1].tag, 0x0101);
+        assert_eq!(entries[1].value_offset, 3000);
+        assert_eq!(entries[2].tag, 0x0111);
+        assert_eq!(entries[2].value_offset, 8192);
+        assert_eq!(next_ifd, 0);
+    }
+
+    #[test]
+    fn test_parse_ifd_with_next_ifd_pointer() {
+        // Create an IFD with a non-zero next IFD pointer
+        let mut data = Vec::new();
+
+        // Entry count: 1 (little-endian)
+        data.extend_from_slice(&1u16.to_le_bytes());
+
+        // Entry 1: tag=0x0100, type=0x0003, count=1, value_offset=100
+        data.extend_from_slice(&0x0100u16.to_le_bytes());
+        data.extend_from_slice(&0x0003u16.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&100u32.to_le_bytes());
+
+        // Next IFD offset: 0x5000
+        data.extend_from_slice(&0x5000u32.to_le_bytes());
+
+        let mut cursor = Cursor::new(&data[..]);
+        let file_size = 0x10000;
+
+        let (entries, next_ifd) = parse_ifd(&mut cursor, true, file_size).unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(next_ifd, 0x5000);
+    }
+
+    #[test]
+    fn test_parse_ifd_too_many_entries() {
+        // Create an IFD with entry_count > 1000 (should return CorruptedFile error)
+        let mut data = Vec::new();
+
+        // Entry count: 1001 (exceeds limit)
+        data.extend_from_slice(&1001u16.to_le_bytes());
+
+        let mut cursor = Cursor::new(&data[..]);
+        let file_size = 0x10000;
+
+        let result = parse_ifd(&mut cursor, true, file_size);
+
+        assert!(result.is_err());
+        match result {
+            Err(DecodeError::CorruptedFile(msg)) => {
+                assert!(msg.contains("Too many IFD entries"));
+            }
+            _ => panic!("Expected CorruptedFile error"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ifd_invalid_offset_skipped() {
+        // Create an IFD where one entry has value_offset > file_size (should be skipped)
+        let mut data = Vec::new();
+
+        // Entry count: 2
+        data.extend_from_slice(&2u16.to_le_bytes());
+
+        // Entry 1: tag=0x0100, type=0x0003, count=1, value_offset=100 (valid)
+        data.extend_from_slice(&0x0100u16.to_le_bytes());
+        data.extend_from_slice(&0x0003u16.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&100u32.to_le_bytes());
+
+        // Entry 2: tag=0x0101, type=0x0003, count=1, value_offset=0x20000 (invalid - exceeds file_size)
+        data.extend_from_slice(&0x0101u16.to_le_bytes());
+        data.extend_from_slice(&0x0003u16.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&0x20000u32.to_le_bytes());
+
+        // Next IFD offset: 0
+        data.extend_from_slice(&0u32.to_le_bytes());
+
+        let mut cursor = Cursor::new(&data[..]);
+        let file_size = 0x10000; // file_size is smaller than the second entry's offset
+
+        let (entries, next_ifd) = parse_ifd(&mut cursor, true, file_size).unwrap();
+
+        // Only the first entry should be present (second was skipped due to invalid offset)
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].tag, 0x0100);
+        assert_eq!(entries[0].value_offset, 100);
+        assert_eq!(next_ifd, 0);
+    }
 }
