@@ -12,11 +12,9 @@ import type { Ref, ComputedRef } from 'vue'
 import type { LinearGradientMask, RadialGradientMask } from '@literoom/core/catalog'
 import { createLinearMask, createRadialMask } from '@literoom/core/catalog'
 import {
-  HANDLE_HIT_RADIUS,
+  MASK_HANDLE_HIT_RADIUS,
   type LinearHandle,
   type RadialHandle,
-  toNormalized,
-  getCanvasCoords,
   getLinearHandlePositions,
   getRadialHandlePositions,
   findLinearHandleAt,
@@ -31,8 +29,8 @@ import {
   getCursorForRadialHandle,
   updateLinearHandlePosition,
   updateRadialHandlePosition,
-  debounce,
 } from './maskUtils'
+import { toNormalized, getCanvasCoords, debounce } from '~/utils/canvasCoords'
 
 // ============================================================================
 // Types

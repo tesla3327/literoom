@@ -13,18 +13,16 @@ import type { CropRectangle } from '@literoom/core/catalog'
 import {
   HANDLES,
   type HandlePosition,
-  toNormalized,
   getHandlePositions,
   findHandleAt,
   isInsideCrop,
-  getCanvasCoords,
   drawOverlay,
   drawBorder,
   drawGrid,
   drawHandles,
   getCursorForHandle,
-  debounce,
 } from './cropUtils'
+import { toNormalized, getCanvasCoords, debounce } from '~/utils/canvasCoords'
 
 // ============================================================================
 // Types

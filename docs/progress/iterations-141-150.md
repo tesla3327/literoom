@@ -290,3 +290,55 @@ The crop and mask overlay composables calculate coordinates based on the canvas 
 
 **Note**: E2E tests have pre-existing timeout issues unrelated to this change.
 
+---
+
+## 146: 2026-01-22 20:19 EST: Fix Duplicated Auto-Import Warnings - Complete
+
+**Objective**: Fix Nuxt auto-import warnings caused by duplicate exports between cropUtils.ts and maskUtils.ts.
+
+**Problem**:
+During test runs and builds, Nuxt was generating warnings like:
+```
+WARN Duplicated imports "HANDLE_SIZE", the one from ".../cropUtils.ts" has been ignored and ".../maskUtils.ts" is used
+WARN Duplicated imports "toNormalized", the one from ".../cropUtils.ts" has been ignored and ".../maskUtils.ts" is used
+```
+
+This happened because both utility files exported functions/constants with the same names, and Nuxt's auto-import system was detecting conflicts.
+
+**Root Cause Analysis**:
+1. Both `cropUtils.ts` and `maskUtils.ts` defined:
+   - `HANDLE_SIZE` (12 in crop, 10 in mask - different values!)
+   - `HANDLE_HIT_RADIUS` (20 in both)
+   - `toNormalized()`, `toCanvas()`, `getCanvasCoords()`, `debounce()` (identical implementations)
+
+2. The duplicate utility functions were copy-pasted code, violating DRY principle.
+
+**Solution**:
+1. **Extract shared utilities to `~/utils/canvasCoords.ts`**:
+   - `toNormalized()` - canvas to normalized coordinates
+   - `toCanvas()` - normalized to canvas coordinates
+   - `getCanvasCoords()` - mouse event to canvas coordinates
+   - `debounce()` - debounce utility
+
+2. **Rename constants to be domain-specific**:
+   - `cropUtils.ts`: `CROP_HANDLE_SIZE`, `CROP_HANDLE_HIT_RADIUS`
+   - `maskUtils.ts`: `MASK_HANDLE_SIZE`, `MASK_HANDLE_HIT_RADIUS`
+
+3. **Update imports in composables**:
+   - `useCropOverlay.ts`: Import coordinate utils from `~/utils/canvasCoords`
+   - `useMaskOverlay.ts`: Import coordinate utils from `~/utils/canvasCoords`
+
+**Files Created** (1 file):
+- `apps/web/app/utils/canvasCoords.ts` (~100 lines) - Shared coordinate/debounce utilities
+
+**Files Modified** (4 files):
+- `apps/web/app/composables/cropUtils.ts` - Removed re-exports, renamed constants
+- `apps/web/app/composables/maskUtils.ts` - Removed duplicate functions, renamed constants
+- `apps/web/app/composables/useCropOverlay.ts` - Updated imports
+- `apps/web/app/composables/useMaskOverlay.ts` - Updated imports
+
+**Result**:
+- All 432 unit tests pass
+- Build completes with no warnings
+- Code follows DRY principle with single source of truth for shared utilities
+

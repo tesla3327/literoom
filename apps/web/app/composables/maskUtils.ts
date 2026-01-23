@@ -3,16 +3,25 @@
  *
  * Shared utilities for mask overlay rendering and interaction.
  * Used by useMaskOverlay for creating and editing linear/radial gradient masks.
+ *
+ * For coordinate conversion functions, import from '~/utils/canvasCoords'.
+ * This file provides mask-specific wrappers that return Point2D types.
  */
 
 import type { LinearGradientMask, RadialGradientMask, Point2D } from '@literoom/core/catalog'
+import {
+  toCanvas as toCanvasBase,
+  toNormalized as toNormalizedBase,
+  getCanvasCoords as getCanvasCoordsBase,
+  debounce as debounceBase,
+} from '~/utils/canvasCoords'
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-export const HANDLE_SIZE = 10
-export const HANDLE_HIT_RADIUS = 20
+export const MASK_HANDLE_SIZE = 10
+export const MASK_HANDLE_HIT_RADIUS = 20
 
 export const MASK_COLORS = {
   // Selected mask colors
@@ -44,53 +53,30 @@ export type RadialHandle = 'center' | 'radiusX+' | 'radiusX-' | 'radiusY+' | 'ra
 export type MaskHandle = LinearHandle | RadialHandle
 
 // ============================================================================
-// Coordinate Conversions
+// Coordinate Conversions (Internal use - delegate to canvasCoords)
 // ============================================================================
 
-/**
- * Convert canvas coordinates to normalized (0-1) coordinates.
- */
-export function toNormalized(
+// These are used internally and by useMaskOverlay
+// Using the base implementations from canvasCoords
+
+/** Convert canvas coordinates to normalized Point2D */
+function toNormalizedPoint2D(
   canvasX: number,
   canvasY: number,
   canvasWidth: number,
   canvasHeight: number,
 ): Point2D {
-  return {
-    x: Math.max(0, Math.min(1, canvasX / canvasWidth)),
-    y: Math.max(0, Math.min(1, canvasY / canvasHeight)),
-  }
+  return toNormalizedBase(canvasX, canvasY, canvasWidth, canvasHeight)
 }
 
-/**
- * Convert normalized coordinates to canvas coordinates.
- */
-export function toCanvas(
+/** Convert normalized to canvas coordinates */
+function toCanvasCoords(
   normX: number,
   normY: number,
   canvasWidth: number,
   canvasHeight: number,
 ): { x: number; y: number } {
-  return {
-    x: normX * canvasWidth,
-    y: normY * canvasHeight,
-  }
-}
-
-/**
- * Get canvas coordinates from mouse event.
- */
-export function getCanvasCoords(
-  e: MouseEvent,
-  canvas: HTMLCanvasElement,
-): { x: number; y: number } {
-  const rect = canvas.getBoundingClientRect()
-  const scaleX = canvas.width / rect.width
-  const scaleY = canvas.height / rect.height
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
-  }
+  return toCanvasBase(normX, normY, canvasWidth, canvasHeight)
 }
 
 // ============================================================================
@@ -106,8 +92,8 @@ export function getLinearHandlePositions(
   canvasHeight: number,
 ): Record<LinearHandle, { x: number; y: number }> {
   return {
-    start: toCanvas(mask.start.x, mask.start.y, canvasWidth, canvasHeight),
-    end: toCanvas(mask.end.x, mask.end.y, canvasWidth, canvasHeight),
+    start: toCanvasCoords(mask.start.x, mask.start.y, canvasWidth, canvasHeight),
+    end: toCanvasCoords(mask.end.x, mask.end.y, canvasWidth, canvasHeight),
   }
 }
 
@@ -126,7 +112,7 @@ export function findLinearHandleAt(
   for (const handle of ['start', 'end'] as LinearHandle[]) {
     const pos = positions[handle]
     const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= HANDLE_HIT_RADIUS) return handle
+    if (dist <= MASK_HANDLE_HIT_RADIUS) return handle
   }
 
   return null
@@ -141,7 +127,7 @@ export function isNearLinearGradient(
   mask: LinearGradientMask,
   canvasWidth: number,
   canvasHeight: number,
-  threshold: number = HANDLE_HIT_RADIUS,
+  threshold: number = MASK_HANDLE_HIT_RADIUS,
 ): boolean {
   const positions = getLinearHandlePositions(mask, canvasWidth, canvasHeight)
   const { start, end } = positions
@@ -180,7 +166,7 @@ export function getRadialHandlePositions(
   canvasWidth: number,
   canvasHeight: number,
 ): Record<RadialHandle, { x: number; y: number }> {
-  const center = toCanvas(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
+  const center = toCanvasCoords(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
   const rx = mask.radiusX * canvasWidth
   const ry = mask.radiusY * canvasHeight
   const cos = Math.cos(mask.rotation * Math.PI / 180)
@@ -209,13 +195,13 @@ export function findRadialHandleAt(
 
   // Check center first (higher priority)
   const centerDist = Math.sqrt((canvasX - positions.center.x) ** 2 + (canvasY - positions.center.y) ** 2)
-  if (centerDist <= HANDLE_HIT_RADIUS) return 'center'
+  if (centerDist <= MASK_HANDLE_HIT_RADIUS) return 'center'
 
   // Check radius handles
   for (const handle of ['radiusX+', 'radiusX-', 'radiusY+', 'radiusY-'] as RadialHandle[]) {
     const pos = positions[handle]
     const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= HANDLE_HIT_RADIUS) return handle
+    if (dist <= MASK_HANDLE_HIT_RADIUS) return handle
   }
 
   return null
@@ -231,7 +217,7 @@ export function isInsideRadialGradient(
   canvasWidth: number,
   canvasHeight: number,
 ): boolean {
-  const center = toCanvas(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
+  const center = toCanvasCoords(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
   const rx = mask.radiusX * canvasWidth
   const ry = mask.radiusY * canvasHeight
 
@@ -363,7 +349,7 @@ export function drawRadialMask(
     fill: MASK_COLORS.unselectedFill,
   }
 
-  const center = toCanvas(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
+  const center = toCanvasCoords(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
   const rx = mask.radiusX * canvasWidth
   const ry = mask.radiusY * canvasHeight
 
@@ -418,7 +404,7 @@ function drawHandle(
   fillColor: string,
   strokeColor: string,
 ): void {
-  const radius = HANDLE_SIZE / 2
+  const radius = MASK_HANDLE_SIZE / 2
 
   ctx.beginPath()
   ctx.arc(x, y, radius, 0, Math.PI * 2)
@@ -439,7 +425,7 @@ function drawCenterHandle(
   fillColor: string,
   strokeColor: string,
 ): void {
-  const radius = HANDLE_SIZE / 2
+  const radius = MASK_HANDLE_SIZE / 2
   const crossSize = radius * 0.7
 
   // Outer circle
@@ -542,39 +528,6 @@ export function getCursorForRadialHandle(handle: RadialHandle | null, isDragging
 }
 
 // ============================================================================
-// Debounce Utility
-// ============================================================================
-
-/**
- * Simple debounce function with cancel capability.
- */
-export function debounce<T extends (...args: unknown[]) => void>(
-  fn: T,
-  delay: number,
-): T & { cancel: () => void } {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-  const debounced = (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId)
-    }
-    timeoutId = setTimeout(() => {
-      fn(...args)
-      timeoutId = null
-    }, delay)
-  }
-
-  debounced.cancel = () => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId)
-      timeoutId = null
-    }
-  }
-
-  return debounced as T & { cancel: () => void }
-}
-
-// ============================================================================
 // Mask Update Helpers
 // ============================================================================
 
@@ -619,8 +572,8 @@ export function updateRadialHandlePosition(
   }
 
   // For radius handles, calculate new radius based on distance from center
-  const center = toCanvas(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
-  const newPos = toCanvas(clampedX, clampedY, canvasWidth, canvasHeight)
+  const center = toCanvasCoords(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
+  const newPos = toCanvasCoords(clampedX, clampedY, canvasWidth, canvasHeight)
 
   // Calculate distance from center to new position
   const dx = newPos.x - center.x

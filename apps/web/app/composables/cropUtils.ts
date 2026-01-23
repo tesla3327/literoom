@@ -3,6 +3,9 @@
  *
  * Shared utilities for crop overlay rendering and interaction.
  * Used by both useCropEditor (panel) and useCropOverlay (main preview).
+ *
+ * For coordinate conversion functions (toNormalized, toCanvas, getCanvasCoords)
+ * and debounce, import from '~/utils/canvasCoords' directly.
  */
 
 import type { CropRectangle } from '@literoom/core/catalog'
@@ -11,8 +14,8 @@ import type { CropRectangle } from '@literoom/core/catalog'
 // Constants
 // ============================================================================
 
-export const HANDLE_SIZE = 12
-export const HANDLE_HIT_RADIUS = 20
+export const CROP_CROP_HANDLE_SIZE = 12
+export const CROP_CROP_HANDLE_HIT_RADIUS = 20
 
 export const COLORS = {
   overlay: 'rgba(0, 0, 0, 0.6)',
@@ -30,39 +33,8 @@ export const COLORS = {
 export const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 export type HandlePosition = (typeof HANDLES)[number]
 
-// ============================================================================
-// Coordinate Conversion
-// ============================================================================
-
-/**
- * Convert canvas coordinates to normalized (0-1) coordinates.
- */
-export function toNormalized(
-  canvasX: number,
-  canvasY: number,
-  canvasWidth: number,
-  canvasHeight: number,
-): { x: number; y: number } {
-  return {
-    x: Math.max(0, Math.min(1, canvasX / canvasWidth)),
-    y: Math.max(0, Math.min(1, canvasY / canvasHeight)),
-  }
-}
-
-/**
- * Convert normalized coordinates to canvas coordinates.
- */
-export function toCanvas(
-  normX: number,
-  normY: number,
-  canvasWidth: number,
-  canvasHeight: number,
-): { x: number; y: number } {
-  return {
-    x: normX * canvasWidth,
-    y: normY * canvasHeight,
-  }
-}
+// Import toCanvas for internal use
+import { toCanvas as toCanvasInternal } from '~/utils/canvasCoords'
 
 /**
  * Get handle positions in canvas coordinates.
@@ -105,7 +77,7 @@ export function findHandleAt(
   for (const handle of HANDLES) {
     const pos = positions[handle]
     const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= HANDLE_HIT_RADIUS) return handle
+    if (dist <= CROP_HANDLE_HIT_RADIUS) return handle
   }
   return null
 }
@@ -128,28 +100,6 @@ export function isInsideCrop(
     && normY >= crop.top
     && normY <= crop.top + crop.height
   )
-}
-
-/**
- * Get canvas coordinates from mouse event.
- *
- * This function correctly handles CSS transforms (zoom/pan) because
- * getBoundingClientRect() returns the transformed position and size.
- * The formula (e.clientX - rect.left) * (canvas.width / rect.width)
- * correctly converts from screen pixels to canvas pixels regardless
- * of any CSS transform applied to the canvas or its ancestors.
- */
-export function getCanvasCoords(
-  e: MouseEvent,
-  canvas: HTMLCanvasElement,
-): { x: number; y: number } {
-  const rect = canvas.getBoundingClientRect()
-  const scaleX = canvas.width / rect.width
-  const scaleY = canvas.height / rect.height
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
-  }
 }
 
 // ============================================================================
@@ -244,7 +194,7 @@ export function drawHandles(
   activeHandle: HandlePosition | null,
 ): void {
   const positions = getHandlePositions(crop, w, h)
-  const half = HANDLE_SIZE / 2
+  const half = CROP_HANDLE_SIZE / 2
 
   ctx.lineWidth = 1
 
@@ -254,11 +204,11 @@ export function drawHandles(
 
     // Handle fill
     ctx.fillStyle = isActive ? COLORS.handleActive : COLORS.handle
-    ctx.fillRect(pos.x - half, pos.y - half, HANDLE_SIZE, HANDLE_SIZE)
+    ctx.fillRect(pos.x - half, pos.y - half, CROP_HANDLE_SIZE, CROP_HANDLE_SIZE)
 
     // Handle border
     ctx.strokeStyle = '#000'
-    ctx.strokeRect(pos.x - half, pos.y - half, HANDLE_SIZE, HANDLE_SIZE)
+    ctx.strokeRect(pos.x - half, pos.y - half, CROP_HANDLE_SIZE, CROP_HANDLE_SIZE)
   }
 }
 
@@ -286,35 +236,3 @@ export function getCursorForHandle(handle: HandlePosition | null): string {
   return cursors[handle]
 }
 
-// ============================================================================
-// Debounce Utility
-// ============================================================================
-
-/**
- * Simple debounce function with cancel capability.
- */
-export function debounce<T extends (...args: unknown[]) => void>(
-  fn: T,
-  delay: number,
-): T & { cancel: () => void } {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-  const debounced = (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId)
-    }
-    timeoutId = setTimeout(() => {
-      fn(...args)
-      timeoutId = null
-    }, delay)
-  }
-
-  debounced.cancel = () => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId)
-      timeoutId = null
-    }
-  }
-
-  return debounced as T & { cancel: () => void }
-}
