@@ -845,7 +845,7 @@ export class MockDecodeService implements IDecodeService {
 
     // 2. Apply rotation if specified
     if (editState.rotation) {
-      const totalAngle = (editState.rotation.angle ?? 0) + (editState.rotation.straightenAngle ?? 0)
+      const totalAngle = (editState.rotation.angle ?? 0) + (editState.rotation.straighten ?? 0)
       if (Math.abs(totalAngle) > 0.001) {
         image = await this.applyRotation(
           image.pixels,

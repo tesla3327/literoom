@@ -183,6 +183,308 @@ describe('MockDecodeService', () => {
   })
 })
 
+describe('generateEditedThumbnail', () => {
+  it('returns JPEG bytes (starts with JPEG magic bytes)', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {}
+    )
+
+    // Verify it's a Uint8Array
+    expect(result).toBeInstanceOf(Uint8Array)
+    // Verify JPEG magic bytes (SOI marker)
+    expect(result[0]).toBe(0xff)
+    expect(result[1]).toBe(0xd8)
+  })
+
+  it('applies rotation when specified', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      { rotation: { angle: 45, straighten: 0 } }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('applies crop when specified', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      { crop: { left: 0.1, top: 0.1, width: 0.5, height: 0.5 } }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('applies adjustments when specified', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {
+        adjustments: {
+          exposure: 1,
+          contrast: 10,
+          highlights: 0,
+          shadows: 0,
+          whites: 0,
+          blacks: 0,
+          temperature: 0,
+          tint: 0,
+          vibrance: 0,
+          saturation: 0,
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('applies tone curve when specified', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {
+        toneCurve: {
+          points: [
+            { x: 0, y: 0 },
+            { x: 0.5, y: 0.6 },
+            { x: 1, y: 1 },
+          ],
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('applies masked adjustments when specified', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {
+        masks: {
+          linearMasks: [
+            {
+              startX: 0,
+              startY: 0,
+              endX: 1,
+              endY: 1,
+              feather: 0.5,
+              enabled: true,
+              adjustments: { exposure: 1 },
+            },
+          ],
+          radialMasks: [],
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('applies full edit pipeline with all parameters', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      512,
+      {
+        rotation: { angle: 5, straighten: 2 },
+        crop: { left: 0.05, top: 0.05, width: 0.9, height: 0.9 },
+        adjustments: {
+          exposure: 0.5,
+          contrast: 20,
+          highlights: -10,
+          shadows: 10,
+          whites: 5,
+          blacks: -5,
+          temperature: 10,
+          tint: 5,
+          vibrance: 15,
+          saturation: 10,
+        },
+        toneCurve: {
+          points: [
+            { x: 0, y: 0.05 },
+            { x: 0.25, y: 0.2 },
+            { x: 0.75, y: 0.85 },
+            { x: 1, y: 0.95 },
+          ],
+        },
+        masks: {
+          linearMasks: [
+            {
+              startX: 0,
+              startY: 0,
+              endX: 0.5,
+              endY: 0.5,
+              feather: 0.3,
+              enabled: true,
+              adjustments: { exposure: -0.5 },
+            },
+          ],
+          radialMasks: [
+            {
+              centerX: 0.5,
+              centerY: 0.5,
+              radiusX: 0.3,
+              radiusY: 0.3,
+              rotation: 0,
+              feather: 0.5,
+              invert: false,
+              enabled: true,
+              adjustments: { contrast: 15 },
+            },
+          ],
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('fails when service is destroyed', async () => {
+    const service = await MockDecodeService.create()
+    service.destroy()
+
+    await expect(
+      service.generateEditedThumbnail(new Uint8Array([0xff, 0xd8]), 256, {})
+    ).rejects.toThrow('Mock service not ready')
+  })
+
+  it('simulates decode delay', async () => {
+    const service = await MockDecodeService.create({ decodeDelay: 50 })
+    const start = Date.now()
+
+    await service.generateEditedThumbnail(new Uint8Array([0xff, 0xd8]), 256, {})
+    const elapsed = Date.now() - start
+
+    // Should have delay from multiple pipeline stages
+    expect(elapsed).toBeGreaterThanOrEqual(45)
+  })
+
+  it('skips rotation when angle is zero', async () => {
+    const service = await MockDecodeService.create()
+
+    // Should not throw and complete quickly
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      { rotation: { angle: 0, straighten: 0 } }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+  })
+
+  it('handles combined rotation angle and straighten', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      { rotation: { angle: 10, straighten: 5 } }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('skips tone curve when points form identity curve', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {
+        toneCurve: {
+          points: [
+            { x: 0, y: 0 },
+            { x: 1, y: 1 },
+          ],
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+  })
+
+  it('handles empty masks array', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {
+        masks: {
+          linearMasks: [],
+          radialMasks: [],
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+  })
+
+  it('handles disabled masks', async () => {
+    const service = await MockDecodeService.create()
+
+    const result = await service.generateEditedThumbnail(
+      new Uint8Array([0xff, 0xd8]),
+      256,
+      {
+        masks: {
+          linearMasks: [
+            {
+              startX: 0,
+              startY: 0,
+              endX: 1,
+              endY: 1,
+              feather: 0.5,
+              enabled: false, // Disabled
+              adjustments: { exposure: 1 },
+            },
+          ],
+          radialMasks: [
+            {
+              centerX: 0.5,
+              centerY: 0.5,
+              radiusX: 0.3,
+              radiusY: 0.3,
+              rotation: 0,
+              feather: 0.5,
+              invert: false,
+              enabled: false, // Disabled
+              adjustments: { contrast: 15 },
+            },
+          ],
+        },
+      }
+    )
+
+    expect(result).toBeInstanceOf(Uint8Array)
+  })
+})
+
 describe('createTestImage', () => {
   it('creates image with specified dimensions', () => {
     const image = createTestImage(10, 20)

@@ -5,7 +5,7 @@
  * enabling parallel thumbnail generation across CPU cores.
  */
 
-import type { DecodeRequest, DecodeResponse, MaskStackData } from './worker-messages'
+import type { DecodeRequest, DecodeResponse, MaskStackData, EditedThumbnailEditState } from './worker-messages'
 import type {
   DecodedImage,
   DecodeServiceState,
@@ -474,6 +474,25 @@ export class DecodeWorkerPool implements IDecodeService {
       width,
       height,
       maskStack
+    }, workerId)
+  }
+
+  /**
+   * Generate a thumbnail with edits applied.
+   * Full pipeline: decode -> rotate -> crop -> adjust -> tone curve -> masks -> resize -> encode
+   */
+  async generateEditedThumbnail(
+    bytes: Uint8Array,
+    size: number,
+    editState: EditedThumbnailEditState
+  ): Promise<Uint8Array> {
+    const workerId = this.getLeastBusyWorker()
+    return this.sendRequest({
+      id: this.generateId(workerId),
+      type: 'generate-edited-thumbnail',
+      bytes,
+      size,
+      editState
     }, workerId)
   }
 
