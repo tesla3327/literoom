@@ -44,6 +44,51 @@
 
 ## Open Issues
 
+### Preview not ready when clicking thumbnail
+
+**Severity**: Medium
+
+**Problem**:
+When a thumbnail is visible (appears loaded), users may double-click to enter edit view, but the preview is still generating. This creates confusion.
+
+**Suggested Fixes**:
+1. Process everything up front and wait before dropping users into the gallery
+2. If user enters edit view before preview is ready, prioritize generating that preview
+3. Implement a processing queue with priority jumping based on user actions
+
+---
+
+## Recently Solved
+
+### Gallery loading state after returning from edit - SOLVED
+
+**Severity**: High | **Fixed**: 2026-01-22
+
+**Problem**:
+When returning to the gallery from the edit page:
+- Sometimes only a loading state is shown with no thumbnails
+- Thumbnails are not updated/regenerated to reflect edits made to the photo
+
+**Issue 1 - Loading State Fix** (SOLVED):
+Added defensive guards in CatalogGrid.vue:
+- `v-if` check on CatalogThumbnail to skip rendering for missing assets
+- Fallback placeholder with loading animation for missing assets
+- Debug logging when asset ID exists but asset data missing
+
+**Issue 2 - Thumbnails Don't Reflect Edits** (SOLVED):
+Implemented full thumbnail regeneration pipeline:
+- Worker message type `GenerateEditedThumbnailRequest` for generating edited thumbnails
+- Full edit pipeline in worker (decode → rotate → crop → adjust → curve → masks → resize → encode)
+- `generateEditedThumbnail()` method in DecodeService and MockDecodeService
+- Regeneration methods in ThumbnailService with generation tracking
+- `regenerateThumbnail()` in CatalogService and useCatalog composable
+- Edit page triggers regeneration on unmount when modifications exist
+- Visual feedback: old thumbnail shown at 70% opacity during regeneration
+
+**Files Modified**: Multiple files across packages/core and apps/web
+
+---
+
 ### Import UX feels slow - SOLVED
 
 **Severity**: Medium | **Fixed**: 2026-01-22
@@ -60,20 +105,6 @@ The import experience feels slow and lacks feedback. Users are dropped into a ga
 6. Added loading messages ("Scanning folder...", "Preparing gallery...") with progress bars
 
 **Result**: Gallery now shows thumbnails (not loading placeholders) when users enter, with visible progress during thumbnail generation.
-
----
-
-### Preview not ready when clicking thumbnail
-
-**Severity**: Medium
-
-**Problem**:
-When a thumbnail is visible (appears loaded), users may double-click to enter edit view, but the preview is still generating. This creates confusion.
-
-**Suggested Fixes**:
-1. Process everything up front and wait before dropping users into the gallery
-2. If user enters edit view before preview is ready, prioritize generating that preview
-3. Implement a processing queue with priority jumping based on user actions
 
 ---
 
@@ -94,31 +125,6 @@ The bug was unable to be reproduced after extensive testing (5+ navigation cycle
 **Files Modified**:
 - `apps/web/app/stores/catalog.ts`
 - `apps/web/app/composables/useCatalog.ts`
-
----
-
-### Gallery loading state after returning from edit - PARTIALLY SOLVED
-
-**Severity**: High | **Partially Fixed**: 2026-01-22
-
-**Problem**:
-When returning to the gallery from the edit page:
-- Sometimes only a loading state is shown with no thumbnails
-- Thumbnails are not updated/regenerated to reflect edits made to the photo
-
-**Issue 1 - Loading State Fix** (SOLVED):
-Added defensive guards in CatalogGrid.vue:
-- `v-if` check on CatalogThumbnail to skip rendering for missing assets
-- Fallback placeholder with loading animation for missing assets
-- Debug logging when asset ID exists but asset data missing
-
-**Issue 2 - Thumbnails Don't Reflect Edits** (DEFERRED):
-Requires implementing thumbnail regeneration pipeline:
-- Add `invalidateThumbnail()` method to ThumbnailCache
-- Hook edit store save to trigger thumbnail regeneration
-- This is significant work tracked for a future iteration
-
-**Files Modified**: `apps/web/app/components/catalog/CatalogGrid.vue`
 
 ---
 

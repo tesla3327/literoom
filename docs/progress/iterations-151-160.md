@@ -448,3 +448,40 @@ The thumbnail regeneration feature is now complete. When a user edits a photo an
 - `apps/web/app/components/catalog/CatalogThumbnail.vue`
 - `docs/plans/2026-01-22-thumbnail-regeneration-plan.md` (all phases marked complete)
 
+---
+
+## 158: 2026-01-22 21:42 EST: Documentation Updates - Gallery Loading Issue Marked Solved
+
+**Objective**: Update documentation to reflect that the "Gallery loading state after returning from edit" issue is now fully SOLVED.
+
+**Background**:
+The thumbnail regeneration feature was completed in iteration 157. This completes the second part of the gallery loading state issue:
+- Issue 1 (loading state with no thumbnails) - Already SOLVED
+- Issue 2 (thumbnails don't reflect edits) - Now SOLVED with thumbnail regeneration
+
+**Changes Made**:
+
+1. **Updated docs/issues.md**:
+   - Moved "Gallery loading state after returning from edit" from PARTIALLY SOLVED to SOLVED
+   - Updated description to include full details of the thumbnail regeneration implementation
+   - Removed the old DEFERRED note about thumbnail regeneration
+
+2. **Updated docs/progress/README.md**:
+   - Added iteration 158 to the index
+   - Updated "Current Phase" to reflect V1 complete
+
+**V1 Acceptance Criteria Status**:
+All v1 acceptance criteria from spec.md are now complete:
+- ✅ User can select a folder and the app persists access across sessions
+- ✅ App scans folder, shows grid of thumbnails quickly
+- ✅ User can pick/reject photos via keyboard and filter by flag
+- ✅ User can open edit view and adjust basic sliders + tone curve + crop/rotate/straighten
+- ✅ Histogram renders and shows highlight/shadow clipping indicators; overlay toggles work
+- ✅ Copy settings and paste selectively (checkbox modal) works for single and multiple targets
+- ✅ Export dialog supports destination folder selection, JPEG quality, resize, and filename templating
+- ✅ App runs offline after first load and survives refresh with catalog intact
+- ✅ CI passes with lint/typecheck/unit/e2e (demo) and Rust fmt/clippy/test + wasm build
+
+**Remaining Open Issues** (non-blocking for v1):
+- Preview not ready when clicking thumbnail (Medium priority)
+
