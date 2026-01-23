@@ -354,6 +354,7 @@ literoom/
 | [142](./iterations-141-150.md:85) | 2026-01-22 | Zoom/Pan Feature - Research & Planning Complete |
 | [143](./iterations-141-150.md:120) | 2026-01-22 | Zoom/Pan Feature - Phase 1 Implementation Complete |
 | [144](./iterations-141-150.md:207) | 2026-01-22 | Zoom/Pan Feature - Overlay Verification Complete |
+| [145](./iterations-141-150.md:258) | 2026-01-22 | Zoom Calculation Unit Tests - Complete |
 
 ---
 
@@ -364,8 +365,8 @@ literoom/
 | literoom-core | 184 | Passing |
 | literoom-wasm | 44 | Passing |
 | packages/core | 362 | Passing |
-| apps/web (unit) | 1 | Passing |
-| apps/web (E2E) | 28 | Passing |
+| apps/web (unit) | 70 | Passing |
+| apps/web (E2E) | 28 | Timeout issues |
 
 ## Related Documentation
 

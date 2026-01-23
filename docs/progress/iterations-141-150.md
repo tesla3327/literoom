@@ -255,3 +255,38 @@ The crop and mask overlay composables calculate coordinates based on the canvas 
 
 ---
 
+## 145: 2026-01-22 20:10 EST: Zoom Calculation Unit Tests - Complete
+
+**Objective**: Add unit tests for the zoom calculation utility functions in `zoomCalculations.ts`.
+
+**Motivation**:
+- The zoom/pan implementation plan (Phase 5) explicitly lists unit tests as needed
+- Pure functions are ideal for unit testing
+- Tests ensure correctness of zoom math (scale calculations, coordinate transforms, clamping)
+
+**Test Coverage** (69 tests total):
+1. `calculateFitScale()` - 6 tests: various image/viewport ratios, edge cases
+2. `calculateFillScale()` - 5 tests: fill mode calculations
+3. `clampScale()` - 6 tests: scale bounds and MIN_ZOOM/MAX_ZOOM
+4. `clampPan()` - 4 tests: pan constraints and centering
+5. `calculateCenteredPan()` - 3 tests: centered position calculations
+6. `zoomToPoint()` - 3 tests: pivot point maintenance during zoom
+7. `zoomIn()` / `zoomOut()` - 5 tests: step zoom operations
+8. `screenToImage()` / `imageToScreen()` - 8 tests: bidirectional coordinate conversion
+9. `canPan()` - 5 tests: pan detection for various scales
+10. `getScaleForPreset()` - 6 tests: preset scale values
+11. `createCameraForPreset()` - 3 tests: camera creation for presets
+12. `getZoomPercentage()` - 4 tests: percentage display
+13. `detectPreset()` - 8 tests: preset detection from camera state
+14. Constants - 3 tests: MIN_ZOOM, MAX_ZOOM, ZOOM_STEP
+
+**Files Created** (1 file):
+- `apps/web/test/zoomCalculations.test.ts` (~600 lines)
+
+**Tests**: All 69 zoom calculation tests pass
+- packages/core: 362 tests pass
+- apps/web: 70 tests pass (1 existing + 69 new)
+- Total: 432 unit tests pass
+
+**Note**: E2E tests have pre-existing timeout issues unrelated to this change.
+
