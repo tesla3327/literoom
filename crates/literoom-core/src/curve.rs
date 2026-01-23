@@ -407,3 +407,257 @@ mod tests {
         assert!((y - 0.5).abs() < 0.01);
     }
 }
+
+// ============================================================================
+// Property-Based Tests
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Strategy to generate valid curve points sorted by x value.
+    fn sorted_curve_points_strategy(
+        min_points: usize,
+        max_points: usize,
+    ) -> impl Strategy<Value = Vec<CurvePoint>> {
+        prop::collection::vec((0.0f32..=1.0, 0.0f32..=1.0), min_points..=max_points)
+            .prop_filter_map("need at least 2 distinct x values", |points| {
+                let mut pts: Vec<(f32, f32)> = points;
+                // Sort by x
+                pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                // Remove duplicates by x
+                pts.dedup_by(|a, b| (a.0 - b.0).abs() < 0.01);
+                if pts.len() < 2 {
+                    return None;
+                }
+                // Ensure we have endpoints at 0 and 1
+                if pts.first().unwrap().0 > 0.01 {
+                    pts.insert(0, (0.0, pts.first().unwrap().1));
+                } else {
+                    pts[0].0 = 0.0;
+                }
+                if pts.last().unwrap().0 < 0.99 {
+                    pts.push((1.0, pts.last().unwrap().1));
+                } else {
+                    pts.last_mut().unwrap().0 = 1.0;
+                }
+                Some(
+                    pts.into_iter()
+                        .map(|(x, y)| CurvePoint::new(x, y))
+                        .collect(),
+                )
+            })
+    }
+
+    /// Strategy to generate monotonically increasing curve points.
+    fn monotonic_curve_strategy() -> impl Strategy<Value = ToneCurve> {
+        (
+            0.0f32..0.5, // Start y (can be low)
+            0.5f32..1.0, // End y (must be higher)
+        )
+            .prop_flat_map(|(start_y, end_y)| {
+                // Generate interior y values that are monotonically increasing
+                let y_range = end_y - start_y;
+                prop::collection::vec(0.0f32..=1.0, 0..=5).prop_map(move |interior_t| {
+                    let mut y_values: Vec<f32> = interior_t
+                        .into_iter()
+                        .map(|t| start_y + t * y_range)
+                        .collect();
+                    y_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+                    let num_points = y_values.len() + 2;
+                    let mut points = vec![CurvePoint::new(0.0, start_y)];
+
+                    for (i, y) in y_values.into_iter().enumerate() {
+                        let x = (i + 1) as f32 / (num_points - 1) as f32;
+                        points.push(CurvePoint::new(x, y));
+                    }
+
+                    points.push(CurvePoint::new(1.0, end_y));
+
+                    ToneCurve { points }
+                })
+            })
+    }
+
+    proptest! {
+        /// Property: Output is always within [0, 1] range.
+        #[test]
+        fn prop_output_in_range(
+            points in sorted_curve_points_strategy(2, 8),
+            x in 0.0f32..=1.0,
+        ) {
+            let curve = ToneCurve { points };
+            let y = evaluate_curve(&curve, x);
+
+            prop_assert!(
+                (0.0..=1.0).contains(&y),
+                "Output {} is out of range [0, 1] for input {}",
+                y,
+                x
+            );
+        }
+
+        /// Property: LUT values are always valid bytes.
+        #[test]
+        fn prop_lut_values_are_valid(points in sorted_curve_points_strategy(2, 8)) {
+            let curve = ToneCurve { points };
+            let lut = ToneCurveLut::from_curve(&curve);
+
+            // All LUT values should be valid (this is always true for u8, but verify LUT generation doesn't panic)
+            for (i, &value) in lut.lut.iter().enumerate() {
+                prop_assert!(
+                    value <= 255,
+                    "LUT value {} at index {} is invalid",
+                    value,
+                    i
+                );
+            }
+        }
+
+        /// Property: Monotonically increasing curves produce monotonically increasing outputs.
+        #[test]
+        fn prop_monotonic_input_produces_monotonic_output(curve in monotonic_curve_strategy()) {
+            let lut = ToneCurveLut::from_curve(&curve);
+
+            // LUT should be monotonically non-decreasing
+            let mut prev = 0u8;
+            for (i, &value) in lut.lut.iter().enumerate() {
+                prop_assert!(
+                    value >= prev,
+                    "LUT monotonicity violated at index {}: {} < {}",
+                    i,
+                    value,
+                    prev
+                );
+                prev = value;
+            }
+        }
+
+        /// Property: Curve always passes through endpoints.
+        #[test]
+        fn prop_endpoints_preserved(points in sorted_curve_points_strategy(2, 8)) {
+            let curve = ToneCurve { points: points.clone() };
+
+            let y_start = evaluate_curve(&curve, 0.0);
+            let y_end = evaluate_curve(&curve, 1.0);
+
+            prop_assert!(
+                (y_start - points[0].y).abs() < 0.02,
+                "Start point not preserved: expected {}, got {}",
+                points[0].y,
+                y_start
+            );
+            prop_assert!(
+                (y_end - points.last().unwrap().y).abs() < 0.02,
+                "End point not preserved: expected {}, got {}",
+                points.last().unwrap().y,
+                y_end
+            );
+        }
+
+        /// Property: Evaluation is continuous (no large jumps for small x changes).
+        #[test]
+        fn prop_continuity(
+            points in sorted_curve_points_strategy(2, 8),
+            x in 0.01f32..=0.99,
+        ) {
+            let curve = ToneCurve { points };
+            let delta = 0.001;
+
+            let y1 = evaluate_curve(&curve, x);
+            let y2 = evaluate_curve(&curve, x + delta);
+
+            // For a reasonable curve, the change should be bounded
+            // Maximum slope can be large, but not infinite
+            let max_expected_change = 0.5; // Allow fairly steep curves
+            prop_assert!(
+                (y2 - y1).abs() < max_expected_change,
+                "Discontinuity detected at x={}: y1={}, y2={}, delta={}",
+                x,
+                y1,
+                y2,
+                (y2 - y1).abs()
+            );
+        }
+
+        /// Property: Identity LUT is actually identity.
+        #[test]
+        fn prop_identity_lut_is_identity(_dummy in 0..1i32) {
+            let lut = ToneCurveLut::identity();
+            prop_assert!(lut.is_identity());
+
+            for i in 0..256 {
+                prop_assert_eq!(lut.lut[i], i as u8);
+            }
+        }
+
+        /// Property: Linear curve produces near-identity LUT.
+        #[test]
+        fn prop_linear_curve_is_near_identity(_dummy in 0..1i32) {
+            let curve = ToneCurve::default();
+            let lut = ToneCurveLut::from_curve(&curve);
+
+            // Identity fast-path should be used
+            prop_assert!(lut.is_identity(), "Linear curve should produce identity LUT");
+        }
+
+        /// Property: Applying identity LUT doesn't change pixels.
+        #[test]
+        fn prop_identity_preserves_pixels(
+            r in 0u8..=255,
+            g in 0u8..=255,
+            b in 0u8..=255,
+        ) {
+            let lut = ToneCurveLut::identity();
+            let mut pixels = vec![r, g, b];
+            let original = pixels.clone();
+
+            apply_tone_curve(&mut pixels, &lut);
+
+            prop_assert_eq!(pixels, original);
+        }
+
+        /// Property: Steep transitions don't cause overshoot.
+        #[test]
+        fn prop_no_overshoot_on_steep_curves(
+            low_y in 0.0f32..=0.3,
+            high_y in 0.7f32..=1.0,
+            transition_x in 0.1f32..=0.9,
+        ) {
+            let curve = ToneCurve {
+                points: vec![
+                    CurvePoint::new(0.0, low_y),
+                    CurvePoint::new(transition_x, high_y),
+                    CurvePoint::new(1.0, high_y + (1.0 - high_y) * 0.5),
+                ],
+            };
+
+            // Check all LUT values are in range
+            let lut = ToneCurveLut::from_curve(&curve);
+            for (i, &value) in lut.lut.iter().enumerate() {
+                // This is implicitly true for u8, but we're testing the f32 math doesn't produce NaN/Inf
+                prop_assert!(
+                    value <= 255,
+                    "Overshoot at index {}: value {}",
+                    i,
+                    value
+                );
+            }
+
+            // Also check raw curve evaluation
+            for i in 0..=100 {
+                let x = i as f32 / 100.0;
+                let y = evaluate_curve(&curve, x);
+                prop_assert!(
+                    (0.0..=1.0).contains(&y),
+                    "Curve overshoot at x={}: y={}",
+                    x,
+                    y
+                );
+            }
+        }
+    }
+}

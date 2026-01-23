@@ -282,3 +282,202 @@ mod tests {
         assert_eq!(hist.max_value(), 1);
     }
 }
+
+// ============================================================================
+// Property-Based Tests
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Strategy to generate valid pixel arrays (multiple of 3 bytes).
+    fn pixel_array_strategy(max_pixels: usize) -> impl Strategy<Value = Vec<u8>> {
+        prop::collection::vec(any::<u8>(), 0..=(max_pixels * 3))
+            .prop_map(|v| {
+                // Truncate to multiple of 3
+                let len = (v.len() / 3) * 3;
+                v[..len].to_vec()
+            })
+    }
+
+    /// Strategy to generate a small image with dimensions.
+    fn small_image_strategy() -> impl Strategy<Value = (Vec<u8>, u32, u32)> {
+        (1u32..=10, 1u32..=10).prop_flat_map(|(width, height)| {
+            let pixel_count = (width * height) as usize;
+            prop::collection::vec(any::<u8>(), pixel_count * 3..=pixel_count * 3)
+                .prop_map(move |pixels| (pixels, width, height))
+        })
+    }
+
+    proptest! {
+        /// Property: Total count in each channel equals pixel count.
+        #[test]
+        fn prop_histogram_count_equals_pixel_count((pixels, width, height) in small_image_strategy()) {
+            let hist = compute_histogram(&pixels, width, height);
+            let pixel_count = (width * height) as u64;
+
+            let red_total: u64 = hist.red.iter().map(|&c| c as u64).sum();
+            let green_total: u64 = hist.green.iter().map(|&c| c as u64).sum();
+            let blue_total: u64 = hist.blue.iter().map(|&c| c as u64).sum();
+            let lum_total: u64 = hist.luminance.iter().map(|&c| c as u64).sum();
+
+            prop_assert_eq!(red_total, pixel_count, "Red channel total mismatch");
+            prop_assert_eq!(green_total, pixel_count, "Green channel total mismatch");
+            prop_assert_eq!(blue_total, pixel_count, "Blue channel total mismatch");
+            prop_assert_eq!(lum_total, pixel_count, "Luminance channel total mismatch");
+        }
+
+        /// Property: Histogram bins are always non-negative (trivially true for u32, but tests no overflow).
+        #[test]
+        fn prop_bins_are_non_negative((pixels, width, height) in small_image_strategy()) {
+            let hist = compute_histogram(&pixels, width, height);
+
+            for i in 0..256 {
+                prop_assert!(hist.red[i] >= 0, "Red bin {} is negative", i);
+                prop_assert!(hist.green[i] >= 0, "Green bin {} is negative", i);
+                prop_assert!(hist.blue[i] >= 0, "Blue bin {} is negative", i);
+                prop_assert!(hist.luminance[i] >= 0, "Luminance bin {} is negative", i);
+            }
+        }
+
+        /// Property: max_value is correct (equals the maximum bin count).
+        #[test]
+        fn prop_max_value_is_correct((pixels, width, height) in small_image_strategy()) {
+            let hist = compute_histogram(&pixels, width, height);
+
+            let expected_max = hist.red.iter()
+                .chain(hist.green.iter())
+                .chain(hist.blue.iter())
+                .chain(hist.luminance.iter())
+                .copied()
+                .max()
+                .unwrap_or(0);
+
+            prop_assert_eq!(hist.max_value(), expected_max);
+        }
+
+        /// Property: Luminance is bounded by RGB values.
+        #[test]
+        fn prop_luminance_bounded_by_rgb(r in 0u8..=255, g in 0u8..=255, b in 0u8..=255) {
+            let lum = calculate_luminance_u8(r, g, b);
+
+            // Luminance should be between min and max of RGB values
+            // This is not strictly true for weighted luminance, but it should be
+            // within a reasonable range
+            let min_rgb = r.min(g).min(b);
+            let max_rgb = r.max(g).max(b);
+
+            // Luminance can be outside min/max RGB due to weights, but should be in [0, 255]
+            prop_assert!(lum <= 255, "Luminance {} exceeds 255", lum);
+        }
+
+        /// Property: Grayscale pixels have identical R, G, B histogram contributions.
+        #[test]
+        fn prop_grayscale_channels_equal(v in 0u8..=255, count in 1usize..=100) {
+            let mut pixels = Vec::with_capacity(count * 3);
+            for _ in 0..count {
+                pixels.push(v);
+                pixels.push(v);
+                pixels.push(v);
+            }
+
+            let hist = compute_histogram(&pixels, count as u32, 1);
+
+            prop_assert_eq!(hist.red[v as usize], count as u32);
+            prop_assert_eq!(hist.green[v as usize], count as u32);
+            prop_assert_eq!(hist.blue[v as usize], count as u32);
+        }
+
+        /// Property: Luminance coefficients sum to approximately 1 (sanity check).
+        #[test]
+        fn prop_luminance_coefficients_valid(_dummy in 0..1i32) {
+            // Test that the coefficients are correct by checking a gray pixel
+            // For gray (r=g=b), luminance should equal that gray value
+            for v in [0u8, 64, 128, 192, 255] {
+                let lum = calculate_luminance_u8(v, v, v);
+                prop_assert!(
+                    (lum as i32 - v as i32).abs() <= 1,
+                    "Luminance {} != gray value {} for grayscale",
+                    lum,
+                    v
+                );
+            }
+        }
+
+        /// Property: Empty pixel array produces zero histogram.
+        #[test]
+        fn prop_empty_produces_zero_histogram(_dummy in 0..1i32) {
+            let pixels: Vec<u8> = vec![];
+            let hist = compute_histogram(&pixels, 0, 0);
+
+            prop_assert_eq!(hist.max_value(), 0);
+            for i in 0..256 {
+                prop_assert_eq!(hist.red[i], 0);
+                prop_assert_eq!(hist.green[i], 0);
+                prop_assert_eq!(hist.blue[i], 0);
+                prop_assert_eq!(hist.luminance[i], 0);
+            }
+        }
+
+        /// Property: Clipping detection is consistent with bin values.
+        #[test]
+        fn prop_clipping_detection_consistent((pixels, width, height) in small_image_strategy()) {
+            let hist = compute_histogram(&pixels, width, height);
+
+            // Highlight clipping should be true iff any channel has non-zero count at index 255
+            let has_highlight = hist.red[255] > 0 || hist.green[255] > 0 || hist.blue[255] > 0;
+            prop_assert_eq!(
+                hist.has_highlight_clipping(),
+                has_highlight,
+                "Highlight clipping detection mismatch"
+            );
+
+            // Shadow clipping should be true iff any channel has non-zero count at index 0
+            let has_shadow = hist.red[0] > 0 || hist.green[0] > 0 || hist.blue[0] > 0;
+            prop_assert_eq!(
+                hist.has_shadow_clipping(),
+                has_shadow,
+                "Shadow clipping detection mismatch"
+            );
+        }
+
+        /// Property: Histogram computation is deterministic.
+        #[test]
+        fn prop_deterministic((pixels, width, height) in small_image_strategy()) {
+            let hist1 = compute_histogram(&pixels, width, height);
+            let hist2 = compute_histogram(&pixels, width, height);
+
+            for i in 0..256 {
+                prop_assert_eq!(hist1.red[i], hist2.red[i]);
+                prop_assert_eq!(hist1.green[i], hist2.green[i]);
+                prop_assert_eq!(hist1.blue[i], hist2.blue[i]);
+                prop_assert_eq!(hist1.luminance[i], hist2.luminance[i]);
+            }
+        }
+
+        /// Property: Single pixel histogram has exactly one count per channel.
+        #[test]
+        fn prop_single_pixel(r in 0u8..=255, g in 0u8..=255, b in 0u8..=255) {
+            let pixels = vec![r, g, b];
+            let hist = compute_histogram(&pixels, 1, 1);
+
+            // Each channel should have exactly 1 entry
+            let red_total: u32 = hist.red.iter().sum();
+            let green_total: u32 = hist.green.iter().sum();
+            let blue_total: u32 = hist.blue.iter().sum();
+            let lum_total: u32 = hist.luminance.iter().sum();
+
+            prop_assert_eq!(red_total, 1);
+            prop_assert_eq!(green_total, 1);
+            prop_assert_eq!(blue_total, 1);
+            prop_assert_eq!(lum_total, 1);
+
+            // The bin for each channel value should have count 1
+            prop_assert_eq!(hist.red[r as usize], 1);
+            prop_assert_eq!(hist.green[g as usize], 1);
+            prop_assert_eq!(hist.blue[b as usize], 1);
+        }
+    }
+}

@@ -456,4 +456,213 @@ mod tests {
         assert_eq!(result.width, img.width);
         assert_eq!(result.height, img.height);
     }
+
+    // ===================== Additional edge case tests =====================
+
+    #[test]
+    fn test_270_degree_rotation_bounds() {
+        let (w, h) = compute_rotated_bounds(100, 50, 270.0);
+        // 270 degrees is same as -90, should swap dimensions
+        assert_eq!(w, 50);
+        assert_eq!(h, 100);
+    }
+
+    #[test]
+    fn test_negative_rotation() {
+        let img = test_image(100, 100);
+
+        // Negative rotation should work
+        let result = apply_rotation(&img, -45.0, InterpolationFilter::Bilinear);
+
+        // Should expand canvas similarly to positive rotation
+        assert!(result.width > img.width);
+        assert!(result.height > img.height);
+    }
+
+    #[test]
+    fn test_large_rotation_angles() {
+        // 720 degrees = 2 full rotations
+        let (w, h) = compute_rotated_bounds(100, 50, 720.0);
+        assert_eq!(w, 100);
+        assert_eq!(h, 50);
+
+        // 450 degrees = 360 + 90
+        let (w, h) = compute_rotated_bounds(100, 50, 450.0);
+        assert_eq!(w, 50);
+        assert_eq!(h, 100);
+    }
+
+    #[test]
+    fn test_small_rotation_angles() {
+        let img = test_image(100, 100);
+
+        // Very small rotation
+        let result = apply_rotation(&img, 1.0, InterpolationFilter::Bilinear);
+
+        // Should still expand slightly
+        assert!(result.width >= img.width);
+        assert!(result.height >= img.height);
+    }
+
+    #[test]
+    fn test_1x1_image_rotation() {
+        // Single pixel image should not panic
+        let img = DecodedImage {
+            width: 1,
+            height: 1,
+            pixels: vec![128, 128, 128],
+        };
+
+        let result = apply_rotation(&img, 45.0, InterpolationFilter::Bilinear);
+        assert!(result.width >= 1);
+        assert!(result.height >= 1);
+    }
+
+    #[test]
+    fn test_very_thin_image_rotation() {
+        // Very thin horizontal image
+        let img = test_image(100, 1);
+
+        let result = apply_rotation(&img, 45.0, InterpolationFilter::Bilinear);
+
+        // Should produce reasonable dimensions
+        assert!(result.width > 0);
+        assert!(result.height > 0);
+    }
+
+    #[test]
+    fn test_very_narrow_image_rotation() {
+        // Very narrow vertical image
+        let img = test_image(1, 100);
+
+        let result = apply_rotation(&img, 45.0, InterpolationFilter::Bilinear);
+
+        assert!(result.width > 0);
+        assert!(result.height > 0);
+    }
+
+    #[test]
+    fn test_rotation_preserves_total_coverage() {
+        let img = test_image(50, 50);
+
+        // After rotation, the bounding box should contain all original pixels
+        let result = apply_rotation(&img, 30.0, InterpolationFilter::Bilinear);
+
+        // The rotated image should be larger than original
+        // to contain all corners
+        assert!(result.width >= img.width);
+        assert!(result.height >= img.height);
+    }
+
+    #[test]
+    fn test_opposite_rotations_same_bounds() {
+        // +30 and -30 should give same bounds
+        let (w1, h1) = compute_rotated_bounds(100, 80, 30.0);
+        let (w2, h2) = compute_rotated_bounds(100, 80, -30.0);
+
+        assert_eq!(w1, w2);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_complementary_rotations() {
+        // 30 and 150 should give same bounds (180 - 30 = 150)
+        let (w1, h1) = compute_rotated_bounds(100, 50, 30.0);
+        let (w2, h2) = compute_rotated_bounds(100, 50, 150.0);
+
+        // Should be same or very close
+        assert!((w1 as i32 - w2 as i32).abs() <= 1);
+        assert!((h1 as i32 - h2 as i32).abs() <= 1);
+    }
+
+    #[test]
+    fn test_lanczos_small_image_fallback() {
+        // Small image should use bilinear fallback at edges
+        let img = test_image(8, 8);
+
+        // Lanczos3 needs 6x6 neighborhood, so small images fall back
+        let result = apply_rotation(&img, 15.0, InterpolationFilter::Lanczos3);
+
+        assert!(result.width > 0);
+        assert!(result.height > 0);
+        assert!(!result.pixels.is_empty());
+    }
+
+    #[test]
+    fn test_interpolation_produces_valid_pixels() {
+        let img = test_image(50, 50);
+
+        let result = apply_rotation(&img, 37.0, InterpolationFilter::Lanczos3);
+
+        // All pixels should be in valid range
+        for pixel in &result.pixels {
+            assert!(*pixel <= 255, "Pixel value out of range");
+        }
+    }
+
+    #[test]
+    fn test_rotation_center_preservation() {
+        // Create image with a larger bright region at center for reliable detection
+        let size = 21;
+        let mut pixels = vec![0u8; (size * size * 3) as usize];
+
+        // Set a 3x3 block at center to white for better interpolation survival
+        let center = size / 2;
+        for dy in -1i32..=1 {
+            for dx in -1i32..=1 {
+                let px = (center as i32 + dx) as u32;
+                let py = (center as i32 + dy) as u32;
+                let idx = ((py * size + px) * 3) as usize;
+                pixels[idx] = 255;
+                pixels[idx + 1] = 255;
+                pixels[idx + 2] = 255;
+            }
+        }
+
+        let img = DecodedImage {
+            width: size,
+            height: size,
+            pixels,
+        };
+
+        // After 90 degree rotation, center region should still be center-ish
+        let result = apply_rotation(&img, 90.0, InterpolationFilter::Bilinear);
+
+        // Check a region around the center for bright values
+        let center_x = result.width / 2;
+        let center_y = result.height / 2;
+        let mut found_bright = false;
+
+        for dy in -2i32..=2 {
+            for dx in -2i32..=2 {
+                let px = (center_x as i32 + dx).max(0) as u32;
+                let py = (center_y as i32 + dy).max(0) as u32;
+                if px < result.width && py < result.height {
+                    let idx = ((py * result.width + px) * 3) as usize;
+                    if result.pixels[idx] > 50 {
+                        found_bright = true;
+                        break;
+                    }
+                }
+            }
+            if found_bright {
+                break;
+            }
+        }
+
+        assert!(
+            found_bright,
+            "Center region should contain bright pixels after rotation"
+        );
+    }
+
+    #[test]
+    fn test_bounds_never_zero() {
+        // Various angles should never produce zero dimensions
+        for angle in [1.0, 15.0, 45.0, 89.0, 90.0, 135.0, 179.0, 180.0, 270.0, 359.0] {
+            let (w, h) = compute_rotated_bounds(10, 10, angle);
+            assert!(w > 0, "Width should be > 0 for angle {}", angle);
+            assert!(h > 0, "Height should be > 0 for angle {}", angle);
+        }
+    }
 }

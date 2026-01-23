@@ -391,4 +391,159 @@ mod tests {
         assert!((val_up - val_down).abs() < 1e-6);
         assert!((val_right - val_up).abs() < 1e-6);
     }
+
+    // ===================== Additional edge case tests =====================
+
+    #[test]
+    fn test_mask_at_image_corners() {
+        let mask = RadialGradientMask::circle(0.5, 0.5, 0.3, 0.5);
+
+        // All four corners should produce valid values
+        let corners = [
+            (0.0, 0.0),
+            (1.0, 0.0),
+            (0.0, 1.0),
+            (1.0, 1.0),
+        ];
+
+        for (x, y) in corners {
+            let val = mask.evaluate(x, y);
+            assert!(
+                val >= 0.0 && val <= 1.0,
+                "Corner ({}, {}) should have valid value, got {}",
+                x, y, val
+            );
+        }
+    }
+
+    #[test]
+    fn test_mask_outside_image() {
+        let mask = RadialGradientMask::circle(0.5, 0.5, 0.2, 0.5);
+
+        // Points outside 0-1 range should still produce valid results
+        let val = mask.evaluate(-1.0, -1.0);
+        assert!(val >= 0.0 && val <= 1.0);
+        assert!(val < 0.01, "Point far outside should have no effect");
+    }
+
+    #[test]
+    fn test_mask_at_edge() {
+        let mask = RadialGradientMask::circle(0.0, 0.0, 0.3, 0.5);
+
+        // Mask centered at corner
+        let val_corner = mask.evaluate(0.0, 0.0);
+        let val_outside = mask.evaluate(0.5, 0.5);
+
+        assert!(val_corner > 0.99, "Center should have full effect");
+        assert!(val_outside < val_corner, "Further point should have less effect");
+    }
+
+    #[test]
+    fn test_zero_radius_handling() {
+        // Zero radius should not cause NaN or infinity
+        let mask = RadialGradientMask::new(0.5, 0.5, 0.0, 0.0, 0.0, 0.5, false);
+
+        let val = mask.evaluate(0.5, 0.5);
+        assert!(!val.is_nan(), "Zero radius should not produce NaN");
+        assert!(!val.is_infinite(), "Zero radius should not produce infinity");
+    }
+
+    #[test]
+    fn test_full_rotation_identity() {
+        // 360 degree rotation should be same as no rotation
+        let mask_no_rot = RadialGradientMask::new(0.5, 0.5, 0.3, 0.2, 0.0, 0.5, false);
+        let mask_full_rot = RadialGradientMask::new(0.5, 0.5, 0.3, 0.2, 2.0 * PI, 0.5, false);
+
+        let test_points = [
+            (0.3, 0.3),
+            (0.7, 0.3),
+            (0.5, 0.6),
+            (0.4, 0.5),
+        ];
+
+        for (x, y) in test_points {
+            let val1 = mask_no_rot.evaluate(x, y);
+            let val2 = mask_full_rot.evaluate(x, y);
+            assert!(
+                (val1 - val2).abs() < 1e-5,
+                "360 degree rotation should produce same result"
+            );
+        }
+    }
+
+    #[test]
+    fn test_180_degree_rotation_symmetry() {
+        // 180 degree rotation should flip the ellipse
+        let mask = RadialGradientMask::new(0.5, 0.5, 0.3, 0.15, 0.0, 0.5, false);
+        let mask_180 = RadialGradientMask::new(0.5, 0.5, 0.3, 0.15, PI, 0.5, false);
+
+        // For an ellipse centered at 0.5, 0.5, 180 rotation should be symmetric
+        let val_normal = mask.evaluate(0.6, 0.5);
+        let val_rotated = mask_180.evaluate(0.4, 0.5);  // Opposite side
+
+        assert!(
+            (val_normal - val_rotated).abs() < 0.05,
+            "180 degree rotation should be symmetric"
+        );
+    }
+
+    #[test]
+    fn test_extreme_aspect_ratio() {
+        // Very thin ellipse
+        let mask = RadialGradientMask::new(0.5, 0.5, 0.4, 0.01, 0.0, 0.5, false);
+
+        // Along the long axis, should extend further
+        let val_along = mask.evaluate(0.7, 0.5);  // Along x axis
+        let val_perp = mask.evaluate(0.5, 0.52);  // Perpendicular (beyond narrow radius)
+
+        assert!(val_along > val_perp, "Value along long axis should be greater");
+    }
+
+    #[test]
+    fn test_inverted_mask_complement() {
+        let mask_normal = RadialGradientMask::new(0.5, 0.5, 0.3, 0.3, 0.0, 0.3, false);
+        let mask_invert = RadialGradientMask::new(0.5, 0.5, 0.3, 0.3, 0.0, 0.3, true);
+
+        // Normal + inverted should sum to 1.0 at every point
+        let test_points = [
+            (0.5, 0.5),
+            (0.3, 0.3),
+            (0.7, 0.7),
+            (0.0, 0.0),
+        ];
+
+        for (x, y) in test_points {
+            let sum = mask_normal.evaluate(x, y) + mask_invert.evaluate(x, y);
+            assert!(
+                (sum - 1.0).abs() < 1e-5,
+                "Normal + inverted should equal 1.0 at ({}, {}), got {}",
+                x, y, sum
+            );
+        }
+    }
+
+    #[test]
+    fn test_continuous_gradient() {
+        // Verify there are no discontinuities in the gradient
+        let mask = RadialGradientMask::circle(0.5, 0.5, 0.3, 1.0);
+
+        let mut prev_val = mask.evaluate(0.5, 0.5);
+        let steps = 100;
+        let mut max_diff = 0.0f32;
+
+        for i in 1..=steps {
+            let dist = (i as f32 / steps as f32) * 0.4;  // Go slightly beyond radius
+            let val = mask.evaluate(0.5 + dist, 0.5);
+            let diff = (val - prev_val).abs();
+            max_diff = max_diff.max(diff);
+            prev_val = val;
+        }
+
+        // Maximum difference between adjacent samples should be small
+        assert!(
+            max_diff < 0.05,
+            "Gradient should be smooth, max difference was {}",
+            max_diff
+        );
+    }
 }

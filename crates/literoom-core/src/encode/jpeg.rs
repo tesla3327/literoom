@@ -226,3 +226,220 @@ mod tests {
         assert!(jpeg_bytes.len() < 50000); // Not too large for 100x100
     }
 }
+
+// ============================================================================
+// Property-Based Tests
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Strategy for generating image dimensions (keep small for speed).
+    fn dimensions_strategy() -> impl Strategy<Value = (u32, u32)> {
+        (1u32..=50, 1u32..=50)
+    }
+
+    /// Strategy for generating quality values.
+    fn quality_strategy() -> impl Strategy<Value = u8> {
+        1u8..=100
+    }
+
+    /// Strategy for generating random pixel data for a given size.
+    fn pixels_strategy(width: u32, height: u32) -> impl Strategy<Value = Vec<u8>> {
+        let size = (width as usize) * (height as usize) * 3;
+        prop::collection::vec(any::<u8>(), size..=size)
+    }
+
+    proptest! {
+        /// Property: Encoding always produces valid JPEG when given valid input.
+        #[test]
+        fn prop_valid_input_produces_valid_jpeg(
+            (width, height) in dimensions_strategy(),
+            quality in quality_strategy(),
+        ) {
+            let size = (width as usize) * (height as usize) * 3;
+            let pixels = vec![128u8; size];
+
+            let result = encode_jpeg(&pixels, width, height, quality);
+            prop_assert!(result.is_ok(), "Valid input should produce valid output");
+
+            let jpeg_bytes = result.unwrap();
+
+            // Check JPEG SOI marker
+            prop_assert_eq!(&jpeg_bytes[0..2], &[0xFF, 0xD8], "Should have SOI marker");
+
+            // Check JPEG EOI marker
+            let len = jpeg_bytes.len();
+            prop_assert!(len >= 4, "JPEG should have at least 4 bytes");
+            prop_assert_eq!(&jpeg_bytes[len - 2..], &[0xFF, 0xD9], "Should have EOI marker");
+        }
+
+        /// Property: Output size is always positive for valid input.
+        #[test]
+        fn prop_output_size_is_positive(
+            (width, height) in dimensions_strategy(),
+            quality in quality_strategy(),
+        ) {
+            let size = (width as usize) * (height as usize) * 3;
+            let pixels = vec![128u8; size];
+
+            let result = encode_jpeg(&pixels, width, height, quality);
+            prop_assert!(result.is_ok());
+
+            let jpeg_bytes = result.unwrap();
+            prop_assert!(jpeg_bytes.len() > 0, "Output should be non-empty");
+        }
+
+        /// Property: Same input always produces same output (deterministic).
+        #[test]
+        fn prop_deterministic_output(
+            (width, height) in (1u32..=20, 1u32..=20),
+            quality in quality_strategy(),
+        ) {
+            let size = (width as usize) * (height as usize) * 3;
+            let pixels = vec![100u8; size]; // Use a fixed value for reproducibility
+
+            let result1 = encode_jpeg(&pixels, width, height, quality);
+            let result2 = encode_jpeg(&pixels, width, height, quality);
+
+            prop_assert!(result1.is_ok() && result2.is_ok());
+            prop_assert_eq!(result1.unwrap(), result2.unwrap(), "Same input should produce same output");
+        }
+
+        /// Property: Quality affects file size (generally higher quality = larger file).
+        #[test]
+        fn prop_quality_affects_size_general(
+            (width, height) in (20u32..=40, 20u32..=40),
+        ) {
+            // Create a complex image (gradient) where quality difference is visible
+            let size = (width as usize) * (height as usize) * 3;
+            let mut pixels = Vec::with_capacity(size);
+
+            for y in 0..height {
+                for x in 0..width {
+                    pixels.push(((x * 255) / width) as u8);
+                    pixels.push(((y * 255) / height) as u8);
+                    pixels.push(((x + y) * 127 / (width + height)) as u8);
+                }
+            }
+
+            let low_q = encode_jpeg(&pixels, width, height, 10);
+            let high_q = encode_jpeg(&pixels, width, height, 100);
+
+            prop_assert!(low_q.is_ok() && high_q.is_ok());
+
+            // High quality should generally be larger, but we allow some tolerance
+            // since for very simple images this might not hold
+            let low_size = low_q.unwrap().len();
+            let high_size = high_q.unwrap().len();
+
+            // Either high quality is larger OR they're within 50% of each other
+            prop_assert!(
+                high_size > low_size || (low_size as f64 / high_size as f64) < 1.5,
+                "Quality should affect size: low={}, high={}",
+                low_size,
+                high_size
+            );
+        }
+
+        /// Property: Invalid pixel data length always returns error.
+        #[test]
+        fn prop_invalid_pixel_length_returns_error(
+            (width, height) in dimensions_strategy(),
+            quality in quality_strategy(),
+            extra_or_missing in -10i32..=10,
+        ) {
+            prop_assume!(extra_or_missing != 0); // Skip zero, as that's valid
+
+            let expected_size = (width as usize) * (height as usize) * 3;
+            let actual_size = if extra_or_missing > 0 {
+                expected_size + extra_or_missing as usize
+            } else {
+                expected_size.saturating_sub((-extra_or_missing) as usize)
+            };
+
+            // Skip if we would get the correct size
+            prop_assume!(actual_size != expected_size);
+
+            let pixels = vec![128u8; actual_size];
+            let result = encode_jpeg(&pixels, width, height, quality);
+
+            prop_assert!(
+                matches!(result, Err(EncodeError::InvalidPixelData { .. })),
+                "Mismatched pixel data should return InvalidPixelData error"
+            );
+        }
+
+        /// Property: Zero dimensions always return error.
+        #[test]
+        fn prop_zero_dimensions_return_error(
+            width in 0u32..=1,
+            height in 0u32..=1,
+            quality in quality_strategy(),
+        ) {
+            prop_assume!(width == 0 || height == 0);
+
+            let pixels = vec![];
+            let result = encode_jpeg(&pixels, width, height, quality);
+
+            prop_assert!(
+                matches!(result, Err(EncodeError::InvalidDimensions { .. })),
+                "Zero dimensions should return InvalidDimensions error"
+            );
+        }
+
+        /// Property: All quality values in range produce valid output.
+        #[test]
+        fn prop_all_quality_values_work(quality in 0u8..=255) {
+            let pixels = vec![128u8; 10 * 10 * 3];
+            let result = encode_jpeg(&pixels, 10, 10, quality);
+
+            // All quality values should work (extreme values get clamped)
+            prop_assert!(result.is_ok(), "Quality {} should work after clamping", quality);
+        }
+
+        /// Property: Various pixel patterns encode successfully.
+        #[test]
+        fn prop_various_pixel_patterns(
+            (width, height) in (5u32..=20, 5u32..=20),
+            pattern in 0u8..=4,
+        ) {
+            let size = (width as usize) * (height as usize) * 3;
+            let pixels: Vec<u8> = match pattern {
+                0 => vec![0u8; size],        // Black
+                1 => vec![255u8; size],      // White
+                2 => vec![128u8; size],      // Gray
+                3 => (0..size).map(|i| (i % 256) as u8).collect(), // Gradient
+                _ => (0..size).map(|i| ((i * 37) % 256) as u8).collect(), // Pseudo-random
+            };
+
+            let result = encode_jpeg(&pixels, width, height, 90);
+            prop_assert!(result.is_ok(), "Pattern {} should encode successfully", pattern);
+
+            let jpeg = result.unwrap();
+            prop_assert_eq!(&jpeg[0..2], &[0xFF, 0xD8], "Should have valid JPEG header");
+        }
+
+        /// Property: Aspect ratios don't affect encoding success.
+        #[test]
+        fn prop_aspect_ratio_independence(
+            short_side in 5u32..=20,
+            ratio in 1u32..=10,
+        ) {
+            let long_side = short_side * ratio;
+
+            // Wide image
+            let pixels_wide = vec![128u8; (long_side * short_side * 3) as usize];
+            let result_wide = encode_jpeg(&pixels_wide, long_side, short_side, 90);
+
+            // Tall image
+            let pixels_tall = vec![128u8; (short_side * long_side * 3) as usize];
+            let result_tall = encode_jpeg(&pixels_tall, short_side, long_side, 90);
+
+            prop_assert!(result_wide.is_ok(), "Wide image should encode");
+            prop_assert!(result_tall.is_ok(), "Tall image should encode");
+        }
+    }
+}

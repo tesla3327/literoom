@@ -300,4 +300,130 @@ mod tests {
             prev = val;
         }
     }
+
+    // ===================== Additional edge case tests =====================
+
+    #[test]
+    fn test_very_short_gradient() {
+        // Very short gradient line (nearly a point)
+        let mask = LinearGradientMask::new(0.5, 0.5, 0.501, 0.501, 0.5);
+
+        // Should still produce valid values
+        let val_center = mask.evaluate(0.5, 0.5);
+        let val_far = mask.evaluate(0.0, 0.0);
+
+        assert!(val_center >= 0.0 && val_center <= 1.0);
+        assert!(val_far >= 0.0 && val_far <= 1.0);
+    }
+
+    #[test]
+    fn test_gradient_at_image_edges() {
+        let mask = LinearGradientMask::new(0.0, 0.0, 1.0, 1.0, 1.0);
+
+        // All four corners should produce valid values
+        let corners = [
+            (0.0, 0.0),
+            (1.0, 0.0),
+            (0.0, 1.0),
+            (1.0, 1.0),
+        ];
+
+        for (x, y) in corners {
+            let val = mask.evaluate(x, y);
+            assert!(
+                val >= 0.0 && val <= 1.0,
+                "Corner ({}, {}) should have valid value, got {}",
+                x, y, val
+            );
+        }
+    }
+
+    #[test]
+    fn test_gradient_outside_image() {
+        let mask = LinearGradientMask::new(0.2, 0.5, 0.8, 0.5, 0.5);
+
+        // Points outside 0-1 range should still work (useful for previews)
+        let val_left = mask.evaluate(-0.5, 0.5);
+        let val_right = mask.evaluate(1.5, 0.5);
+
+        assert!(val_left > 0.99, "Far left should be full effect");
+        assert!(val_right < 0.01, "Far right should be no effect");
+    }
+
+    #[test]
+    fn test_partial_feather() {
+        let mask_half = LinearGradientMask::new(0.0, 0.5, 1.0, 0.5, 0.5);
+        let mask_quarter = LinearGradientMask::new(0.0, 0.5, 1.0, 0.5, 0.25);
+
+        // With less feather, transition should be sharper
+        // At midpoint both should be ~0.5
+        let val_half_mid = mask_half.evaluate(0.5, 0.5);
+        let val_quarter_mid = mask_quarter.evaluate(0.5, 0.5);
+
+        assert!((val_half_mid - 0.5).abs() < 0.01);
+        assert!((val_quarter_mid - 0.5).abs() < 0.01);
+
+        // At the start, both should have full effect
+        let val_half_start = mask_half.evaluate(0.0, 0.5);
+        let val_quarter_start = mask_quarter.evaluate(0.0, 0.5);
+
+        assert!(val_half_start > 0.99, "Start should have full effect");
+        assert!(val_quarter_start > 0.99, "Start should have full effect");
+
+        // At 0.35 (within half-feather zone but outside quarter-feather zone)
+        // quarter-feather should already be at full effect, half-feather should be transitioning
+        let val_half_35 = mask_half.evaluate(0.35, 0.5);
+        let val_quarter_35 = mask_quarter.evaluate(0.35, 0.5);
+
+        // With quarter feather (0.25), transition is from 0.375 to 0.625
+        // With half feather (0.5), transition is from 0.25 to 0.75
+        // At 0.35, half feather is in transition, quarter feather should be at full effect
+        assert!(val_quarter_35 >= val_half_35, "Smaller feather should have sharper transition");
+    }
+
+    #[test]
+    fn test_gradient_symmetry() {
+        // Symmetric gradient from center
+        let mask_left = LinearGradientMask::new(0.5, 0.5, 0.0, 0.5, 0.5);
+        let mask_right = LinearGradientMask::new(0.5, 0.5, 1.0, 0.5, 0.5);
+
+        // At symmetric points, values should be inversely related
+        let val_left_at_25 = mask_left.evaluate(0.25, 0.5);
+        let val_right_at_75 = mask_right.evaluate(0.75, 0.5);
+
+        assert!(
+            (val_left_at_25 - val_right_at_75).abs() < 0.05,
+            "Symmetric gradients should produce symmetric results"
+        );
+    }
+
+    #[test]
+    fn test_45_degree_gradient() {
+        // 45-degree diagonal gradient
+        let mask = LinearGradientMask::new(0.0, 0.0, 1.0, 1.0, 1.0);
+
+        // Points equidistant from the diagonal should have same value
+        let val_a = mask.evaluate(0.3, 0.7);  // Above diagonal
+        let val_b = mask.evaluate(0.7, 0.3);  // Below diagonal (same distance)
+
+        assert!(
+            (val_a - val_b).abs() < 0.05,
+            "Equidistant points should have similar values"
+        );
+    }
+
+    #[test]
+    fn test_gradient_perpendicular_invariance() {
+        // Horizontal gradient
+        let mask = LinearGradientMask::new(0.0, 0.5, 1.0, 0.5, 1.0);
+
+        // All y values at same x should give same result
+        let x = 0.3;
+        let val_top = mask.evaluate(x, 0.0);
+        let val_mid = mask.evaluate(x, 0.5);
+        let val_bottom = mask.evaluate(x, 1.0);
+
+        assert!((val_top - val_mid).abs() < 0.01);
+        assert!((val_mid - val_bottom).abs() < 0.01);
+    }
 }
