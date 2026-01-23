@@ -4,14 +4,13 @@
  * Provides utilities for creating test data in E2E and unit tests.
  */
 
-import {
+import type { Asset, FlagStatus,
   createDemoAssets,
   createDemoAsset,
   getDemoFlagCounts,
   filterDemoAssetsByFlag,
   type DemoAssetOptions,
 } from '@literoom/core/catalog'
-import type { Asset, FlagStatus } from '@literoom/core/catalog'
 
 /**
  * Default number of assets in the demo catalog.
@@ -45,7 +44,7 @@ export function createTestCatalog(overrides?: Partial<Asset>[]): Asset[] {
  */
 export function createSmallTestCatalog(
   count: number = 10,
-  options?: Omit<DemoAssetOptions, 'count'>
+  options?: Omit<DemoAssetOptions, 'count'>,
 ): Asset[] {
   return createDemoAssets({ count, ...options })
 }
@@ -80,7 +79,7 @@ export function getExpectedFlagCounts(): {
  */
 export function createTestAsset(
   index: number = 0,
-  overrides?: Partial<Asset>
+  overrides?: Partial<Asset>,
 ): Asset {
   const asset = createDemoAsset(index)
   if (overrides) {
