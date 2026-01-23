@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 20:58 EST
-**Current Phase**: Test Coverage Metrics Implemented (TypeScript)
+**Last Updated**: 2026-01-22 21:00 EST
+**Current Phase**: Rust Test Coverage Implementation (Phase 2)
 
 ## Project Structure
 
@@ -361,17 +361,31 @@ literoom/
 | [149](./iterations-141-150.md:436) | 2026-01-22 | Test Coverage Metrics - Research Complete |
 | [150](./iterations-141-150.md:476) | 2026-01-22 | Test Coverage Metrics - Phase 1 Implementation (TypeScript) |
 
+### [Iterations 151-160](./iterations-151-160.md)
+
+| # | Date | Title |
+|---|------|-------|
+| [151](./iterations-151-160.md:3) | 2026-01-22 | Rust Test Coverage - Phase 2 Implementation |
+
 ---
 
 ## Test Status
 
 | Package | Tests | Status | Coverage |
 |---------|-------|--------|----------|
-| literoom-core | 184 | Passing | N/A (Rust) |
-| literoom-wasm | 44 | Passing | N/A (Rust) |
+| literoom-core | 214 | Passing | 93.38% lines |
+| literoom-wasm | 44 | Passing | 72.48% lines |
 | packages/core | 362 | Passing | 32.38% lines |
 | apps/web (unit) | 341 | Passing | 22.52% lines |
 | apps/web (E2E) | 28 | Passing | N/A |
+
+### Rust Coverage Details
+
+| Crate | Lines | Functions | Regions |
+|-------|-------|-----------|---------|
+| literoom-core | 93.38% | 100.00% | 90.28% |
+| literoom-wasm | 72.48% | 67.32% | 66.67% |
+| **Total** | **89.83%** | **88.20%** | **90.28%** |
 
 ## Related Documentation
 
