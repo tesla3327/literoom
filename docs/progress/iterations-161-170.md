@@ -1,5 +1,79 @@
 # Iterations 161-170
 
+## 163: 2026-01-22 22:02 EST: GPU Acceleration - Phase 3 (Tone Curve Shader)
+
+**Objective**: Move LUT-based tone curve application to GPU with hardware linear interpolation.
+
+**Background**:
+Phase 2 basic adjustments shader is complete. Phase 3 implements tone curve application using a 1D LUT texture uploaded to the GPU. The WGSL shader samples the LUT using textureSampleLevel with linear filtering for smooth interpolation.
+
+**Performance Target**: 15ms → 1ms for 2560×1440 preview (15x speedup)
+
+**Implementation Complete**:
+
+1. **WGSL Tone Curve Shader** (`packages/core/src/gpu/shaders/`):
+   - `tone-curve.wgsl`: Compute shader for LUT-based tone mapping
+   - Uses 1D texture sampling with linear filtering for smooth interpolation
+   - Applies LUT independently to each RGB channel
+   - 16×16 workgroups for parallelization
+
+2. **Tone Curve Pipeline** (`packages/core/src/gpu/pipelines/tone-curve-pipeline.ts`):
+   - `ToneCurvePipeline` class manages WebGPU compute pipeline lifecycle
+   - `apply()`: Full CPU→GPU→CPU path with LUT texture upload
+   - `applyToTextures()`: GPU-only path for chaining operations
+   - LUT caching to avoid redundant texture uploads
+   - Identity LUT fast-path (skip processing)
+   - Uses r8unorm format for 256-entry 1D LUT texture
+
+3. **GPU Tone Curve Service** (`packages/core/src/gpu/gpu-tone-curve-service.ts`):
+   - `GPUToneCurveService`: High-level service for tone curve operations
+   - `applyToneCurve()`: RGB pixels with automatic RGBA conversion
+   - `applyToneCurveRgba()`: More efficient RGBA path
+   - `applyToneCurveAdaptive()`: Adaptive GPU/WASM selection
+   - `createIdentityLut()` and `isIdentityLut()` helper functions
+
+**Files Created** (3):
+- `packages/core/src/gpu/shaders/tone-curve.wgsl`
+- `packages/core/src/gpu/pipelines/tone-curve-pipeline.ts`
+- `packages/core/src/gpu/gpu-tone-curve-service.ts`
+
+**Files Modified** (3):
+- `packages/core/src/gpu/shaders/index.ts` - Export tone curve shader source
+- `packages/core/src/gpu/pipelines/index.ts` - Export ToneCurvePipeline
+- `packages/core/src/gpu/index.ts` - Export GPUToneCurveService
+
+**Verification**:
+- ✅ All 749 core package tests pass (5 skipped)
+- ✅ No new type errors in GPU module
+
+**Architecture**:
+```
+App Code
+    │
+    ├── GPUToneCurveService.applyToneCurve(pixels, w, h, lut)
+    │       │
+    │       ├── Identity LUT check (fast-path)
+    │       │
+    │       ├── RGB→RGBA conversion
+    │       │
+    │       └── ToneCurvePipeline.apply()
+    │               │
+    │               ├── Upload LUT to 1D texture (r8unorm, 256 entries)
+    │               ├── Create input/output textures
+    │               ├── Dispatch compute shader
+    │               │       └── For each pixel:
+    │               │           - Load RGB from input
+    │               │           - Sample LUT for each channel
+    │               │           - Store result to output
+    │               └── Read back results
+    │
+    └── RGBA→RGB conversion
+```
+
+**Next**: Phase 4 - Gradient Mask Shaders (linear and radial masks)
+
+---
+
 ## 162: 2026-01-22 21:53 EST: GPU Acceleration - Phase 2 (Basic Adjustments Shader)
 
 **Objective**: Implement WGSL compute shader for all 10 basic adjustments and integrate with AdaptiveProcessor.

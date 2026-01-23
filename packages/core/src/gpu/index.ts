@@ -67,6 +67,12 @@ export {
   resetAdjustmentsPipeline,
   type BasicAdjustments,
   DEFAULT_BASIC_ADJUSTMENTS,
+  ToneCurvePipeline,
+  getToneCurvePipeline,
+  resetToneCurvePipeline,
+  type ToneCurveLut,
+  createIdentityLut,
+  isIdentityLut,
 } from './pipelines'
 
 // Texture utilities
@@ -88,3 +94,11 @@ export {
   resetGPUAdjustmentsService,
   applyAdjustmentsAdaptive,
 } from './gpu-adjustments-service'
+
+// GPU tone curve service
+export {
+  GPUToneCurveService,
+  getGPUToneCurveService,
+  resetGPUToneCurveService,
+  applyToneCurveAdaptive,
+} from './gpu-tone-curve-service'

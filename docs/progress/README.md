@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 22:01 EST
-**Current Phase**: V1.1 - GPU Acceleration Phase 2 Complete (Basic Adjustments Shader)
+**Last Updated**: 2026-01-22 22:10 EST
+**Current Phase**: V1.1 - GPU Acceleration Phase 3 Complete (Tone Curve Shader)
 
 ## Project Structure
 
@@ -378,10 +378,11 @@ literoom/
 
 | # | Date | Title |
 |---|------|-------|
-| [162](./iterations-161-170.md:3) | 2026-01-22 | GPU Acceleration - Phase 2 Complete (Basic Adjustments Shader) |
-| [161](./iterations-161-170.md:90) | 2026-01-22 | GPU Acceleration - Phase 1 Complete (Infrastructure & Detection) |
-| [160](./iterations-161-170.md:176) | 2026-01-22 | GPU Acceleration - Implementation Plan Creation |
-| [159](./iterations-161-170.md:207) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
+| [163](./iterations-161-170.md:3) | 2026-01-22 | GPU Acceleration - Phase 3 Complete (Tone Curve Shader) |
+| [162](./iterations-161-170.md:86) | 2026-01-22 | GPU Acceleration - Phase 2 Complete (Basic Adjustments Shader) |
+| [161](./iterations-161-170.md:172) | 2026-01-22 | GPU Acceleration - Phase 1 Complete (Infrastructure & Detection) |
+| [160](./iterations-161-170.md:258) | 2026-01-22 | GPU Acceleration - Implementation Plan Creation |
+| [159](./iterations-161-170.md:289) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
 
 ---
 
@@ -391,7 +392,7 @@ literoom/
 |---------|-------|--------|----------|
 | literoom-core | 214 | Passing | 93.38% lines |
 | literoom-wasm | 44 | Passing | 72.48% lines |
-| packages/core | 412 | Passing | 32.38% lines |
+| packages/core | 749 | Passing | 32.38% lines |
 | apps/web (unit) | 341 | Passing | 22.52% lines |
 | apps/web (E2E) | 28 | Passing | N/A |
 
