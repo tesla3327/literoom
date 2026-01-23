@@ -1,5 +1,36 @@
 # Iterations 161-170
 
+## 164: 2026-01-23 08:56 EST: GPU Acceleration - Phase 4 Research (Gradient Mask Shaders)
+
+**Objective**: Create research plan and conduct research for GPU-accelerated gradient mask shaders.
+
+**Background**:
+Phases 1-3 of GPU acceleration are complete (infrastructure, basic adjustments, tone curve). Phase 4 will move linear and radial gradient masks to GPU. This iteration creates the research plan and conducts parallel research to understand the existing mask implementation and optimal WGSL shader patterns.
+
+**Research Plan Created**: `docs/research/2026-01-23-gradient-mask-shaders-research-plan.md`
+
+**Parallel Research Conducted** (4 sub-agents):
+1. **Rust Mask Algorithms**: Deep analysis of `crates/literoom-core/src/mask/` - documented smootherstep formula, linear gradient projection, radial ellipse distance metrics, and sequential blending
+2. **GPU Pipeline Architecture**: Analyzed existing adjustments/tone-curve shaders - documented bind group patterns, uniform buffer layouts, and dual-method approach (apply/applyToTextures)
+3. **WGSL Patterns**: Researched array handling, memory alignment, loop unrolling - recommended fixed-size 8-mask arrays in uniform buffer
+4. **Integration Points**: Analyzed useEditPreview.ts and mask data flow - documented MaskStackData interface and service patterns
+
+**Research Synthesis**: `docs/research/2026-01-23-gradient-mask-shaders-synthesis.md`
+
+**Key Findings**:
+1. **Smootherstep must be manually implemented** - WGSL's built-in smoothstep uses Hermite cubic (3rd order), but Rust uses Ken Perlin's 5th order polynomial
+2. **Fixed-size arrays recommended** - 8 masks max fits well in 64KB uniform buffer (~656 bytes total)
+3. **Pipeline pattern is established** - Follow same structure as adjustments/tone-curve pipelines
+4. **Target performance**: 100ms → 4ms for 2 masks (25x speedup)
+
+**Files Created** (2):
+- `docs/research/2026-01-23-gradient-mask-shaders-research-plan.md`
+- `docs/research/2026-01-23-gradient-mask-shaders-synthesis.md`
+
+**Next**: Create implementation plan based on research synthesis
+
+---
+
 ## 163: 2026-01-22 22:02 EST: GPU Acceleration - Phase 3 (Tone Curve Shader)
 
 **Objective**: Move LUT-based tone curve application to GPU with hardware linear interpolation.

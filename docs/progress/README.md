@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 22:10 EST
-**Current Phase**: V1.1 - GPU Acceleration Phase 3 Complete (Tone Curve Shader)
+**Last Updated**: 2026-01-23 08:56 EST
+**Current Phase**: V1.1 - GPU Acceleration Phase 4 (Gradient Mask Shaders)
 
 ## Project Structure
 
@@ -378,11 +378,12 @@ literoom/
 
 | # | Date | Title |
 |---|------|-------|
-| [163](./iterations-161-170.md:3) | 2026-01-22 | GPU Acceleration - Phase 3 Complete (Tone Curve Shader) |
-| [162](./iterations-161-170.md:86) | 2026-01-22 | GPU Acceleration - Phase 2 Complete (Basic Adjustments Shader) |
-| [161](./iterations-161-170.md:172) | 2026-01-22 | GPU Acceleration - Phase 1 Complete (Infrastructure & Detection) |
-| [160](./iterations-161-170.md:258) | 2026-01-22 | GPU Acceleration - Implementation Plan Creation |
-| [159](./iterations-161-170.md:289) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
+| [164](./iterations-161-170.md:3) | 2026-01-23 | GPU Acceleration - Phase 4 Research (Gradient Mask Shaders) |
+| [163](./iterations-161-170.md:17) | 2026-01-22 | GPU Acceleration - Phase 3 Complete (Tone Curve Shader) |
+| [162](./iterations-161-170.md:100) | 2026-01-22 | GPU Acceleration - Phase 2 Complete (Basic Adjustments Shader) |
+| [161](./iterations-161-170.md:186) | 2026-01-22 | GPU Acceleration - Phase 1 Complete (Infrastructure & Detection) |
+| [160](./iterations-161-170.md:272) | 2026-01-22 | GPU Acceleration - Implementation Plan Creation |
+| [159](./iterations-161-170.md:303) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
 
 ---
 
