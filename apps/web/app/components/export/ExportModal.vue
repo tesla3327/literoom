@@ -95,6 +95,7 @@ function handleCancel() {
   <UModal
     v-model:open="exportStore.isModalOpen"
     :dismissible="!exportStore.isExporting"
+    data-testid="export-modal"
   >
     <template #header>
       <div class="flex items-center gap-2">
@@ -145,6 +146,7 @@ function handleCancel() {
             class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-gray-500"
             :class="{ 'border-red-500': templateErrors.length > 0 }"
             placeholder="{orig}_{seq:4}"
+            data-testid="export-filename-template"
           >
           <p class="mt-1.5 text-xs text-gray-500">
             Tokens: <code class="text-gray-400">{orig}</code> = original name,
@@ -175,12 +177,16 @@ function handleCancel() {
                   ? 'bg-gray-700 text-white'
                   : 'text-gray-400 hover:text-white',
               ]"
+              :data-testid="`export-scope-${option.value}`"
               @click="handleScopeChange(option.value)"
             >
               {{ option.label }}
             </button>
           </div>
-          <p class="mt-2 text-sm text-gray-400">
+          <p
+            class="mt-2 text-sm text-gray-400"
+            data-testid="export-count"
+          >
             {{ exportCount }} image{{ exportCount === 1 ? '' : 's' }} will be exported
           </p>
         </div>
@@ -253,6 +259,7 @@ function handleCancel() {
         <UButton
           variant="ghost"
           :disabled="exportStore.isExporting"
+          data-testid="export-cancel-button"
           @click="handleCancel"
         >
           Cancel
@@ -261,6 +268,7 @@ function handleCancel() {
           color="primary"
           :disabled="!canExport"
           :loading="exportStore.isExporting"
+          data-testid="export-submit-button"
           @click="handleExport"
         >
           Export {{ exportCount }} Image{{ exportCount === 1 ? '' : 's' }}
