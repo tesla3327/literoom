@@ -373,5 +373,97 @@ The solution is to implement the Fritsch-Carlson monotonic cubic hermite spline 
 - ✅ Tone Curve (GPU adaptive) **NEW**
 - ✅ Masks (GPU adaptive)
 
-**Next**: Commit changes, then Phase 7.3 (GPUEditPipeline for unified texture chaining)
+**Commit**: `0737f16` feat(gpu): enable GPU-accelerated tone curve in preview pipeline
+
+**Next**: Phase 7.3 (GPUEditPipeline for unified texture chaining)
+
+---
+
+## 174: 2026-01-23 13:40 EST: GPU Acceleration - Phase 7.3 (GPUEditPipeline Coordinator)
+
+**Objective**: Create a unified GPU edit pipeline that chains all operations with single upload/readback for 60fps preview.
+
+**Status**: In Progress
+
+**Background**:
+Phases 7.1-7.2 enabled GPU adjustments and tone curve, but each operation still transfers pixels back to CPU before the next operation. This creates 4 GPU↔CPU round-trips per render. Phase 7.3 creates a unified pipeline that keeps data on GPU throughout.
+
+**Current State**:
+- Rotation: GPU adaptive (1 round-trip)
+- Adjustments: GPU adaptive (1 round-trip)
+- Tone Curve: GPU adaptive (1 round-trip)
+- Masks: GPU adaptive (1 round-trip)
+- Total: ~4 round-trips, ~250ms render time
+
+**Target State**:
+- All operations chained on GPU textures
+- Single upload at start, single readback at end
+- Total: 1 round-trip, <50ms render time
+
+**Implementation Plan**:
+1. Create `GPUEditPipeline` class that coordinates all operations
+2. Implement texture ping-pong for multi-stage processing
+3. Use existing `applyToTextures()` methods for chaining
+4. Integrate into useEditPreview.ts as primary path
+
+**Research Complete** (6 parallel sub-agents):
+1. **Adjustments Pipeline**: `applyToTextures()` with encoder chaining, 48-byte uniform buffer
+2. **Tone Curve Pipeline**: `applyToTextures()` with LUT texture, 1D r8unorm format
+3. **Mask Pipeline**: `applyToTextures()` with mask data buffer, up to 8 linear + 8 radial
+4. **Rotation Pipeline**: `applyToTextures()` with dimension changes via `computeRotatedDimensions()`
+5. **Texture Utils**: `TextureUsage.PINGPONG`, `DoubleBufferedTextures`, `createTextureFromPixels`, `readTexturePixels`
+6. **useEditPreview**: Current pipeline order (rotation→crop→adjustments→toneCurve→masks)
+
+**Implementation Complete**:
+
+1. **GPUEditPipeline class** (`packages/core/src/gpu/pipelines/edit-pipeline.ts`):
+   - `initialize()`: Initializes GPU device via GPUCapabilityService
+   - `process()`: Chains all operations with single upload/readback
+   - `destroy()`: Releases GPU resources
+   - Singleton pattern via `getGPUEditPipeline()` / `resetGPUEditPipeline()`
+
+2. **Pipeline stages** (in order):
+   - **Rotation**: GPU adaptive with bilinear interpolation, dimension changes tracked
+   - **Adjustments**: GPU adaptive for all 10 parameters
+   - **Tone Curve**: GPU adaptive with LUT generation from curve points
+   - **Masks**: GPU adaptive for linear and radial gradient masks
+
+3. **Features**:
+   - RGB↔RGBA conversion at pipeline boundaries
+   - Timing breakdown for each stage (`EditPipelineTiming` interface)
+   - Smart operation skipping (no-ops when params are default/undefined)
+   - Texture cleanup after processing
+
+4. **Unit tests** (`edit-pipeline.test.ts`):
+   - 22 tests covering initialization, destruction, parameter validation
+   - Tests for RGB format, timing structure, singleton pattern
+
+**Files Created** (2):
+- `packages/core/src/gpu/pipelines/edit-pipeline.ts` - 400 lines
+- `packages/core/src/gpu/pipelines/edit-pipeline.test.ts` - 250 lines
+
+**Files Modified** (2):
+- `packages/core/src/gpu/pipelines/index.ts` - Added exports
+- `packages/core/src/gpu/index.ts` - Added exports
+
+**Verification**:
+- ✅ All 1428 tests pass (5 skipped)
+- ✅ 22 new tests for GPUEditPipeline
+- ✅ TypeScript compiles without errors
+- ✅ Exports correctly from @literoom/core/gpu
+
+**Phase 7.3 Status**: Complete
+- ✅ GPUEditPipeline coordinator class
+- ✅ Texture ping-pong pattern
+- ✅ RGB↔RGBA conversion utilities
+- ✅ Timing breakdown
+- ✅ Unit tests
+
+**GPU Operations in Pipeline**:
+- ✅ Rotation (applyToTextures chaining)
+- ✅ Adjustments (applyToTextures chaining)
+- ✅ Tone Curve (applyToTextures chaining)
+- ✅ Masks (applyToTextures chaining)
+
+**Next**: Phase 7.4 - Integrate GPUEditPipeline into useEditPreview.ts to replace individual GPU calls
 

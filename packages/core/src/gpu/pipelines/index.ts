@@ -44,3 +44,13 @@ export {
   resetRotationPipeline,
   type RotationResult,
 } from './rotation-pipeline'
+
+export {
+  GPUEditPipeline,
+  getGPUEditPipeline,
+  resetGPUEditPipeline,
+  type EditPipelineInput,
+  type EditPipelineParams,
+  type EditPipelineTiming,
+  type EditPipelineResult,
+} from './edit-pipeline'

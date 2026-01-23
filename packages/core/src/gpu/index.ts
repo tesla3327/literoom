@@ -86,6 +86,17 @@ export {
   getHistogramPipeline,
   resetHistogramPipeline,
   type HistogramResult,
+  RotationPipeline,
+  getRotationPipeline,
+  resetRotationPipeline,
+  type RotationResult,
+  GPUEditPipeline,
+  getGPUEditPipeline,
+  resetGPUEditPipeline,
+  type EditPipelineInput,
+  type EditPipelineParams,
+  type EditPipelineTiming,
+  type EditPipelineResult,
 } from './pipelines'
 
 // Texture utilities
