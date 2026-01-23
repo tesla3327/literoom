@@ -82,6 +82,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^2
         version: 2.1.9(vitest@2.1.9(happy-dom@16.8.1)(lightningcss@1.30.2)(terser@5.46.0))
+      '@webgpu/types':
+        specifier: ^0.1.69
+        version: 0.1.69
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -2589,6 +2592,9 @@ packages:
     resolution: {integrity: sha512-EcKxtYvn6gx1F8z9J5/rsg3+lTQnvOruQd8fUecW99DCK04BkWD7z5KQ/wTAx+DazyoEE9dJt/zV8OIEQbM6kw==}
     peerDependencies:
       vue: ^3.5.0
+
+  '@webgpu/types@0.1.69':
+    resolution: {integrity: sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==}
 
   abbrev@2.0.0:
     resolution: {integrity: sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apAf5oB7UB7E19ol2R2LKH8hQ==}
@@ -8468,6 +8474,8 @@ snapshots:
   '@vueuse/shared@14.1.0(vue@3.5.27(typescript@5.9.3))':
     dependencies:
       vue: 3.5.27(typescript@5.9.3)
+
+  '@webgpu/types@0.1.69': {}
 
   abbrev@2.0.0: {}
 

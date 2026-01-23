@@ -9,9 +9,14 @@
  *
  * It also provides `$initializeCatalog()` which middleware can call to
  * ensure catalog data is loaded before allowing navigation to edit pages.
+ *
+ * GPU Acceleration:
+ * The plugin also initializes the GPU capability service for optional
+ * WebGPU-based image processing acceleration.
  */
 import type { ICatalogService } from '@literoom/core/catalog'
 import type { IDecodeService } from '@literoom/core/decode'
+import type { AdaptiveProcessor, GPUCapabilities } from '@literoom/core'
 
 // Type augmentation for the provided functions
 declare module '#app' {
@@ -21,6 +26,8 @@ declare module '#app' {
     $decodeService: IDecodeService
     $isDemoMode: boolean
     $initializeCatalog: () => Promise<boolean>
+    $gpuProcessor: AdaptiveProcessor
+    $gpuCapabilities: GPUCapabilities
   }
 }
 
@@ -37,6 +44,23 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   // Immediately provide the ready promise so it's available during SSR/early hydration
   nuxtApp.provide('catalogReady', catalogReady)
+
+  // Initialize GPU acceleration (non-blocking)
+  const { getAdaptiveProcessor, DEFAULT_GPU_CAPABILITIES } = await import('@literoom/core')
+  const gpuProcessor = getAdaptiveProcessor()
+  let gpuCapabilities = DEFAULT_GPU_CAPABILITIES
+
+  // Initialize GPU in background - don't block plugin initialization
+  gpuProcessor.initialize().then(() => {
+    gpuCapabilities = gpuProcessor.state.capabilities
+    const backend = gpuProcessor.state.activeBackend
+    console.log(`[catalog.client] GPU initialized: backend=${backend}, available=${gpuCapabilities.available}`)
+    if (gpuCapabilities.available && gpuCapabilities.adapterInfo) {
+      console.log(`[catalog.client] GPU: ${gpuCapabilities.adapterInfo.vendor} ${gpuCapabilities.adapterInfo.device}`)
+    }
+  }).catch((error: unknown) => {
+    console.warn('[catalog.client] GPU initialization failed (using WASM):', error)
+  })
 
   // Get stores for callback wiring
   const catalogStore = useCatalogStore()
@@ -86,8 +110,12 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     window.addEventListener('beforeunload', () => {
       catalogService.destroy()
       decodeService.destroy()
+      gpuProcessor.destroy()
     })
   }
+
+  // Get edit store for restoring persisted edits
+  const editStore = useEditStore()
 
   // Track initialization to prevent duplicate calls
   let initializationPromise: Promise<boolean> | null = null
@@ -99,11 +127,15 @@ export default defineNuxtPlugin(async (nuxtApp) => {
    * In demo mode: auto-loads demo catalog
    * In real mode: restores from database or returns false
    *
+   * Also initializes the edit store from IndexedDB to restore any persisted edits.
+   *
    * @returns true if catalog is populated, false if initialization failed
    */
   async function initializeCatalog(): Promise<boolean> {
     // Already populated
     if (catalogStore.assetIds.length > 0) {
+      // Still need to initialize edit store if not already done
+      await editStore.initializeFromDb()
       return true
     }
 
@@ -121,6 +153,8 @@ export default defineNuxtPlugin(async (nuxtApp) => {
           try {
             await catalogService.selectFolder()
             await catalogService.scanFolder()
+            // Initialize edit store (no persisted edits in demo, but consistent)
+            await editStore.initializeFromDb()
             return catalogStore.assetIds.length > 0
           }
           finally {
@@ -134,6 +168,11 @@ export default defineNuxtPlugin(async (nuxtApp) => {
             const folder = catalogService.getCurrentFolder()
             if (folder) {
               catalogStore.setFolderPath(folder.name)
+            }
+            // Initialize edit store to restore any persisted edits
+            const editCount = await editStore.initializeFromDb()
+            if (editCount > 0) {
+              console.log(`[catalog.client] Restored ${editCount} edit state(s) from database`)
             }
             return catalogStore.assetIds.length > 0
           }
@@ -161,6 +200,8 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       decodeService,
       isDemoMode,
       initializeCatalog,
+      gpuProcessor,
+      gpuCapabilities,
     },
   }
 })

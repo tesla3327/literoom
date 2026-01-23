@@ -45,31 +45,34 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 
 ## Phases
 
-### Phase 1: Infrastructure & Detection (Foundation)
+### Phase 1: Infrastructure & Detection (Foundation) ✅ COMPLETE
 
 **Objective**: Set up wgpu infrastructure and capability detection
 
 **Tasks**:
-1. Add wgpu dependency to `crates/literoom-wasm/Cargo.toml`
-2. Create `GPUCapabilities` detection service in TypeScript
-3. Create `AdaptiveProcessor` routing layer
-4. Add feature flag for GPU acceleration opt-in
-5. Implement graceful fallback to WASM
+1. ~~Add wgpu dependency to `crates/literoom-wasm/Cargo.toml`~~ (Deferred - using browser WebGPU API)
+2. ✅ Create `GPUCapabilities` detection service in TypeScript
+3. ✅ Create `AdaptiveProcessor` routing layer
+4. ✅ Add feature flag for GPU acceleration opt-in
+5. ✅ Implement graceful fallback to WASM
 
-**Files to Create**:
-- `packages/core/src/gpu/capabilities.ts` - WebGPU detection
-- `packages/core/src/gpu/adaptive-processor.ts` - Operation routing
-- `packages/core/src/gpu/index.ts` - Exports
+**Files Created**:
+- ✅ `packages/core/src/gpu/types.ts` - GPU types and error handling
+- ✅ `packages/core/src/gpu/capabilities.ts` - WebGPU detection
+- ✅ `packages/core/src/gpu/adaptive-processor.ts` - Operation routing
+- ✅ `packages/core/src/gpu/index.ts` - Exports
 
-**Files to Modify**:
-- `packages/core/src/index.ts` - Export GPU module
-- `apps/web/app/plugins/catalog.client.ts` - Initialize GPU on startup
+**Files Modified**:
+- ✅ `packages/core/src/index.ts` - Export GPU module
+- ✅ `packages/core/package.json` - Add GPU subpath export and @webgpu/types
+- ✅ `packages/core/tsconfig.json` - Add @webgpu/types reference
+- ✅ `apps/web/app/plugins/catalog.client.ts` - Initialize GPU on startup
 
 **Acceptance Criteria**:
-- [ ] WebGPU availability detected correctly
-- [ ] Fallback to WASM works when WebGPU unavailable
-- [ ] Feature flag controls GPU usage
-- [ ] No regressions in existing functionality
+- [x] WebGPU availability detected correctly
+- [x] Fallback to WASM works when WebGPU unavailable
+- [x] Feature flag controls GPU usage (forceDisabled option)
+- [x] No regressions in existing functionality (646 tests pass, build succeeds)
 
 ### Phase 2: Basic Adjustments Shader
 

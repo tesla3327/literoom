@@ -2,8 +2,8 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 21:43 EST
-**Current Phase**: V1.1 Planning - GPU Acceleration
+**Last Updated**: 2026-01-22 21:51 EST
+**Current Phase**: V1.1 - GPU Acceleration Phase 1 Complete
 
 ## Project Structure
 
@@ -378,8 +378,9 @@ literoom/
 
 | # | Date | Title |
 |---|------|-------|
-| [160](./iterations-161-170.md:3) | 2026-01-22 | GPU Acceleration - Implementation Plan Creation |
-| [159](./iterations-161-170.md:34) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
+| [161](./iterations-161-170.md:3) | 2026-01-22 | GPU Acceleration - Phase 1 Complete (Infrastructure & Detection) |
+| [160](./iterations-161-170.md:89) | 2026-01-22 | GPU Acceleration - Implementation Plan Creation |
+| [159](./iterations-161-170.md:120) | 2026-01-22 | Preview Priority Queue - Issue Verified & Closed |
 
 ---
 

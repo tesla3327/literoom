@@ -1,0 +1,61 @@
+/**
+ * GPU acceleration module for Literoom.
+ *
+ * This module provides WebGPU-based GPU acceleration for image processing
+ * operations, with automatic fallback to WASM when WebGPU is not available.
+ *
+ * @example
+ * ```typescript
+ * import { getAdaptiveProcessor, detectGPUCapabilities } from '@literoom/core'
+ *
+ * // Check capabilities
+ * const caps = await detectGPUCapabilities()
+ * console.log(`GPU available: ${caps.available}`)
+ *
+ * // Initialize processor
+ * const processor = getAdaptiveProcessor()
+ * await processor.initialize()
+ *
+ * // Execute operation with automatic backend selection
+ * const result = await processor.execute(
+ *   'adjustments',
+ *   width, height,
+ *   () => gpuAdjustments(pixels, adjustments),
+ *   () => wasmAdjustments(pixels, adjustments)
+ * )
+ * console.log(`Used ${result.backend} in ${result.timing}ms`)
+ * ```
+ */
+
+// Types
+export {
+  type ProcessingBackend,
+  type GPUCapabilities,
+  type GPUServiceState,
+  type GPUInitOptions,
+  type GPUOperation,
+  type ProcessingResult,
+  type GPUErrorCode,
+  GPUError,
+  DEFAULT_GPU_CAPABILITIES,
+  DEFAULT_GPU_INIT_OPTIONS,
+} from './types'
+
+// Capability detection
+export {
+  detectGPUCapabilities,
+  isWebGPUAvailable,
+  isImageSizeSupported,
+  GPUCapabilityService,
+  getGPUCapabilityService,
+  resetGPUCapabilityService,
+} from './capabilities'
+
+// Adaptive processor
+export {
+  type AdaptiveProcessorConfig,
+  type AdaptiveProcessorState,
+  AdaptiveProcessor,
+  getAdaptiveProcessor,
+  resetAdaptiveProcessor,
+} from './adaptive-processor'
