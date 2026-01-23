@@ -59,7 +59,16 @@ function handleUpdate(value: number | undefined) {
 }
 
 /**
- * Reset value to zero (double-click on label).
+ * Reset value to zero (double-click or Alt+click on label).
+ */
+function handleLabelClick(event: MouseEvent) {
+  if (event.altKey) {
+    emit('update:modelValue', 0)
+  }
+}
+
+/**
+ * Reset value to zero on double-click.
  */
 function handleDoubleClick() {
   emit('update:modelValue', 0)
@@ -68,10 +77,11 @@ function handleDoubleClick() {
 
 <template>
   <div class="flex items-center gap-3 py-1.5 group">
-    <!-- Label (double-click to reset) -->
+    <!-- Label (double-click or Alt+click to reset) -->
     <span
       class="w-24 text-sm text-gray-400 cursor-pointer select-none hover:text-gray-300"
-      :title="`Double-click to reset ${label}`"
+      :title="`Double-click or Alt+click to reset ${label}`"
+      @click="handleLabelClick"
       @dblclick="handleDoubleClick"
     >
       {{ label }}
@@ -92,7 +102,7 @@ function handleDoubleClick() {
     <span
       class="w-14 text-right text-sm font-mono tabular-nums"
       :class="[
-        modelValue === 0 ? 'text-gray-500' : 'text-gray-300'
+        modelValue === 0 ? 'text-gray-500' : 'text-gray-300',
       ]"
     >
       {{ displayValue }}
