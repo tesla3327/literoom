@@ -70,3 +70,55 @@ Phase 4 (Gradient Masks) is complete. Phase 5 moves histogram computation to GPU
 
 ---
 
+## 170: 2026-01-23 11:20 EST: GPU Acceleration - Phase 5.4 Complete (GPU Histogram Integration)
+
+**Objective**: Integrate GPU histogram computation into the histogram display composables for real-time updates.
+
+**Status**: Complete
+
+**Background**:
+Phase 5 (GPU Histogram) is complete except for UI integration. The GPU histogram service (`computeHistogramAdaptive`) is ready but not yet used by the histogram display composables. Currently, histogram computation uses WASM which is ~12ms per computation. GPU can reduce this to ~1ms.
+
+**Implementation Complete**:
+
+1. **useHistogramDisplay.ts** - Updated both computation functions:
+   - `computeHistogram()`: Now uses `computeHistogramAdaptive` with WASM fallback
+   - `computeHistogramFromPixels()`: Now uses `computeHistogramAdaptive` with WASM fallback
+   - Added logging to show backend (webgpu/wasm) and timing
+
+2. **useHistogramDisplaySVG.ts** - Updated both computation functions:
+   - `computeHistogram()`: Now uses `computeHistogramAdaptive` with WASM fallback
+   - `computeHistogramFromPixels()`: Now uses `computeHistogramAdaptive` with WASM fallback
+   - Added logging to show backend (webgpu/wasm) and timing
+
+**Files Modified** (2):
+- `apps/web/app/composables/useHistogramDisplay.ts`
+- `apps/web/app/composables/useHistogramDisplaySVG.ts`
+
+**Verification**:
+- ✅ All 1214 core tests pass
+- ✅ 899 of 900 web tests pass (1 pre-existing app component test failure)
+- ✅ GPU histogram import added correctly
+- ✅ Both composables use adaptive GPU/WASM selection
+
+**Phase 5 Status**: Complete
+- ✅ Phase 5.1: WGSL histogram shader with workgroup privatization
+- ✅ Phase 5.2: HistogramPipeline TypeScript wrapper
+- ✅ Phase 5.3: GPUHistogramService high-level service
+- ✅ Phase 5.4: Integration into edit preview pipeline
+
+**GPU Acceleration Status**:
+- Phase 1: Infrastructure & Detection ✅
+- Phase 2: Basic Adjustments Shader ✅
+- Phase 3: Tone Curve Shader ✅
+- Phase 4: Gradient Mask Shaders ✅
+- Phase 5: Histogram Computation ✅ **COMPLETE**
+- Phase 6: Transform Operations (next)
+- Phase 7: Pipeline Integration
+- Phase 8: UI Integration & Polish
+- Phase 9: Testing & Documentation
+
+**Next**: Phase 6 - Transform Operations (GPU rotation and resize)
+
+---
+

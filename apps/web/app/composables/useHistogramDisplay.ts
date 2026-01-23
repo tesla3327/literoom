@@ -9,6 +9,7 @@
  */
 import type { Ref } from 'vue'
 import type { HistogramData } from '@literoom/core/decode'
+import { computeHistogramAdaptive } from '@literoom/core/gpu'
 
 // ============================================================================
 // Types
@@ -413,8 +414,14 @@ export function useHistogramDisplay(
         return
       }
 
-      // Compute histogram via WASM worker
-      const result = await $decodeService.computeHistogram(pixels, width, height)
+      // Compute histogram via GPU (with WASM fallback)
+      const { result, backend, timing } = await computeHistogramAdaptive(
+        pixels,
+        width,
+        height,
+        () => $decodeService.computeHistogram(pixels, width, height),
+      )
+      console.log(`[useHistogramDisplay] Histogram computed via ${backend} in ${timing.toFixed(1)}ms`)
 
       // Check again if asset or generation changed
       if (cachedId !== assetId.value || computeGeneration.value !== currentGen) {
@@ -462,8 +469,14 @@ export function useHistogramDisplay(
     error.value = null
 
     try {
-      // Compute histogram via WASM worker
-      const result = await $decodeService.computeHistogram(pixels, width, height)
+      // Compute histogram via GPU (with WASM fallback)
+      const { result, backend, timing } = await computeHistogramAdaptive(
+        pixels,
+        width,
+        height,
+        () => $decodeService.computeHistogram(pixels, width, height),
+      )
+      console.log(`[useHistogramDisplay] Histogram (from pixels) computed via ${backend} in ${timing.toFixed(1)}ms`)
 
       // Check if generation changed (stale computation)
       if (computeGeneration.value !== currentGen) {

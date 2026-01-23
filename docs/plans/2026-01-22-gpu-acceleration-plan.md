@@ -165,11 +165,11 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 - [x] Multiple masks composite correctly (up to 8 each)
 - [x] Automatic fallback to WASM when GPU unavailable
 
-### Phase 5: Histogram Computation
+### Phase 5: Histogram Computation ✅ COMPLETE
 
 **Objective**: Move histogram computation to GPU
 
-**Status**: In Progress (Research Complete)
+**Status**: Complete
 
 **Research Findings** (from `docs/research/2026-01-23-gpu-histogram-synthesis.md`):
 - Global atomics cause 10-25x slowdown due to memory contention
@@ -204,11 +204,11 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 **Performance Target**: 12ms → 1ms (12x speedup)
 
 **Acceptance Criteria**:
-- [ ] Histogram values match WASM implementation
-- [ ] Per-channel (RGB) histograms correct
-- [ ] Luminance histogram correct
-- [ ] Clipping detection works correctly
-- [ ] Automatic fallback to WASM when GPU unavailable
+- [x] Histogram values match WASM implementation
+- [x] Per-channel (RGB) histograms correct
+- [x] Luminance histogram correct
+- [x] Clipping detection works correctly
+- [x] Automatic fallback to WASM when GPU unavailable
 
 ### Phase 6: Transform Operations
 

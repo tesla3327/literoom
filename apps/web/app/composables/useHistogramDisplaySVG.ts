@@ -6,6 +6,7 @@
  */
 import type { Ref } from 'vue'
 import type { HistogramData } from '@literoom/core/decode'
+import { computeHistogramAdaptive } from '@literoom/core/gpu'
 
 // ============================================================================
 // Types
@@ -387,7 +388,13 @@ export function useHistogramDisplaySVG(
         return
       }
 
-      const result = await $decodeService.computeHistogram(pixels, width, height)
+      const { result, backend, timing } = await computeHistogramAdaptive(
+        pixels,
+        width,
+        height,
+        () => $decodeService.computeHistogram(pixels, width, height)
+      )
+      console.log(`[useHistogramDisplaySVG] Histogram computed via ${backend} in ${timing.toFixed(1)}ms`)
 
       if (cachedId !== assetId.value || computeGeneration.value !== currentGen) {
         console.log('[useHistogramDisplaySVG] Discarding stale histogram result')
@@ -425,7 +432,13 @@ export function useHistogramDisplaySVG(
     error.value = null
 
     try {
-      const result = await $decodeService.computeHistogram(pixels, width, height)
+      const { result, backend, timing } = await computeHistogramAdaptive(
+        pixels,
+        width,
+        height,
+        () => $decodeService.computeHistogram(pixels, width, height)
+      )
+      console.log(`[useHistogramDisplaySVG] Adjusted-pixels histogram computed via ${backend} in ${timing.toFixed(1)}ms`)
 
       if (computeGeneration.value !== currentGen) {
         console.log('[useHistogramDisplaySVG] Discarding stale adjusted-pixels histogram result')
