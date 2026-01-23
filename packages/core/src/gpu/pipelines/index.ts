@@ -37,3 +37,10 @@ export {
   resetHistogramPipeline,
   type HistogramResult,
 } from './histogram-pipeline'
+
+export {
+  RotationPipeline,
+  getRotationPipeline,
+  resetRotationPipeline,
+  type RotationResult,
+} from './rotation-pipeline'

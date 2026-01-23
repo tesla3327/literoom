@@ -131,3 +131,11 @@ export {
   resetGPUHistogramService,
   computeHistogramAdaptive,
 } from './gpu-histogram-service'
+
+// GPU transform service
+export {
+  GPUTransformService,
+  getGPUTransformService,
+  resetGPUTransformService,
+  applyRotationAdaptive,
+} from './gpu-transform-service'

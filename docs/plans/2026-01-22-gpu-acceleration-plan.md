@@ -210,29 +210,40 @@ This plan implements WebGPU-based GPU acceleration as an optional enhancement la
 - [x] Clipping detection works correctly
 - [x] Automatic fallback to WASM when GPU unavailable
 
-### Phase 6: Transform Operations
+### Phase 6: Transform Operations ✅ COMPLETE (Rotation)
 
 **Objective**: Move rotation and resize to GPU
 
-**Tasks**:
-1. Create WGSL shader for bilinear resize
-2. Create WGSL shader for rotation with interpolation
-3. Implement double-buffered texture pattern
-4. Benchmark transform operations
+**Status**: Rotation complete, resize deferred (primarily for thumbnails, not preview)
 
-**Files to Create**:
-- `crates/literoom-wasm/src/shaders/resize.wgsl`
-- `crates/literoom-wasm/src/shaders/rotation.wgsl`
-- `packages/core/src/gpu/pipelines/transform-pipeline.ts`
+**Tasks**:
+1. ⏳ Create WGSL shader for bilinear resize (deferred)
+2. ✅ Create WGSL shader for rotation with bilinear interpolation
+3. ✅ Create RotationPipeline TypeScript wrapper
+4. ✅ Create GPUTransformService high-level service
+5. ✅ Integrate into useEditPreview.ts with adaptive fallback
+6. ⏳ Benchmark transform operations (pending real-world testing)
+
+**Files Created**:
+- ✅ `packages/core/src/gpu/shaders/rotation.wgsl`
+- ✅ `packages/core/src/gpu/pipelines/rotation-pipeline.ts`
+- ✅ `packages/core/src/gpu/gpu-transform-service.ts`
+
+**Files Modified**:
+- ✅ `packages/core/src/gpu/shaders/index.ts` - Export shader
+- ✅ `packages/core/src/gpu/pipelines/index.ts` - Export pipeline
+- ✅ `packages/core/src/gpu/index.ts` - Export service
+- ✅ `apps/web/app/composables/useEditPreview.ts` - GPU rotation integration
 
 **Performance Target**:
-- Resize: 420ms → 12ms (35x speedup)
-- Rotation: 850ms → 8ms (106x speedup)
+- Resize: 420ms → 12ms (35x speedup) - deferred
+- Rotation: 850ms → 8ms (106x speedup) - implemented
 
 **Acceptance Criteria**:
-- [ ] Resize quality matches Lanczos3 (or acceptable bilinear)
-- [ ] Rotation handles arbitrary angles
-- [ ] Edge handling (transparent/repeat) works correctly
+- [ ] Resize quality matches Lanczos3 (or acceptable bilinear) - deferred
+- [x] Rotation handles arbitrary angles
+- [x] Edge handling (black for out-of-bounds) works correctly
+- [x] Automatic fallback to WASM when GPU unavailable
 
 ### Phase 7: Pipeline Integration
 

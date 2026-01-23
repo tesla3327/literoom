@@ -21,7 +21,7 @@ import {
   getTotalRotation,
   ThumbnailPriority,
 } from '@literoom/core/catalog'
-import { applyMaskedAdjustmentsAdaptive } from '@literoom/core/gpu'
+import { applyMaskedAdjustmentsAdaptive, applyRotationAdaptive } from '@literoom/core/gpu'
 
 // ============================================================================
 // Types
@@ -534,14 +534,19 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         // ===== STEP 1: Apply rotation (if needed) =====
         const totalRotation = getTotalRotation(editStore.cropTransform.rotation)
         if (Math.abs(totalRotation) > 0.001) {
-          console.log('[useEditPreview] Applying rotation:', totalRotation, 'degrees')
-          const rotated = await $decodeService.applyRotation(
+          const { result: rotated, backend, timing } = await applyRotationAdaptive(
             currentPixels,
             currentWidth,
             currentHeight,
             totalRotation,
-            false, // Use bilinear for preview (fast)
+            // WASM fallback
+            () => $decodeService.applyRotation(
+              currentPixels, currentWidth, currentHeight,
+              totalRotation,
+              false, // bilinear for preview
+            )
           )
+          console.log(`[useEditPreview] Rotation via ${backend} in ${timing.toFixed(1)}ms`)
           currentPixels = rotated.pixels
           currentWidth = rotated.width
           currentHeight = rotated.height
