@@ -59,3 +59,32 @@ export {
   getAdaptiveProcessor,
   resetAdaptiveProcessor,
 } from './adaptive-processor'
+
+// GPU Pipelines
+export {
+  AdjustmentsPipeline,
+  getAdjustmentsPipeline,
+  resetAdjustmentsPipeline,
+  type BasicAdjustments,
+  DEFAULT_BASIC_ADJUSTMENTS,
+} from './pipelines'
+
+// Texture utilities
+export {
+  TextureUsage,
+  createTextureFromPixels,
+  createOutputTexture,
+  readTexturePixels,
+  TexturePool,
+  BufferPool,
+  DoubleBufferedTextures,
+  calculateDispatchSize,
+} from './texture-utils'
+
+// GPU adjustments service
+export {
+  GPUAdjustmentsService,
+  getGPUAdjustmentsService,
+  resetGPUAdjustmentsService,
+  applyAdjustmentsAdaptive,
+} from './gpu-adjustments-service'

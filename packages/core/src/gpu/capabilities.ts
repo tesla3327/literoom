@@ -274,18 +274,20 @@ export class GPUCapabilityService {
 
     try {
       // Request adapter
-      this._adapter = (await navigator.gpu.requestAdapter({
+      const adapter = await navigator.gpu.requestAdapter({
         powerPreference: this._options.preferHighPerformance
           ? 'high-performance'
           : 'low-power',
-      })) as ExtendedGPUAdapter | null
+      })
 
-      if (!this._adapter) {
+      if (!adapter) {
         throw new GPUError('No suitable GPU adapter found', 'ADAPTER_NOT_FOUND')
       }
 
+      this._adapter = adapter
+
       // Cast to extended adapter for checking fallback
-      const extAdapter = this._adapter as ExtendedGPUAdapter
+      const extAdapter = adapter as unknown as ExtendedGPUAdapter
 
       // Check for fallback adapter
       if (extAdapter.isFallbackAdapter && !this._options.allowFallbackAdapter) {

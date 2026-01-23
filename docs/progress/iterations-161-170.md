@@ -1,5 +1,86 @@
 # Iterations 161-170
 
+## 162: 2026-01-22 21:53 EST: GPU Acceleration - Phase 2 (Basic Adjustments Shader)
+
+**Objective**: Implement WGSL compute shader for all 10 basic adjustments and integrate with AdaptiveProcessor.
+
+**Background**:
+Phase 1 infrastructure is complete. Phase 2 implements the first GPU operation - basic adjustments (exposure, contrast, temperature, tint, saturation, vibrance, highlights, shadows, whites, blacks).
+
+**Performance Target**: 180ms → 8ms for 2560×1440 preview (22x speedup)
+
+**Implementation Complete**:
+
+1. **WGSL Adjustments Shader** (`packages/core/src/gpu/shaders/`):
+   - `adjustments.wgsl`: Full compute shader matching Rust implementation exactly
+   - All 10 adjustments: exposure, contrast, temperature, tint, highlights, shadows, whites, blacks, saturation, vibrance
+   - Uses 16×16 workgroups for efficient parallelization
+   - `index.ts`: Exports shader source as embedded string (avoids build system issues with raw imports)
+
+2. **Adjustments Pipeline** (`packages/core/src/gpu/pipelines/adjustments-pipeline.ts`):
+   - `AdjustmentsPipeline` class manages WebGPU compute pipeline lifecycle
+   - `apply()`: Full CPU→GPU→CPU path (upload pixels, process, download results)
+   - `applyToTextures()`: GPU-only path for chaining operations (avoids memory copies)
+   - Bind group layout for input texture, output storage texture, and uniform buffers
+   - Reusable uniform buffers for adjustments parameters and dimensions
+
+3. **Texture Utilities** (`packages/core/src/gpu/texture-utils.ts`):
+   - `createTextureFromPixels()`: Upload pixel data to GPU texture
+   - `createOutputTexture()`: Create empty storage texture for results
+   - `readTexturePixels()`: Download pixels from GPU texture
+   - `TexturePool`: Reuse textures to reduce allocation overhead
+   - `BufferPool`: Reuse staging buffers for readback
+   - `DoubleBufferedTextures`: Ping-pong pattern for multi-pass effects
+   - `calculateDispatchSize()`: Helper for workgroup dispatch dimensions
+
+4. **GPU Adjustments Service** (`packages/core/src/gpu/gpu-adjustments-service.ts`):
+   - `GPUAdjustmentsService`: High-level service matching DecodeService interface
+   - `applyAdjustments()`: Takes RGB pixels, handles RGB↔RGBA conversion
+   - `applyAdjustmentsRgba()`: More efficient RGBA path (no conversion)
+   - `applyAdjustmentsAdaptive()`: Convenience function for GPU/WASM selection
+
+**Files Created** (5):
+- `packages/core/src/gpu/shaders/adjustments.wgsl`
+- `packages/core/src/gpu/shaders/index.ts`
+- `packages/core/src/gpu/pipelines/adjustments-pipeline.ts`
+- `packages/core/src/gpu/pipelines/index.ts`
+- `packages/core/src/gpu/texture-utils.ts`
+- `packages/core/src/gpu/gpu-adjustments-service.ts`
+
+**Files Modified** (2):
+- `packages/core/src/gpu/index.ts` - Export new modules
+- `packages/core/src/gpu/capabilities.ts` - Fix adapter type casting
+
+**Verification**:
+- ✅ All 748 core package tests pass (1 pre-existing failure unrelated to changes)
+- ✅ No new type errors in GPU module
+
+**Architecture**:
+```
+App Code
+    │
+    ├── GPUAdjustmentsService.applyAdjustments(pixels, w, h, adjustments)
+    │       │
+    │       ├── RGB→RGBA conversion
+    │       │
+    │       └── AdjustmentsPipeline.apply()
+    │               │
+    │               ├── Create input texture
+    │               ├── Upload pixels (writeTexture)
+    │               ├── Create output texture
+    │               ├── Update uniform buffers
+    │               ├── Dispatch compute shader (16×16 workgroups)
+    │               ├── Copy output to staging buffer
+    │               ├── Map and read results
+    │               └── Return RGBA pixels
+    │
+    └── RGBA→RGB conversion
+```
+
+**Next**: Performance benchmarking and integration testing with actual preview rendering
+
+---
+
 ## 161: 2026-01-22 21:51 EST: GPU Acceleration - Phase 1 Complete (Infrastructure & Detection)
 
 **Objective**: Implement Phase 1 of the GPU acceleration plan - set up WebGPU capability detection and adaptive processor routing layer.
