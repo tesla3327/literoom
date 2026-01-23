@@ -29,7 +29,7 @@ When a user edits a photo and returns to the gallery, the thumbnail should displ
 ## Implementation Phases
 
 ### Phase 1: Worker Message Type (30 min)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Add new worker message type for generating edited thumbnails.
 
@@ -57,7 +57,7 @@ export type WorkerRequest =
 ---
 
 ### Phase 2: Worker Handler (1 hr)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
 Implement the edit pipeline in the decode worker.
 

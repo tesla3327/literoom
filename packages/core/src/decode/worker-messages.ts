@@ -5,7 +5,8 @@
  * Each message has a unique `id` for request/response correlation.
  */
 
-import type { Adjustments, ErrorCode } from './types'
+import type { Adjustments, ErrorCode, ToneCurve } from './types'
+import type { CropRectangle, RotationParameters } from '../catalog/types'
 
 /**
  * Mask stack data for masked adjustments request.
@@ -51,6 +52,7 @@ export type DecodeRequest =
   | ApplyCropRequest
   | EncodeJpegRequest
   | ApplyMaskedAdjustmentsRequest
+  | GenerateEditedThumbnailRequest
 
 /**
  * Decode a JPEG file to raw RGB pixels.
@@ -224,6 +226,38 @@ export interface ApplyMaskedAdjustmentsRequest {
 }
 
 /**
+ * Edit state for generating edited thumbnails.
+ * Contains all parameters needed to apply a full edit pipeline.
+ */
+export interface EditedThumbnailEditState {
+  /** Basic adjustments (exposure, contrast, etc.) */
+  adjustments?: Adjustments
+  /** Tone curve control points */
+  toneCurve?: ToneCurve
+  /** Crop region in normalized coordinates (0-1) */
+  crop?: CropRectangle | null
+  /** Rotation parameters (angle, straighten) */
+  rotation?: RotationParameters
+  /** Local adjustment masks */
+  masks?: MaskStackData
+}
+
+/**
+ * Generate a thumbnail with edits applied.
+ * Full pipeline: decode -> rotate -> crop -> adjust -> tone curve -> masks -> resize -> encode
+ */
+export interface GenerateEditedThumbnailRequest {
+  id: string
+  type: 'generate-edited-thumbnail'
+  /** Raw image bytes */
+  bytes: Uint8Array
+  /** Target thumbnail size (longest edge) */
+  size: number
+  /** Edit state to apply */
+  editState: EditedThumbnailEditState
+}
+
+/**
  * Response message sent from decode worker to main thread.
  */
 export type DecodeResponse =
@@ -232,6 +266,7 @@ export type DecodeResponse =
   | HistogramResponse
   | ToneCurveResponse
   | EncodeJpegResponse
+  | GenerateEditedThumbnailResponse
   | DecodeErrorResponse
 
 /**
@@ -308,5 +343,15 @@ export interface EncodeJpegResponse {
   id: string
   type: 'encode-jpeg-result'
   /** JPEG-encoded bytes */
+  bytes: Uint8Array
+}
+
+/**
+ * Edited thumbnail generation response.
+ */
+export interface GenerateEditedThumbnailResponse {
+  id: string
+  type: 'generate-edited-thumbnail-result'
+  /** JPEG-encoded thumbnail bytes with edits applied */
   bytes: Uint8Array
 }

@@ -114,3 +114,63 @@ Research synthesis was completed in `docs/research/2026-01-22-thumbnail-regenera
 
 **Estimated Time**: ~5.5 hours total
 
+---
+
+## 153: 2026-01-22 21:18 EST: Thumbnail Regeneration - Phase 1 & 2 Complete
+
+**Objective**: Implement worker message types and worker handler for edited thumbnail generation.
+
+**Implementation Status**: Phases 1 & 2 Complete
+
+### Phase 1: Worker Message Type
+
+Added new message types to `packages/core/src/decode/worker-messages.ts`:
+
+1. **`EditedThumbnailEditState`** - Contains all edit parameters:
+   - `adjustments`: Basic adjustments (exposure, contrast, etc.)
+   - `toneCurve`: Tone curve control points
+   - `crop`: Crop region in normalized coordinates
+   - `rotation`: Rotation parameters (angle, straighten)
+   - `masks`: Local adjustment masks (MaskStackData)
+
+2. **`GenerateEditedThumbnailRequest`** - Request to generate thumbnail with edits:
+   - `type: 'generate-edited-thumbnail'`
+   - `bytes`: Raw image bytes
+   - `size`: Target thumbnail size
+   - `editState`: Edit parameters to apply
+
+3. **`GenerateEditedThumbnailResponse`** - Response with encoded JPEG:
+   - `type: 'generate-edited-thumbnail-result'`
+   - `bytes`: JPEG-encoded thumbnail bytes
+
+### Phase 2: Worker Handler
+
+Implemented full edit pipeline in `packages/core/src/decode/decode-worker.ts`:
+
+**Pipeline Order** (same as export):
+1. Decode source image (RAW or JPEG auto-detected)
+2. Apply rotation (angle + straighten)
+3. Apply crop (normalized coordinates)
+4. Apply basic adjustments (10 parameters)
+5. Apply tone curve (from control points via LUT)
+6. Apply masked adjustments (linear and radial gradients)
+7. Resize to thumbnail size (generate_thumbnail)
+8. Encode to JPEG (quality 85)
+
+**Memory Management**:
+- Each intermediate image is freed via `.free()` after use
+- Final JPEG bytes transferred via postMessage to avoid copy
+
+**Files Modified** (3 files):
+- `packages/core/src/decode/worker-messages.ts` - New message types
+- `packages/core/src/decode/decode-worker.ts` - Handler implementation
+- `packages/core/src/decode/index.ts` - Export new types
+
+**Test Results**: 412 tests passing in @literoom/core
+
+**Next Steps**:
+- Phase 3: Add `generateEditedThumbnail()` to DecodeService
+- Phase 4: Add regeneration methods to ThumbnailService
+- Phase 5: CatalogService integration
+- Phase 6+: UI integration
+

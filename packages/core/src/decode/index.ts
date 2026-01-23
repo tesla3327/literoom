@@ -37,13 +37,16 @@ export {
   type ApplyToneCurveRequest,
   type EncodeJpegRequest,
   type ApplyMaskedAdjustmentsRequest,
+  type GenerateEditedThumbnailRequest,
   type MaskStackData,
+  type EditedThumbnailEditState,
   type DecodeResponse,
   type DecodeSuccessResponse,
   type FileTypeResponse,
   type HistogramResponse,
   type ToneCurveResponse,
   type EncodeJpegResponse,
+  type GenerateEditedThumbnailResponse,
   type DecodeErrorResponse
 } from './worker-messages'
 

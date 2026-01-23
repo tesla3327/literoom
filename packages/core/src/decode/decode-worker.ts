@@ -37,7 +37,8 @@ import type {
   DecodeErrorResponse,
   HistogramResponse,
   ToneCurveResponse,
-  EncodeJpegResponse
+  EncodeJpegResponse,
+  GenerateEditedThumbnailResponse
 } from './worker-messages'
 import type { ErrorCode } from './types'
 
@@ -492,6 +493,158 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
         // Free output image WASM memory
         outputImage.free()
+        break
+      }
+
+      case 'generate-edited-thumbnail': {
+        const { bytes, size, editState } = request
+
+        // Step 1: Decode source image
+        let currentImage: JsDecodedImage
+        if (is_raw_file(bytes)) {
+          currentImage = decode_raw_thumbnail(bytes)
+        } else {
+          currentImage = decode_jpeg(bytes)
+        }
+
+        // Step 2: Apply rotation (if any)
+        if (editState.rotation) {
+          const totalAngle =
+            (editState.rotation.angle ?? 0) + (editState.rotation.straighten ?? 0)
+          if (totalAngle !== 0) {
+            const rotatedImage = apply_rotation(currentImage, totalAngle, false) // bilinear for speed
+            currentImage.free()
+            currentImage = rotatedImage
+          }
+        }
+
+        // Step 3: Apply crop (if any)
+        if (editState.crop) {
+          const croppedImage = apply_crop(
+            currentImage,
+            editState.crop.left,
+            editState.crop.top,
+            editState.crop.width,
+            editState.crop.height
+          )
+          currentImage.free()
+          currentImage = croppedImage
+        }
+
+        // Step 4: Apply basic adjustments (if any)
+        if (editState.adjustments) {
+          const wasmAdj = new BasicAdjustments()
+          wasmAdj.temperature = editState.adjustments.temperature ?? 0
+          wasmAdj.tint = editState.adjustments.tint ?? 0
+          wasmAdj.exposure = editState.adjustments.exposure ?? 0
+          wasmAdj.contrast = editState.adjustments.contrast ?? 0
+          wasmAdj.highlights = editState.adjustments.highlights ?? 0
+          wasmAdj.shadows = editState.adjustments.shadows ?? 0
+          wasmAdj.whites = editState.adjustments.whites ?? 0
+          wasmAdj.blacks = editState.adjustments.blacks ?? 0
+          wasmAdj.vibrance = editState.adjustments.vibrance ?? 0
+          wasmAdj.saturation = editState.adjustments.saturation ?? 0
+
+          const adjustedImage = apply_adjustments(currentImage, wasmAdj)
+          currentImage.free()
+          wasmAdj.free()
+          currentImage = adjustedImage
+        }
+
+        // Step 5: Apply tone curve (if any)
+        if (editState.toneCurve && editState.toneCurve.points && editState.toneCurve.points.length > 0) {
+          const lut = new JsToneCurveLut(editState.toneCurve.points)
+          const curvedImage = apply_tone_curve(currentImage, lut)
+          currentImage.free()
+          lut.free()
+          currentImage = curvedImage
+        }
+
+        // Step 6: Apply masked adjustments (if any)
+        if (editState.masks) {
+          const hasEnabledMasks =
+            (editState.masks.linearMasks?.length ?? 0) > 0 ||
+            (editState.masks.radialMasks?.length ?? 0) > 0
+
+          if (hasEnabledMasks) {
+            const wasmMaskData = {
+              linear_masks: (editState.masks.linearMasks || [])
+                .filter(m => m.enabled)
+                .map(m => ({
+                  start_x: m.startX,
+                  start_y: m.startY,
+                  end_x: m.endX,
+                  end_y: m.endY,
+                  feather: m.feather,
+                  enabled: true,
+                  adjustments: {
+                    exposure: m.adjustments.exposure ?? 0,
+                    contrast: m.adjustments.contrast ?? 0,
+                    highlights: m.adjustments.highlights ?? 0,
+                    shadows: m.adjustments.shadows ?? 0,
+                    whites: m.adjustments.whites ?? 0,
+                    blacks: m.adjustments.blacks ?? 0,
+                    temperature: m.adjustments.temperature ?? 0,
+                    tint: m.adjustments.tint ?? 0,
+                    saturation: m.adjustments.saturation ?? 0,
+                    vibrance: m.adjustments.vibrance ?? 0,
+                  },
+                })),
+              radial_masks: (editState.masks.radialMasks || [])
+                .filter(m => m.enabled)
+                .map(m => ({
+                  center_x: m.centerX,
+                  center_y: m.centerY,
+                  radius_x: m.radiusX,
+                  radius_y: m.radiusY,
+                  rotation: m.rotation,
+                  feather: m.feather,
+                  invert: m.invert,
+                  enabled: true,
+                  adjustments: {
+                    exposure: m.adjustments.exposure ?? 0,
+                    contrast: m.adjustments.contrast ?? 0,
+                    highlights: m.adjustments.highlights ?? 0,
+                    shadows: m.adjustments.shadows ?? 0,
+                    whites: m.adjustments.whites ?? 0,
+                    blacks: m.adjustments.blacks ?? 0,
+                    temperature: m.adjustments.temperature ?? 0,
+                    tint: m.adjustments.tint ?? 0,
+                    saturation: m.adjustments.saturation ?? 0,
+                    vibrance: m.adjustments.vibrance ?? 0,
+                  },
+                })),
+            }
+
+            const maskedImage = apply_masked_adjustments(currentImage, wasmMaskData)
+            currentImage.free()
+            currentImage = maskedImage
+          }
+        }
+
+        // Step 7: Resize to thumbnail size
+        const resizedImage = generate_thumbnail(currentImage, size)
+        currentImage.free()
+
+        // Step 8: Encode to JPEG
+        const resizedPixels = resizedImage.pixels()
+        const thumbnailBytes = encode_jpeg(
+          resizedPixels,
+          resizedImage.width,
+          resizedImage.height,
+          85 // JPEG quality for thumbnails
+        )
+
+        resizedImage.free()
+
+        const editedThumbResponse: GenerateEditedThumbnailResponse = {
+          id,
+          type: 'generate-edited-thumbnail-result',
+          bytes: thumbnailBytes
+        }
+
+        // Transfer the JPEG buffer to avoid copying
+        self.postMessage(editedThumbResponse, [thumbnailBytes.buffer])
         break
       }
 
