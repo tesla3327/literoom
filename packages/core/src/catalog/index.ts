@@ -83,7 +83,7 @@ export {
 
 // Services
 export { ScanService, createScanService } from './scan-service'
-export { ThumbnailQueue, createThumbnailQueue } from './thumbnail-queue'
+export { ThumbnailQueue, createThumbnailQueue, type ThumbnailQueueItemWithEditState } from './thumbnail-queue'
 export {
   MemoryThumbnailCache,
   OPFSThumbnailCache,

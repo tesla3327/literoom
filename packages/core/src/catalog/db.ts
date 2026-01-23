@@ -91,6 +91,21 @@ export interface CacheMetadataRecord {
   preview2xReady: boolean
 }
 
+/**
+ * Database record for edit states using asset UUID.
+ * This allows edit state persistence independent of the catalog database IDs.
+ */
+export interface EditStateRecord {
+  /** Asset UUID (primary key) */
+  assetUuid: string
+  /** Schema version for migrations */
+  schemaVersion: number
+  /** Last update timestamp */
+  updatedAt: Date
+  /** JSON serialized edit state */
+  editState: string
+}
+
 // ============================================================================
 // Database Class
 // ============================================================================
@@ -100,7 +115,7 @@ export interface CacheMetadataRecord {
  *
  * Index design:
  * - assets: Compound indexes for efficient filtering by flag + date
- * - folders: Unique path index for lookup
+ * - folders: Unique path index for lookup, lastScanDate for sorting
  * - edits: Unique assetId for 1:1 relationship
  * - cacheMetadata: Unique assetId for 1:1 relationship
  */
@@ -109,6 +124,7 @@ export class LiteroomDB extends Dexie {
   folders!: Table<FolderRecord, number>
   edits!: Table<EditRecord, number>
   cacheMetadata!: Table<CacheMetadataRecord, number>
+  editStates!: Table<EditStateRecord, string>
 
   constructor() {
     super('LiteroomCatalog')
@@ -134,6 +150,28 @@ export class LiteroomDB extends Dexie {
 
       // Cache metadata with unique assetId (1:1 with assets)
       cacheMetadata: '&assetId',
+    })
+
+    // Version 2: Add editStates table for UUID-based edit state persistence
+    this.version(2).stores({
+      // Keep existing tables unchanged
+      assets:
+        '++id, &uuid, folderId, path, filename, flag, captureDate, [flag+captureDate], [folderId+captureDate]',
+      folders: '++id, &path',
+      edits: '&assetId, schemaVersion',
+      cacheMetadata: '&assetId',
+      // New editStates table using asset UUID as primary key
+      editStates: '&assetUuid, updatedAt',
+    })
+
+    // Version 3: Add lastScanDate index to folders for recent folders feature
+    this.version(3).stores({
+      assets:
+        '++id, &uuid, folderId, path, filename, flag, captureDate, [flag+captureDate], [folderId+captureDate]',
+      folders: '++id, &path, lastScanDate',
+      edits: '&assetId, schemaVersion',
+      cacheMetadata: '&assetId',
+      editStates: '&assetUuid, updatedAt',
     })
   }
 }
@@ -244,4 +282,87 @@ export async function assetExistsByPath(folderId: number, path: string): Promise
  */
 export async function getFolderByPath(path: string): Promise<FolderRecord | undefined> {
   return db.folders.where('path').equals(path).first()
+}
+
+// ============================================================================
+// Edit State Persistence Utilities
+// ============================================================================
+
+/**
+ * Save an edit state to IndexedDB.
+ * Uses put() for upsert behavior (insert or update).
+ */
+export async function saveEditStateToDb(
+  assetUuid: string,
+  editState: unknown,
+  schemaVersion: number
+): Promise<void> {
+  await db.editStates.put({
+    assetUuid,
+    schemaVersion,
+    updatedAt: new Date(),
+    editState: JSON.stringify(editState),
+  })
+}
+
+/**
+ * Load an edit state from IndexedDB.
+ * Returns null if not found.
+ */
+export async function loadEditStateFromDb(assetUuid: string): Promise<{
+  editState: unknown
+  schemaVersion: number
+  updatedAt: Date
+} | null> {
+  const record = await db.editStates.get(assetUuid)
+  if (!record) {
+    return null
+  }
+
+  try {
+    return {
+      editState: JSON.parse(record.editState),
+      schemaVersion: record.schemaVersion,
+      updatedAt: record.updatedAt,
+    }
+  }
+  catch {
+    // If JSON parsing fails, return null
+    console.error('[db] Failed to parse edit state for asset:', assetUuid)
+    return null
+  }
+}
+
+/**
+ * Load all edit states from IndexedDB.
+ * Returns a Map of assetUuid -> parsed edit state.
+ */
+export async function loadAllEditStatesFromDb(): Promise<Map<string, unknown>> {
+  const records = await db.editStates.toArray()
+  const result = new Map<string, unknown>()
+
+  for (const record of records) {
+    try {
+      result.set(record.assetUuid, JSON.parse(record.editState))
+    }
+    catch {
+      console.error('[db] Failed to parse edit state for asset:', record.assetUuid)
+    }
+  }
+
+  return result
+}
+
+/**
+ * Delete an edit state from IndexedDB.
+ */
+export async function deleteEditStateFromDb(assetUuid: string): Promise<void> {
+  await db.editStates.delete(assetUuid)
+}
+
+/**
+ * Delete multiple edit states from IndexedDB.
+ */
+export async function deleteEditStatesFromDb(assetUuids: string[]): Promise<void> {
+  await db.editStates.bulkDelete(assetUuids)
 }

@@ -36,6 +36,10 @@ import {
   isModifiedCropTransform,
   isModifiedMaskStack,
   isModifiedToneCurve,
+  loadAllEditStatesFromDb,
+  loadEditStateFromDb,
+  migrateEditState,
+  saveEditStateToDb,
 } from '@literoom/core/catalog'
 import type { CurvePoint, ToneCurve } from '@literoom/core/decode'
 import { DEFAULT_TONE_CURVE } from '@literoom/core/decode'
@@ -88,9 +92,19 @@ export const useEditStore = defineStore('edit', () => {
   /**
    * In-memory cache of edit states per asset.
    * This allows edits to persist within a session when switching between images.
-   * Note: This is NOT persisted to database - edits are lost on page refresh.
+   * Backed by IndexedDB for persistence across page refreshes.
    */
   const editCache = ref<Map<string, EditState>>(new Map())
+
+  /**
+   * Whether the edit cache has been initialized from IndexedDB.
+   */
+  const isInitialized = ref(false)
+
+  /**
+   * Whether initialization is currently in progress.
+   */
+  const isInitializing = ref(false)
 
   // ============================================================================
   // Computed
@@ -151,10 +165,11 @@ export const useEditStore = defineStore('edit', () => {
 
   /**
    * Load edit state for an asset.
-   * First checks the in-memory cache, then falls back to defaults.
+   * First checks the in-memory cache, then IndexedDB, then falls back to defaults.
    * Saves current edits to cache before switching.
    */
   async function loadForAsset(assetId: string): Promise<void> {
+    console.log('[EditStore] loadForAsset called for:', assetId, 'isInitialized:', isInitialized.value, 'cacheSize:', editCache.value.size)
     // Save current edits to cache before switching
     if (currentAssetId.value && isDirty.value) {
       saveToCache(currentAssetId.value)
@@ -163,19 +178,36 @@ export const useEditStore = defineStore('edit', () => {
     currentAssetId.value = assetId
     error.value = null
 
-    // Try to load from cache
+    // Try to load from in-memory cache first
     const cached = editCache.value.get(assetId)
+    console.log('[EditStore] Cache lookup for', assetId, ':', cached ? 'FOUND' : 'NOT FOUND')
     if (cached) {
-      adjustments.value = { ...cached.adjustments }
-      cropTransform.value = cloneCropTransform(cached.cropTransform)
-      masks.value = cached.masks ? cloneMaskStack(cached.masks) : null
-      selectedMaskId.value = null
-      isDirty.value = false
+      console.log('[EditStore] Using cached edit state, exposure:', cached.adjustments?.exposure)
+      applyEditState(cached)
       return
     }
 
-    // TODO: Load from database once full persistence is implemented
-    // For now, initialize with defaults
+    // Try to load from IndexedDB
+    try {
+      console.log('[EditStore] Checking IndexedDB for:', assetId)
+      const dbRecord = await loadEditStateFromDb(assetId)
+      console.log('[EditStore] IndexedDB result for', assetId, ':', dbRecord ? 'FOUND' : 'NOT FOUND')
+      if (dbRecord) {
+        // Migrate if needed and apply
+        const migrated = migrateEditState(dbRecord.editState)
+        console.log('[EditStore] Using IndexedDB edit state, exposure:', migrated.adjustments?.exposure)
+        // Store in memory cache for future access
+        editCache.value.set(assetId, migrated)
+        applyEditState(migrated)
+        return
+      }
+    }
+    catch (err) {
+      console.error('[EditStore] Failed to load from IndexedDB:', err)
+      // Continue with defaults on error
+    }
+
+    // Initialize with defaults
     adjustments.value = { ...DEFAULT_ADJUSTMENTS }
     cropTransform.value = cloneCropTransform(DEFAULT_CROP_TRANSFORM)
     masks.value = null
@@ -184,14 +216,78 @@ export const useEditStore = defineStore('edit', () => {
   }
 
   /**
-   * Save current edit state to the in-memory cache.
+   * Apply an edit state to the current reactive state.
+   */
+  function applyEditState(state: EditState): void {
+    adjustments.value = { ...state.adjustments }
+    cropTransform.value = cloneCropTransform(state.cropTransform)
+    masks.value = state.masks ? cloneMaskStack(state.masks) : null
+    selectedMaskId.value = null
+    isDirty.value = false
+  }
+
+  /**
+   * Initialize the in-memory cache from IndexedDB.
+   * This should be called when the application starts up.
+   * Returns the number of edit states loaded.
+   */
+  async function initializeFromDb(): Promise<number> {
+    console.log('[EditStore] initializeFromDb called, isInitialized:', isInitialized.value, 'isInitializing:', isInitializing.value)
+    if (isInitialized.value || isInitializing.value) {
+      console.log('[EditStore] Already initialized/initializing, returning cache size:', editCache.value.size)
+      return editCache.value.size
+    }
+
+    isInitializing.value = true
+
+    try {
+      const allEditStates = await loadAllEditStatesFromDb()
+      console.log('[EditStore] Loaded', allEditStates.size, 'edit states from IndexedDB')
+      let loadedCount = 0
+
+      for (const [assetUuid, rawState] of allEditStates) {
+        try {
+          const migrated = migrateEditState(rawState)
+          editCache.value.set(assetUuid, migrated)
+          loadedCount++
+        }
+        catch (err) {
+          console.error(`[EditStore] Failed to migrate edit state for ${assetUuid}:`, err)
+        }
+      }
+
+      isInitialized.value = true
+      return loadedCount
+    }
+    catch (err) {
+      console.error('[EditStore] Failed to initialize from IndexedDB:', err)
+      // Mark as initialized even on failure to prevent infinite retry loops
+      isInitialized.value = true
+      return 0
+    }
+    finally {
+      isInitializing.value = false
+    }
+  }
+
+  /**
+   * Save current edit state to the in-memory cache and persist to IndexedDB.
+   * IndexedDB persistence is async and non-blocking.
    */
   function saveToCache(assetId: string): void {
-    editCache.value.set(assetId, {
+    const state: EditState = {
       version: EDIT_SCHEMA_VERSION,
       adjustments: { ...adjustments.value },
       cropTransform: cloneCropTransform(cropTransform.value),
       masks: masks.value ? cloneMaskStack(masks.value) : undefined,
+    }
+
+    // Update in-memory cache immediately
+    editCache.value.set(assetId, state)
+
+    // Persist to IndexedDB asynchronously (don't block the UI)
+    saveEditStateToDb(assetId, state, EDIT_SCHEMA_VERSION).catch((err) => {
+      console.error('[EditStore] Failed to persist edit state to IndexedDB:', err)
     })
   }
 
@@ -229,7 +325,7 @@ export const useEditStore = defineStore('edit', () => {
    * Mark the edit state as dirty and update the cache.
    */
   function markDirty(): void {
-    markDirty()
+    isDirty.value = true
     // Update cache immediately so export always has latest edits
     if (currentAssetId.value) {
       saveToCache(currentAssetId.value)
@@ -623,6 +719,8 @@ export const useEditStore = defineStore('edit', () => {
     isDirty,
     isSaving,
     error,
+    isInitialized: readonly(isInitialized),
+    isInitializing: readonly(isInitializing),
 
     // Computed
     hasModifications,
@@ -639,6 +737,7 @@ export const useEditStore = defineStore('edit', () => {
     reset,
     save,
     clear,
+    initializeFromDb,
 
     // Tone Curve Actions
     setToneCurve,
