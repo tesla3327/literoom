@@ -34,8 +34,8 @@ export interface UseHistogramDisplaySVGReturn {
 export const SVG_WIDTH = 256
 export const SVG_HEIGHT = 192
 
-/** Debounce delay for histogram computation (longer than preview) */
-const HISTOGRAM_DEBOUNCE_MS = 500
+/** Throttle delay for histogram computation (longer than preview) */
+const HISTOGRAM_THROTTLE_MS = 250
 
 /** How many bins to sample (lower = smoother, higher = more detail) */
 const SAMPLE_RATE = 4 // Sample every 4th bin (64 points total)
@@ -173,33 +173,60 @@ function histogramToStrokePath(
 }
 
 // ============================================================================
-// Debounce Utility
+// Throttle Utility
 // ============================================================================
 
-function debounce<T extends (...args: unknown[]) => void>(
+/**
+ * Throttle function with leading and trailing edge execution.
+ * - First call executes immediately (leading edge) for responsive feel
+ * - Subsequent calls during the delay period are throttled
+ * - Last call is guaranteed to execute (trailing edge) to capture final value
+ */
+function throttle<T extends (...args: unknown[]) => void>(
   fn: T,
   delay: number,
 ): T & { cancel: () => void } {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
+  let lastArgs: Parameters<T> | null = null
+  let lastCallTime = 0
 
-  const debounced = (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId)
-    }
-    timeoutId = setTimeout(() => {
+  const throttled = (...args: Parameters<T>) => {
+    const now = Date.now()
+    const timeSinceLastCall = now - lastCallTime
+
+    // If enough time has passed, execute immediately (leading edge)
+    if (timeSinceLastCall >= delay) {
+      lastCallTime = now
       fn(...args)
-      timeoutId = null
-    }, delay)
+      return
+    }
+
+    // Store args for trailing edge execution
+    lastArgs = args
+
+    // Schedule trailing edge if not already scheduled
+    if (timeoutId === null) {
+      const remainingTime = delay - timeSinceLastCall
+      timeoutId = setTimeout(() => {
+        timeoutId = null
+        if (lastArgs !== null) {
+          lastCallTime = Date.now()
+          fn(...lastArgs)
+          lastArgs = null
+        }
+      }, remainingTime)
+    }
   }
 
-  debounced.cancel = () => {
+  throttled.cancel = () => {
     if (timeoutId !== null) {
       clearTimeout(timeoutId)
       timeoutId = null
     }
+    lastArgs = null
   }
 
-  return debounced as T & { cancel: () => void }
+  return throttled as T & { cancel: () => void }
 }
 
 // ============================================================================
@@ -419,12 +446,12 @@ export function useHistogramDisplaySVG(
   }
 
   /**
-   * Debounced histogram computation for adjusted pixels.
+   * Throttled histogram computation for adjusted pixels.
    * Stores the pending pixels to avoid closure issues with typed parameters.
    */
   let pendingAdjustedPixels: { pixels: Uint8Array; width: number; height: number } | null = null
 
-  const debouncedComputeFromPixels = debounce(() => {
+  const throttledComputeFromPixels = throttle(() => {
     if (pendingAdjustedPixels) {
       computeHistogramFromPixels(
         pendingAdjustedPixels.pixels,
@@ -432,19 +459,19 @@ export function useHistogramDisplaySVG(
         pendingAdjustedPixels.height,
       )
     }
-  }, HISTOGRAM_DEBOUNCE_MS)
+  }, HISTOGRAM_THROTTLE_MS)
 
   /**
-   * Schedule debounced histogram computation from adjusted pixels.
+   * Schedule throttled histogram computation from adjusted pixels.
    */
   function scheduleComputeFromPixels(pixels: Uint8Array, width: number, height: number) {
     pendingAdjustedPixels = { pixels, width, height }
-    debouncedComputeFromPixels()
+    throttledComputeFromPixels()
   }
 
-  const debouncedCompute = debounce(() => {
+  const throttledCompute = throttle(() => {
     computeHistogram()
-  }, HISTOGRAM_DEBOUNCE_MS)
+  }, HISTOGRAM_THROTTLE_MS)
 
   // ============================================================================
   // Watchers
@@ -462,7 +489,7 @@ export function useHistogramDisplaySVG(
       computeGeneration.value++
       const currentGen = computeGeneration.value
 
-      debouncedCompute.cancel()
+      throttledCompute.cancel()
       error.value = null
       sourceCache.value = null
       histogram.value = null
@@ -538,7 +565,7 @@ export function useHistogramDisplaySVG(
     () => editStore.adjustments,
     () => {
       if (!adjustedPixelsRef && sourceCache.value) {
-        debouncedCompute()
+        throttledCompute()
       }
     },
     { deep: true },
@@ -549,8 +576,8 @@ export function useHistogramDisplaySVG(
   // ============================================================================
 
   onUnmounted(() => {
-    debouncedCompute.cancel()
-    debouncedComputeFromPixels.cancel()
+    throttledCompute.cancel()
+    throttledComputeFromPixels.cancel()
   })
 
   return {
