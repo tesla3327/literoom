@@ -26,6 +26,10 @@ import {
   applyRotationAdaptive,
   applyAdjustmentsAdaptive,
   applyToneCurveFromPointsAdaptive,
+  getGPUEditPipeline,
+  type EditPipelineParams,
+  type MaskStackInput,
+  type BasicAdjustments,
 } from '@literoom/core/gpu'
 
 // ============================================================================
@@ -88,11 +92,11 @@ export interface UseEditPreviewReturn {
   /** Clipping map for overlay rendering */
   clippingMap: Ref<ClippingMap | null>
   /** Dimensions of the current preview image */
-  previewDimensions: Ref<{ width: number; height: number } | null>
+  previewDimensions: Ref<{ width: number, height: number } | null>
   /** Adjusted pixel data (RGB, 3 bytes per pixel) for histogram computation */
   adjustedPixels: Ref<Uint8Array | null>
   /** Dimensions of the adjusted pixels */
-  adjustedDimensions: Ref<{ width: number; height: number } | null>
+  adjustedDimensions: Ref<{ width: number, height: number } | null>
   /** Whether we're waiting for a high-quality preview to load (never show thumbnail) */
   isWaitingForPreview: Ref<boolean>
 }
@@ -214,7 +218,7 @@ async function pixelsToUrl(
  */
 async function loadImagePixels(
   url: string,
-): Promise<{ pixels: Uint8Array; width: number; height: number }> {
+): Promise<{ pixels: Uint8Array, width: number, height: number }> {
   // Load image
   const img = new Image()
   img.crossOrigin = 'anonymous'
@@ -319,6 +323,129 @@ function detectClippedPixels(
 }
 
 // ============================================================================
+// GPU Pipeline Helpers
+// ============================================================================
+
+/**
+ * Convert partial mask adjustments to GPU-compatible format with defaults.
+ * The catalog stores mask adjustments as Partial<Adjustments>, but GPU needs all values.
+ */
+function convertMaskAdjustments(adj: {
+  exposure?: number
+  contrast?: number
+  temperature?: number
+  tint?: number
+  highlights?: number
+  shadows?: number
+  saturation?: number
+  vibrance?: number
+}): {
+  exposure: number
+  contrast: number
+  temperature: number
+  tint: number
+  highlights: number
+  shadows: number
+  saturation: number
+  vibrance: number
+} {
+  return {
+    exposure: adj.exposure ?? 0,
+    contrast: adj.contrast ?? 0,
+    temperature: adj.temperature ?? 0,
+    tint: adj.tint ?? 0,
+    highlights: adj.highlights ?? 0,
+    shadows: adj.shadows ?? 0,
+    saturation: adj.saturation ?? 0,
+    vibrance: adj.vibrance ?? 0,
+  }
+}
+
+/**
+ * Convert edit store masks to GPU MaskStackInput format.
+ * This helper bridges the store's mask format with the GPU pipeline's expected format.
+ */
+function convertMasksToGPUFormat(masks: {
+  readonly linearMasks: readonly {
+    readonly start: { readonly x: number, readonly y: number }
+    readonly end: { readonly x: number, readonly y: number }
+    readonly feather: number
+    readonly enabled: boolean
+    readonly adjustments: {
+      readonly exposure?: number
+      readonly contrast?: number
+      readonly temperature?: number
+      readonly tint?: number
+      readonly highlights?: number
+      readonly shadows?: number
+      readonly saturation?: number
+      readonly vibrance?: number
+    }
+  }[]
+  readonly radialMasks: readonly {
+    readonly center: { readonly x: number, readonly y: number }
+    readonly radiusX: number
+    readonly radiusY: number
+    readonly rotation: number
+    readonly feather: number
+    readonly invert: boolean
+    readonly enabled: boolean
+    readonly adjustments: {
+      readonly exposure?: number
+      readonly contrast?: number
+      readonly temperature?: number
+      readonly tint?: number
+      readonly highlights?: number
+      readonly shadows?: number
+      readonly saturation?: number
+      readonly vibrance?: number
+    }
+  }[]
+} | null): MaskStackInput {
+  return {
+    linearMasks: masks?.linearMasks.map(m => ({
+      startX: m.start.x,
+      startY: m.start.y,
+      endX: m.end.x,
+      endY: m.end.y,
+      feather: m.feather,
+      enabled: m.enabled,
+      adjustments: convertMaskAdjustments(m.adjustments),
+    })) ?? [],
+    radialMasks: masks?.radialMasks.map(m => ({
+      centerX: m.center.x,
+      centerY: m.center.y,
+      radiusX: m.radiusX,
+      radiusY: m.radiusY,
+      rotation: m.rotation,
+      feather: m.feather,
+      invert: m.invert,
+      enabled: m.enabled,
+      adjustments: convertMaskAdjustments(m.adjustments),
+    })) ?? [],
+  }
+}
+
+/**
+ * Convert Adjustments to BasicAdjustments format for GPU pipeline.
+ * Strips the toneCurve field which is handled separately.
+ */
+function convertToBasicAdjustments(adjustments: Adjustments): BasicAdjustments {
+  return {
+    temperature: adjustments.temperature,
+    tint: adjustments.tint,
+    exposure: adjustments.exposure,
+    contrast: adjustments.contrast,
+    highlights: adjustments.highlights,
+    shadows: adjustments.shadows,
+    whites: adjustments.whites,
+    blacks: adjustments.blacks,
+    vibrance: adjustments.vibrance,
+    saturation: adjustments.saturation,
+  }
+}
+
+// ============================================================================
 // Composable
 // ============================================================================
 
@@ -356,13 +483,13 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   const clippingMap = ref<ClippingMap | null>(null)
 
   /** Dimensions of the current preview image */
-  const previewDimensions = ref<{ width: number; height: number } | null>(null)
+  const previewDimensions = ref<{ width: number, height: number } | null>(null)
 
   /** Adjusted pixel data (RGB, 3 bytes per pixel) for histogram computation */
   const adjustedPixels = shallowRef<Uint8Array | null>(null)
 
   /** Dimensions of the adjusted pixels */
-  const adjustedDimensions = shallowRef<{ width: number; height: number } | null>(null)
+  const adjustedDimensions = shallowRef<{ width: number, height: number } | null>(null)
 
   /** Whether we're waiting for a high-quality preview to load (never show thumbnail in edit view) */
   const isWaitingForPreview = ref(false)
@@ -531,123 +658,264 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         adjustedDimensions.value = { width, height }
       }
       else {
-        // Apply transforms and adjustments via WASM
+        // Apply transforms and adjustments
+        // Uses unified GPU pipeline when possible for maximum performance (1 GPU round-trip)
         let currentPixels = pixels
         let currentWidth = width
         let currentHeight = height
 
-        // ===== STEP 1: Apply rotation (if needed) =====
-        const totalRotation = getTotalRotation(editStore.cropTransform.rotation)
-        if (Math.abs(totalRotation) > 0.001) {
-          const { result: rotated, backend, timing } = await applyRotationAdaptive(
-            currentPixels,
-            currentWidth,
-            currentHeight,
-            totalRotation,
-            // WASM fallback
-            () => $decodeService.applyRotation(
-              currentPixels, currentWidth, currentHeight,
-              totalRotation,
-              false, // bilinear for preview
-            )
-          )
-          console.log(`[useEditPreview] Rotation via ${backend} in ${timing.toFixed(1)}ms`)
-          currentPixels = rotated.pixels
-          currentWidth = rotated.width
-          currentHeight = rotated.height
-        }
-
-        // ===== STEP 2: Apply crop (if needed) =====
+        // Check if crop is needed (determines which GPU path to use)
         const crop = editStore.cropTransform.crop
-        if (crop) {
-          console.log('[useEditPreview] Applying crop:', crop)
-          const cropped = await $decodeService.applyCrop(
-            currentPixels,
-            currentWidth,
-            currentHeight,
-            crop,
-          )
-          currentPixels = cropped.pixels
-          currentWidth = cropped.width
-          currentHeight = cropped.height
+        const totalRotation = getTotalRotation(editStore.cropTransform.rotation)
+        const hasCrop = !!crop
+        const hasRotation = Math.abs(totalRotation) > 0.001
+        const hasToneCurve = isModifiedToneCurve(adjustments.toneCurve)
+
+        // Try to use the unified GPU pipeline for better performance
+        let usedUnifiedPipeline = false
+
+        // Get the GPU edit pipeline (singleton)
+        const gpuPipeline = getGPUEditPipeline()
+
+        // Initialize pipeline if not ready
+        let pipelineReady = gpuPipeline.isReady
+        if (!pipelineReady) {
+          try {
+            pipelineReady = await gpuPipeline.initialize()
+          }
+          catch (e) {
+            console.warn('[useEditPreview] GPU pipeline initialization failed:', e)
+            pipelineReady = false
+          }
         }
 
-        // ===== STEP 3: Apply basic adjustments (exposure, contrast, etc.) =====
-        // Uses GPU-accelerated processing when available, falls back to WASM
-        if (hasAdjustments) {
-          const { result, backend, timing } = await applyAdjustmentsAdaptive(
-            currentPixels,
-            currentWidth,
-            currentHeight,
-            adjustments,
-            // WASM fallback
-            () => $decodeService.applyAdjustments(
-              currentPixels, currentWidth, currentHeight, adjustments,
+        if (pipelineReady && !hasCrop) {
+          // ===== PATH A: No crop - Use unified pipeline for ALL operations =====
+          // This gives us 1 GPU round-trip instead of 4
+          try {
+            const pipelineParams: EditPipelineParams = {}
+
+            // Add rotation if needed
+            if (hasRotation) {
+              pipelineParams.rotation = totalRotation
+            }
+
+            // Add adjustments if needed
+            if (hasAdjustments) {
+              pipelineParams.adjustments = convertToBasicAdjustments(adjustments)
+            }
+
+            // Add tone curve if needed
+            if (hasToneCurve) {
+              pipelineParams.toneCurvePoints = adjustments.toneCurve.points
+            }
+
+            // Add masks if needed
+            if (hasMasks && editStore.masks) {
+              pipelineParams.masks = convertMasksToGPUFormat(editStore.masks)
+            }
+
+            const result = await gpuPipeline.process(
+              { pixels, width, height },
+              pipelineParams,
             )
-          )
-          console.log(`[useEditPreview] Adjustments via ${backend} in ${timing.toFixed(1)}ms`)
-          currentPixels = result.pixels
-          currentWidth = result.width
-          currentHeight = result.height
-        }
 
-        // ===== STEP 4: Apply tone curve if it differs from linear =====
-        // Uses GPU-accelerated processing when available, falls back to WASM
-        if (isModifiedToneCurve(adjustments.toneCurve)) {
-          const { result: curveResult, backend, timing } = await applyToneCurveFromPointsAdaptive(
-            currentPixels,
-            currentWidth,
-            currentHeight,
-            adjustments.toneCurve.points,
-            // WASM fallback
-            () => $decodeService.applyToneCurve(
-              currentPixels, currentWidth, currentHeight, adjustments.toneCurve.points,
+            console.log(`[useEditPreview] GPU Pipeline: ${JSON.stringify(result.timing)}`)
+
+            currentPixels = result.pixels
+            currentWidth = result.width
+            currentHeight = result.height
+            usedUnifiedPipeline = true
+          }
+          catch (e) {
+            console.warn('[useEditPreview] GPU unified pipeline failed, falling back to sequential:', e)
+            usedUnifiedPipeline = false
+          }
+        }
+        else if (pipelineReady && hasCrop) {
+          // ===== PATH B: Crop IS needed - Split into stages =====
+          // Stage 1: Rotation via unified pipeline (if needed)
+          // Stage 2: Crop via WASM (must happen on CPU)
+          // Stage 3: Adjustments + Tone Curve + Masks via unified pipeline (without rotation)
+          // This gives us 2 GPU round-trips (necessary due to crop)
+          try {
+            // Stage 1: Rotation only (if needed)
+            if (hasRotation) {
+              const rotationResult = await gpuPipeline.process(
+                { pixels: currentPixels, width: currentWidth, height: currentHeight },
+                { rotation: totalRotation },
+              )
+              console.log(`[useEditPreview] GPU Pipeline (rotation stage): ${JSON.stringify(rotationResult.timing)}`)
+              currentPixels = rotationResult.pixels
+              currentWidth = rotationResult.width
+              currentHeight = rotationResult.height
+            }
+
+            // Stage 2: Crop via WASM (CPU operation)
+            console.log('[useEditPreview] Applying crop:', crop)
+            const cropped = await $decodeService.applyCrop(
+              currentPixels,
+              currentWidth,
+              currentHeight,
+              crop,
             )
-          )
-          console.log(`[useEditPreview] Tone curve via ${backend} in ${timing.toFixed(1)}ms`)
-          currentPixels = curveResult.pixels
-          currentWidth = curveResult.width
-          currentHeight = curveResult.height
+            currentPixels = cropped.pixels
+            currentWidth = cropped.width
+            currentHeight = cropped.height
+
+            // Stage 3: Adjustments + Tone Curve + Masks via unified pipeline
+            const hasPostCropEdits = hasAdjustments || hasToneCurve || hasMasks
+            if (hasPostCropEdits) {
+              const postCropParams: EditPipelineParams = {}
+
+              if (hasAdjustments) {
+                postCropParams.adjustments = convertToBasicAdjustments(adjustments)
+              }
+
+              if (hasToneCurve) {
+                postCropParams.toneCurvePoints = adjustments.toneCurve.points
+              }
+
+              if (hasMasks && editStore.masks) {
+                postCropParams.masks = convertMasksToGPUFormat(editStore.masks)
+              }
+
+              const postCropResult = await gpuPipeline.process(
+                { pixels: currentPixels, width: currentWidth, height: currentHeight },
+                postCropParams,
+              )
+              console.log(`[useEditPreview] GPU Pipeline (post-crop stage): ${JSON.stringify(postCropResult.timing)}`)
+              currentPixels = postCropResult.pixels
+              currentWidth = postCropResult.width
+              currentHeight = postCropResult.height
+            }
+
+            usedUnifiedPipeline = true
+          }
+          catch (e) {
+            console.warn('[useEditPreview] GPU pipeline with crop failed, falling back to sequential:', e)
+            usedUnifiedPipeline = false
+            // Reset to original pixels for fallback
+            currentPixels = pixels
+            currentWidth = width
+            currentHeight = height
+          }
         }
 
-        // ===== STEP 5: Apply masked adjustments (local adjustments) =====
-        // Uses GPU-accelerated processing when available, falls back to WASM
-        if (hasMasks && editStore.masks) {
-          const maskStack: MaskStackData = {
-            linearMasks: editStore.masks.linearMasks.map(m => ({
-              startX: m.start.x,
-              startY: m.start.y,
-              endX: m.end.x,
-              endY: m.end.y,
-              feather: m.feather,
-              enabled: m.enabled,
-              adjustments: m.adjustments,
-            })),
-            radialMasks: editStore.masks.radialMasks.map(m => ({
-              centerX: m.center.x,
-              centerY: m.center.y,
-              radiusX: m.radiusX,
-              radiusY: m.radiusY,
-              rotation: m.rotation,
-              feather: m.feather,
-              invert: m.invert,
-              enabled: m.enabled,
-              adjustments: m.adjustments,
-            })),
+        // ===== PATH C: Fallback - Sequential processing =====
+        // Used when GPU pipeline unavailable or fails
+        if (!usedUnifiedPipeline) {
+          // ===== STEP 1: Apply rotation (if needed) =====
+          if (hasRotation) {
+            const { result: rotated, backend, timing } = await applyRotationAdaptive(
+              currentPixels,
+              currentWidth,
+              currentHeight,
+              totalRotation,
+              // WASM fallback
+              () => $decodeService.applyRotation(
+                currentPixels, currentWidth, currentHeight,
+                totalRotation,
+                false, // bilinear for preview
+              ),
+            )
+            console.log(`[useEditPreview] Rotation via ${backend} in ${timing.toFixed(1)}ms`)
+            currentPixels = rotated.pixels
+            currentWidth = rotated.width
+            currentHeight = rotated.height
           }
 
-          // Use adaptive GPU/WASM processing for masked adjustments
-          const { result: maskedResult, backend, timing } = await applyMaskedAdjustmentsAdaptive(
-            currentPixels,
-            currentWidth,
-            currentHeight,
-            maskStack,
-            () => $decodeService.applyMaskedAdjustments(currentPixels, currentWidth, currentHeight, maskStack),
-          )
-          console.log(`[useEditPreview] Masked adjustments via ${backend} in ${timing.toFixed(1)}ms`)
-          currentPixels = maskedResult.pixels
-          currentWidth = maskedResult.width
-          currentHeight = maskedResult.height
+          // ===== STEP 2: Apply crop (if needed) =====
+          if (crop) {
+            console.log('[useEditPreview] Applying crop:', crop)
+            const cropped = await $decodeService.applyCrop(
+              currentPixels,
+              currentWidth,
+              currentHeight,
+              crop,
+            )
+            currentPixels = cropped.pixels
+            currentWidth = cropped.width
+            currentHeight = cropped.height
+          }
+
+          // ===== STEP 3: Apply basic adjustments (exposure, contrast, etc.) =====
+          // Uses GPU-accelerated processing when available, falls back to WASM
+          if (hasAdjustments) {
+            const { result, backend, timing } = await applyAdjustmentsAdaptive(
+              currentPixels,
+              currentWidth,
+              currentHeight,
+              adjustments,
+              // WASM fallback
+              () => $decodeService.applyAdjustments(
+                currentPixels, currentWidth, currentHeight, adjustments,
+              ),
+            )
+            console.log(`[useEditPreview] Adjustments via ${backend} in ${timing.toFixed(1)}ms`)
+            currentPixels = result.pixels
+            currentWidth = result.width
+            currentHeight = result.height
+          }
+
+          // ===== STEP 4: Apply tone curve if it differs from linear =====
+          // Uses GPU-accelerated processing when available, falls back to WASM
+          if (hasToneCurve) {
+            const { result: curveResult, backend, timing } = await applyToneCurveFromPointsAdaptive(
+              currentPixels,
+              currentWidth,
+              currentHeight,
+              adjustments.toneCurve.points,
+              // WASM fallback
+              () => $decodeService.applyToneCurve(
+                currentPixels, currentWidth, currentHeight, adjustments.toneCurve.points,
+              ),
+            )
+            console.log(`[useEditPreview] Tone curve via ${backend} in ${timing.toFixed(1)}ms`)
+            currentPixels = curveResult.pixels
+            currentWidth = curveResult.width
+            currentHeight = curveResult.height
+          }
+
+          // ===== STEP 5: Apply masked adjustments (local adjustments) =====
+          // Uses GPU-accelerated processing when available, falls back to WASM
+          if (hasMasks && editStore.masks) {
+            const maskStack: MaskStackData = {
+              linearMasks: editStore.masks.linearMasks.map(m => ({
+                startX: m.start.x,
+                startY: m.start.y,
+                endX: m.end.x,
+                endY: m.end.y,
+                feather: m.feather,
+                enabled: m.enabled,
+                adjustments: m.adjustments,
+              })),
+              radialMasks: editStore.masks.radialMasks.map(m => ({
+                centerX: m.center.x,
+                centerY: m.center.y,
+                radiusX: m.radiusX,
+                radiusY: m.radiusY,
+                rotation: m.rotation,
+                feather: m.feather,
+                invert: m.invert,
+                enabled: m.enabled,
+                adjustments: m.adjustments,
+              })),
+            }
+
+            // Use adaptive GPU/WASM processing for masked adjustments
+            const { result: maskedResult, backend, timing } = await applyMaskedAdjustmentsAdaptive(
+              currentPixels,
+              currentWidth,
+              currentHeight,
+              maskStack,
+              () => $decodeService.applyMaskedAdjustments(currentPixels, currentWidth, currentHeight, maskStack),
+            )
+            console.log(`[useEditPreview] Masked adjustments via ${backend} in ${timing.toFixed(1)}ms`)
+            currentPixels = maskedResult.pixels
+            currentWidth = maskedResult.width
+            currentHeight = maskedResult.height
+          }
         }
 
         // ===== STEP 6: Detect clipping for overlay =====
@@ -784,7 +1052,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       if (import.meta.client && catalog) {
         // In edit view, preview is the primary display (2560px) - highest priority
         // Thumbnail is only needed as fallback (512px) - lower priority
-        catalog.requestPreview(id, ThumbnailPriority.VISIBLE)  // Priority 0 - highest
+        catalog.requestPreview(id, ThumbnailPriority.VISIBLE) // Priority 0 - highest
         catalog.requestThumbnail(id, ThumbnailPriority.PRELOAD) // Priority 2 - lower
       }
 

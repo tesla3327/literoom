@@ -467,3 +467,89 @@ Phases 7.1-7.2 enabled GPU adjustments and tone curve, but each operation still 
 
 **Next**: Phase 7.4 - Integrate GPUEditPipeline into useEditPreview.ts to replace individual GPU calls
 
+
+---
+
+## 175: 2026-01-23 13:56 EST: GPU Acceleration - Phase 7.4 (Integrate Unified Pipeline)
+
+**Objective**: Integrate GPUEditPipeline into useEditPreview.ts to replace individual GPU calls with unified pipeline for 60fps preview.
+
+**Status**: Complete
+
+**Background**:
+Phase 7.3 created GPUEditPipeline which chains all operations (rotation, adjustments, tone curve, masks) with single GPU upload/readback. Currently useEditPreview.ts uses 4 separate GPU round-trips. Phase 7.4 integrates the unified pipeline for maximum performance.
+
+**Performance Target**:
+- Current: ~4 GPU round-trips, ~250ms render time
+- Target: 1 GPU round-trip (when no crop), ~50ms render time
+- With crop: 2 round-trips (rotation → crop [WASM] → rest)
+
+**Implementation Complete**:
+
+1. **New Imports** - Added GPUEditPipeline imports:
+   - `getGPUEditPipeline` - Singleton accessor for unified pipeline
+   - `EditPipelineParams` - Type for pipeline parameters
+   - `MaskStackInput` - Type for GPU mask format
+   - `BasicAdjustments` - Type for GPU adjustments format
+
+2. **Helper Functions** (lines 325-446):
+   - `convertMaskAdjustments()` - Converts partial mask adjustments to GPU-compatible format with defaults
+   - `convertMasksToGPUFormat()` - Converts edit store masks (start/end points) to GPU MaskStackInput (startX/startY/endX/endY)
+   - `convertToBasicAdjustments()` - Strips toneCurve field from Adjustments for GPU pipeline
+
+3. **Three-Path Rendering Strategy** (lines 660-939):
+
+   **Path A - No Crop (1 GPU round-trip)**:
+   - All operations in single `gpuPipeline.process()` call
+   - Chains: rotation → adjustments → tone curve → masks
+   - Maximum performance: 1 GPU upload/readback instead of 4
+
+   **Path B - With Crop (2 GPU round-trips)**:
+   - Stage 1: Rotation via unified pipeline (if needed)
+   - Stage 2: Crop via WASM (must happen on CPU)
+   - Stage 3: Adjustments + Tone Curve + Masks via unified pipeline
+   - Necessary because crop requires pixel-level extraction
+
+   **Path C - Fallback (Sequential Processing)**:
+   - Used when GPU pipeline unavailable or fails
+   - Uses existing `applyRotationAdaptive`, `applyAdjustmentsAdaptive`, etc.
+   - Graceful degradation ensures app continues to work
+
+4. **Timing Breakdown Logging**:
+   ```
+   console.log(`[useEditPreview] GPU Pipeline: ${JSON.stringify(result.timing)}`)
+   ```
+
+**Files Modified** (1):
+- `apps/web/app/composables/useEditPreview.ts` - Three-path GPU pipeline integration
+
+**Verification**:
+- ✅ All 1433 core tests pass (5 skipped)
+- ✅ 899/900 web tests pass (1 pre-existing UI test failure)
+- ✅ TypeScript compiles (pre-existing type errors in other files)
+- ✅ Pipeline initialization with lazy loading
+- ✅ Fallback to sequential processing when GPU unavailable
+
+**Performance Impact**:
+- Without crop: Reduces ~4 GPU round-trips to 1
+- With crop: Reduces to 2 GPU round-trips (necessary due to crop)
+- Fallback: Original sequential processing still available
+
+**Phase 7 Status**: Complete
+- ✅ Phase 7.1: Enable GPU adjustments
+- ✅ Phase 7.2: Enable GPU tone curve
+- ✅ Phase 7.3: Create GPUEditPipeline coordinator
+- ✅ Phase 7.4: Integrate unified pipeline into useEditPreview.ts **COMPLETE**
+
+**GPU Acceleration Status**:
+- Phase 1: Infrastructure & Detection ✅
+- Phase 2: Basic Adjustments Shader ✅
+- Phase 3: Tone Curve Shader ✅
+- Phase 4: Gradient Mask Shaders ✅
+- Phase 5: Histogram Computation ✅
+- Phase 6: Transform Operations ✅
+- Phase 7: Pipeline Integration ✅ **COMPLETE**
+- Phase 8: UI Integration & Polish (next)
+- Phase 9: Testing & Documentation
+
+**Next**: Phase 8 - UI Integration & Polish (performance monitoring, error handling UI)
