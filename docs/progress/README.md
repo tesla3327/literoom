@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-22 20:26 EST
+**Last Updated**: 2026-01-22 20:36 EST
 **Current Phase**: All E2E Tests Passing
 
 ## Project Structure
@@ -357,6 +357,8 @@ literoom/
 | [145](./iterations-141-150.md:258) | 2026-01-22 | Zoom Calculation Unit Tests - Complete |
 | [146](./iterations-141-150.md:293) | 2026-01-22 | Fix Duplicated Auto-Import Warnings - Complete |
 | [147](./iterations-141-150.md:347) | 2026-01-22 | E2E Test Fix - Complete |
+| [148](./iterations-141-150.md:390) | 2026-01-22 | Edit Persistence - Research and Implementation Complete |
+| [149](./iterations-141-150.md:436) | 2026-01-22 | Test Coverage Metrics - Research Complete |
 
 ---
 

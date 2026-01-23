@@ -387,3 +387,87 @@ All 28 E2E tests now pass.
 - `apps/web/e2e/example.spec.ts` - Updated tests for demo mode behavior
 - `apps/web/e2e/keyboard-navigation.spec.ts` - Removed choose-folder-button click
 
+---
+
+## 148: 2026-01-22 20:28 EST: Edit Persistence - Research and Implementation Complete
+
+**Objective**: Fix edit persistence so edits survive page refresh.
+
+**Background**:
+Currently edits were only cached in memory (editStore.editCache Map) and were lost on page refresh. The spec requires:
+> All edits persist automatically (no save button).
+> Must store a versioned edit schema to support future migrations.
+
+**Surprising Finding**:
+Edit persistence was **already fully implemented** at the database level! The database schema, save functions (`saveEditStateToDb`), and load functions (`loadAllEditStatesFromDb`) all existed. The only missing piece was calling `editStore.initializeFromDb()` on app startup.
+
+**Research Conducted** (5 parallel agents):
+1. **Database Schema**: `editStates` table exists with UUID-keyed records
+2. **Save Pattern**: Edits saved to IndexedDB on every change (async, non-blocking)
+3. **Dexie Patterns**: Proper JSON serialization with schema versioning
+4. **Schema Versioning**: v4 current with progressive migrations
+5. **Load/Restore Flow**: `initializeFromDb()` implemented but never called
+
+**The Gap**:
+`initializeFromDb()` was never called on app startup, so the edit cache remained empty after page refresh.
+
+**Implementation** (1 file modified):
+- `apps/web/app/plugins/catalog.client.ts`
+  - Added `const editStore = useEditStore()`
+  - Added `await editStore.initializeFromDb()` call in `initializeCatalog()`
+  - Logs count of restored edits in real mode
+
+**Test Results**:
+- 432 unit tests pass (362 core + 70 web)
+- 28 E2E tests pass
+- Rust tests: 228 pass (184 core + 44 wasm)
+
+**Files Created** (1):
+- `docs/research/2026-01-22-edit-persistence-synthesis.md`
+
+**Result**: Edits now persist across page refresh. Users can:
+1. Make edits (exposure, crop, masks, etc.)
+2. Close browser or refresh page
+3. Return to the same image
+4. See their edits restored automatically
+
+---
+
+## 149: 2026-01-22 20:47 EST: Test Coverage Metrics - Research Complete
+
+**Objective**: Add test coverage metrics for both Rust and TypeScript code to track progress.
+
+**Background** (from issues.md open issues):
+> Add in test coverage metrics for both Rust and TypeScript code so we can keep track of our progress.
+
+This is an infrastructure improvement to help track code quality going forward.
+
+**Research Completed** (4 parallel agents):
+1. **Rust Coverage Tools**: Analyzed cargo-llvm-cov, grcov, tarpaulin
+2. **Vitest Coverage Config**: Analyzed V8 and Istanbul providers
+3. **CI Integration**: Researched Codecov, Coveralls, GitHub native
+4. **Existing Test Setup**: Reviewed current test infrastructure
+
+**Key Findings**:
+
+### TypeScript (Vitest)
+- **Recommended**: V8 provider (built into Node.js, no extra dependencies)
+- **Output**: LCOV, HTML, JSON for CI and local review
+- **Thresholds**: 75% for core, 65% for web (UI harder to test)
+
+### Rust
+- **Recommended**: cargo-llvm-cov (not tarpaulin)
+- **Why**: Cross-platform (tarpaulin is Linux-only), WASM support (experimental), most accurate coverage
+- **Output**: LCOV, HTML, JSON
+
+### CI Integration
+- **Service**: Codecov (multi-language support, PR comments, unified dashboard)
+- **Method**: codecov/codecov-action@v4 for both languages
+- **Flags**: Separate `typescript` and `rust` flags for filtering
+
+**Files Created** (2):
+- `docs/research/2026-01-22-test-coverage-synthesis.md`
+- `docs/plans/2026-01-22-test-coverage-plan.md`
+
+**Next Steps**: Implement Phase 1 (TypeScript coverage configuration)
+
