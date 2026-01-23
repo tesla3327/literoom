@@ -84,3 +84,33 @@ pnpm coverage:rust:html
 **Next Steps** (per plan):
 - Phase 3: CI integration with Codecov (future iteration)
 
+---
+
+## 152: 2026-01-22 21:10 EST: Thumbnail Regeneration - Implementation Plan Created
+
+**Objective**: Create an implementation plan for thumbnail regeneration after edits, to complete the remaining part of the "Gallery loading state after returning from edit" issue (HIGH severity).
+
+**Background**:
+Research synthesis was completed in `docs/research/2026-01-22-thumbnail-regeneration-synthesis.md`. The feature will make edited thumbnails reflect their edits when returning to the gallery view.
+
+**Current State**:
+- ✅ Research synthesis complete with architecture design
+- ✅ All required infrastructure exists (caches, priority queue, edit state)
+- ✅ Implementation plan created
+- 🔲 Need to implement the feature
+
+**Plan Location**: `docs/plans/2026-01-22-thumbnail-regeneration-plan.md`
+
+**Implementation Phases** (from plan):
+1. Worker Message Type - Add `GenerateEditedThumbnailRequest` type
+2. Worker Handler - Implement edit pipeline in decode worker
+3. DecodeService Method - Add `generateEditedThumbnail()`
+4. ThumbnailService Integration - Add regeneration + invalidation methods
+5. CatalogService Integration - Expose through service interface
+6. useCatalog Composable - Export `regenerateThumbnail()`
+7. Edit Page Integration - Trigger regeneration on unmount
+8. Visual Feedback - Opacity transition during regeneration
+9. Unit Tests - Cover new functionality
+
+**Estimated Time**: ~5.5 hours total
+
