@@ -117,9 +117,35 @@ function handleKeydown(e: KeyboardEvent) {
     return
   }
 
+  const isMod = e.metaKey || e.ctrlKey
+  const key = e.key.toLowerCase()
+
+  // Zoom shortcuts (Cmd/Ctrl + 0, 1, +, -)
+  if (isMod && !e.shiftKey) {
+    if (key === '0') {
+      e.preventDefault()
+      previewCanvasRef.value?.setPreset('fit')
+      return
+    }
+    if (key === '1') {
+      e.preventDefault()
+      previewCanvasRef.value?.setPreset('100%')
+      return
+    }
+    if (key === '=' || key === '+') {
+      e.preventDefault()
+      previewCanvasRef.value?.zoomIn()
+      return
+    }
+    if (key === '-') {
+      e.preventDefault()
+      previewCanvasRef.value?.zoomOut()
+      return
+    }
+  }
+
   // Copy/Paste shortcuts (Cmd/Ctrl+Shift+C/V)
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
-    const key = e.key.toLowerCase()
+  if (isMod && e.shiftKey) {
     if (key === 'c') {
       e.preventDefault()
       openCopyModal()
@@ -148,6 +174,13 @@ function handleKeydown(e: KeyboardEvent) {
     case 'G':
       // G = return to Grid
       goBack()
+      break
+    case 'z':
+    case 'Z':
+      // Z = toggle zoom (fit/100%)
+      if (!isMod) {
+        previewCanvasRef.value?.toggleZoom()
+      }
       break
   }
 }

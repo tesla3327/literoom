@@ -221,6 +221,49 @@ function handleClose() {
             </div>
           </div>
 
+          <!-- Zoom -->
+          <div>
+            <h4 class="text-xs font-medium text-gray-500 mb-2">
+              Zoom
+            </h4>
+            <div class="space-y-2">
+              <div class="flex justify-between">
+                <span class="text-gray-300">Toggle fit/100%</span>
+                <span class="text-gray-400"><kbd class="kbd">Z</kbd></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-300">Fit to view</span>
+                <span class="text-gray-400">
+                  <kbd class="kbd">{{ modKey }}</kbd>+<kbd class="kbd">0</kbd>
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-300">100% zoom</span>
+                <span class="text-gray-400">
+                  <kbd class="kbd">{{ modKey }}</kbd>+<kbd class="kbd">1</kbd>
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-300">Zoom in</span>
+                <span class="text-gray-400">
+                  <kbd class="kbd">{{ modKey }}</kbd>+<kbd class="kbd">+</kbd>
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-300">Zoom out</span>
+                <span class="text-gray-400">
+                  <kbd class="kbd">{{ modKey }}</kbd>+<kbd class="kbd">-</kbd>
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-300">Pan (when zoomed)</span>
+                <span class="text-gray-400">
+                  <kbd class="kbd">Space</kbd>+Drag
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- Mask Editing -->
           <div>
             <h4 class="text-xs font-medium text-gray-500 mb-2">

@@ -4,13 +4,16 @@
  *
  * Displays the photo preview in the edit view with:
  * - Source image display
+ * - Zoom/pan support via CSS transforms
  * - Clipping overlay (shadow/highlight clipping indicators)
+ * - Crop and mask overlays
  * - Rendering indicator during edit updates
  * - Quality indicator (draft/full)
  * - Error handling
  *
- * Uses the useEditPreview composable for preview management and
- * useClippingOverlay for rendering clipping indicators.
+ * Uses the useEditPreview composable for preview management,
+ * useClippingOverlay for rendering clipping indicators,
+ * and useZoomPan for zoom/pan interactions.
  */
 
 interface Props {
@@ -26,6 +29,7 @@ const props = defineProps<Props>()
 
 const catalogStore = useCatalogStore()
 const editUIStore = useEditUIStore()
+const selectionStore = useSelectionStore()
 
 /**
  * Preview management composable.
@@ -43,18 +47,13 @@ const {
   isWaitingForPreview,
 } = useEditPreview(toRef(props, 'assetId'))
 
-/**
- * Expose adjusted pixels for histogram computation.
- * This allows the parent component to pass these to the histogram.
- */
-defineExpose({
-  adjustedPixels,
-  adjustedDimensions,
-})
 
 // ============================================================================
 // Template Refs
 // ============================================================================
+
+/** Reference to the zoom container (receives wheel/mouse events) */
+const zoomContainerRef = ref<HTMLElement | null>(null)
 
 /** Reference to the preview image element */
 const previewImageRef = ref<HTMLImageElement | null>(null)
@@ -64,6 +63,57 @@ const clippingCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 /** Reference to the crop overlay canvas */
 const cropCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+// ============================================================================
+// Zoom/Pan
+// ============================================================================
+
+/**
+ * Zoom/pan composable for wheel zoom and drag pan.
+ */
+const {
+  transformStyle,
+  cursorStyle: zoomCursorStyle,
+  isSpacebarHeld,
+  zoomIn,
+  zoomOut,
+  toggleZoom,
+  setPreset,
+  resetZoom,
+} = useZoomPan({
+  containerRef: zoomContainerRef,
+  imageRef: previewImageRef,
+})
+
+/**
+ * Expose zoom methods for parent component (keyboard shortcuts).
+ */
+defineExpose({
+  adjustedPixels,
+  adjustedDimensions,
+  zoomIn,
+  zoomOut,
+  toggleZoom,
+  setPreset,
+  resetZoom,
+})
+
+/**
+ * Cache/restore zoom state when switching assets.
+ */
+watch(
+  () => props.assetId,
+  (newId, oldId) => {
+    if (oldId && oldId !== newId) {
+      // Cache zoom state for previous asset
+      editUIStore.cacheZoomForAsset(oldId)
+    }
+    if (newId) {
+      // Restore zoom state for new asset (or reset to fit)
+      editUIStore.restoreZoomForAsset(newId)
+    }
+  },
+)
 
 // ============================================================================
 // Computed
@@ -192,6 +242,16 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
       Draft
     </div>
 
+    <!-- Zoom percentage indicator (top-left, below quality) -->
+    <div
+      v-if="editUIStore.zoomPreset !== 'fit' && !isInitialLoading && previewUrl"
+      class="absolute top-4 left-4 z-10 px-2 py-1 bg-gray-800/80 rounded text-xs text-gray-400"
+      :class="{ 'top-12': renderQuality === 'draft' }"
+      data-testid="zoom-indicator"
+    >
+      {{ editUIStore.zoomPercentage }}%
+    </div>
+
     <!-- Initial loading state -->
     <div
       v-if="isInitialLoading"
@@ -205,70 +265,82 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
       <span class="text-sm">{{ isWaitingForPreview ? 'Generating preview...' : 'Loading preview...' }}</span>
     </div>
 
-    <!-- Preview image with clipping overlay -->
+    <!-- Zoom container (receives wheel/mouse events) -->
     <div
       v-else-if="previewUrl"
-      class="relative max-w-full max-h-full"
+      ref="zoomContainerRef"
+      class="absolute inset-0 overflow-hidden"
+      :style="{ cursor: zoomCursorStyle }"
+      data-testid="zoom-container"
     >
-      <img
-        ref="previewImageRef"
-        :src="previewUrl"
-        :alt="asset?.filename"
-        class="max-w-full max-h-full object-contain"
-        data-testid="preview-image"
-        @load="onImageLoad"
+      <!-- Transform container (applies zoom/pan via CSS transform) -->
+      <div
+        class="absolute"
+        :style="transformStyle"
+        data-testid="transform-container"
       >
+        <div class="relative">
+          <img
+            ref="previewImageRef"
+            :src="previewUrl"
+            :alt="asset?.filename"
+            class="block"
+            data-testid="preview-image"
+            @load="onImageLoad"
+          >
 
-      <!-- Clipping overlay canvas - positioned over the image -->
-      <canvas
-        ref="clippingCanvasRef"
-        class="absolute top-0 left-0 pointer-events-none"
-        :width="renderedDimensions.width"
-        :height="renderedDimensions.height"
-        :style="{
-          width: renderedDimensions.width + 'px',
-          height: renderedDimensions.height + 'px',
-        }"
-        data-testid="clipping-overlay-canvas"
-      />
+          <!-- Clipping overlay canvas - positioned over the image -->
+          <canvas
+            ref="clippingCanvasRef"
+            class="absolute top-0 left-0 pointer-events-none"
+            :width="renderedDimensions.width"
+            :height="renderedDimensions.height"
+            :style="{
+              width: renderedDimensions.width + 'px',
+              height: renderedDimensions.height + 'px',
+            }"
+            data-testid="clipping-overlay-canvas"
+          />
 
-      <!-- Crop overlay canvas - positioned over the image, interactive -->
-      <canvas
-        v-if="editUIStore.isCropToolActive"
-        ref="cropCanvasRef"
-        class="absolute top-0 left-0"
-        :class="{
-          'cursor-grab': !isCropDragging,
-          'cursor-grabbing': isCropDragging,
-        }"
-        :width="renderedDimensions.width"
-        :height="renderedDimensions.height"
-        :style="{
-          width: renderedDimensions.width + 'px',
-          height: renderedDimensions.height + 'px',
-          cursor: cropCursorStyle,
-          zIndex: 20,
-          touchAction: 'none',
-        }"
-        data-testid="crop-overlay-canvas"
-      />
+          <!-- Crop overlay canvas - positioned over the image, interactive -->
+          <canvas
+            v-if="editUIStore.isCropToolActive"
+            ref="cropCanvasRef"
+            class="absolute top-0 left-0"
+            :class="{
+              'cursor-grab': !isCropDragging,
+              'cursor-grabbing': isCropDragging,
+            }"
+            :width="renderedDimensions.width"
+            :height="renderedDimensions.height"
+            :style="{
+              width: renderedDimensions.width + 'px',
+              height: renderedDimensions.height + 'px',
+              cursor: cropCursorStyle,
+              zIndex: 20,
+              touchAction: 'none',
+            }"
+            data-testid="crop-overlay-canvas"
+          />
 
-      <!-- Mask overlay canvas - positioned over the image, interactive -->
-      <canvas
-        v-if="editUIStore.isMaskToolActive"
-        ref="maskCanvasRef"
-        class="absolute top-0 left-0"
-        :width="renderedDimensions.width"
-        :height="renderedDimensions.height"
-        :style="{
-          width: renderedDimensions.width + 'px',
-          height: renderedDimensions.height + 'px',
-          cursor: maskCursorStyle,
-          zIndex: 25,
-          touchAction: 'none',
-        }"
-        data-testid="mask-overlay-canvas"
-      />
+          <!-- Mask overlay canvas - positioned over the image, interactive -->
+          <canvas
+            v-if="editUIStore.isMaskToolActive"
+            ref="maskCanvasRef"
+            class="absolute top-0 left-0"
+            :width="renderedDimensions.width"
+            :height="renderedDimensions.height"
+            :style="{
+              width: renderedDimensions.width + 'px',
+              height: renderedDimensions.height + 'px',
+              cursor: maskCursorStyle,
+              zIndex: 25,
+              touchAction: 'none',
+            }"
+            data-testid="mask-overlay-canvas"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- Error state -->
@@ -297,6 +369,56 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
       <span class="text-sm">Preview not available</span>
     </div>
 
-    <!-- TODO: Add zoom/pan controls (Phase 8.6+) -->
+    <!-- Zoom controls (bottom-left, fixed position) -->
+    <div
+      v-if="previewUrl && !isInitialLoading"
+      class="absolute bottom-4 left-4 z-10 flex items-center gap-1 bg-gray-800/90 rounded-lg p-1"
+      data-testid="zoom-controls"
+    >
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        icon="i-heroicons-minus"
+        aria-label="Zoom out"
+        @click="zoomOut"
+      />
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        class="w-14 justify-center font-mono text-xs"
+        @click="toggleZoom"
+      >
+        {{ editUIStore.zoomPercentage }}%
+      </UButton>
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        icon="i-heroicons-plus"
+        aria-label="Zoom in"
+        @click="zoomIn"
+      />
+      <div class="w-px h-4 bg-gray-600 mx-1" />
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        :class="{ 'bg-gray-700': editUIStore.zoomPreset === 'fit' }"
+        @click="setPreset('fit')"
+      >
+        Fit
+      </UButton>
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        :class="{ 'bg-gray-700': editUIStore.zoomPreset === '100%' }"
+        @click="setPreset('100%')"
+      >
+        1:1
+      </UButton>
+    </div>
   </div>
 </template>

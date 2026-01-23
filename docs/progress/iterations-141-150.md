@@ -128,3 +128,78 @@ The spec requires (section 3.5 - Zoom/pan behavior):
 6. Add keyboard shortcuts and UI controls
 
 ---
+
+## 143: 2026-01-22 19:16 EST: Zoom/Pan Feature - Phase 1 Implementation Complete
+
+**Objective**: Implement core zoom/pan infrastructure (Phase 1 of zoom/pan plan).
+
+**Implementation Completed**:
+
+### Phase 1.1: Create Zoom Utilities
+- Created `apps/web/app/utils/zoomCalculations.ts` with pure functions:
+  - `Camera` interface (scale, panX, panY)
+  - `ZoomPreset` type (fit, fill, 50%, 100%, 200%, custom)
+  - `calculateFitScale()`, `calculateFillScale()` - Scale calculations
+  - `clampScale()`, `clampPan()` - Constraint functions
+  - `zoomToPoint()`, `zoomIn()`, `zoomOut()` - Zoom operations
+  - `screenToImage()`, `imageToScreen()` - Coordinate conversion
+  - `canPan()`, `createCameraForPreset()`, `getZoomPercentage()`, `detectPreset()`
+
+### Phase 1.2: Add Zoom State to editUI Store
+- Extended `apps/web/app/stores/editUI.ts` with:
+  - `camera`, `zoomPreset`, `isZoomInteracting` refs
+  - `imageDimensions`, `viewportDimensions` refs
+  - `zoomPercentage`, `fitScale`, `canPanImage` computed
+  - Per-image zoom cache (LRU, max 50 entries)
+  - Methods: setCamera, setZoomPreset, zoomToPointAction, zoomIn, zoomOut, toggleZoom, resetZoom, pan, cacheZoomForAsset, restoreZoomForAsset, initializeZoom
+
+### Phase 1.3: Create useZoomPan Composable
+- Created `apps/web/app/composables/useZoomPan.ts`:
+  - Handles mouse wheel zoom (toward cursor position)
+  - Handles click+drag pan (when zoomed in)
+  - Handles double-click toggle (fit/100%)
+  - Handles spacebar pan mode
+  - ResizeObserver for viewport dimension tracking
+  - Image load listener for dimension tracking
+  - Returns transformStyle, cursorStyle, zoom methods
+
+### Phase 2.1: Update EditPreviewCanvas Structure
+- Updated `apps/web/app/components/edit/EditPreviewCanvas.vue`:
+  - Added outer zoom container (receives wheel/mouse events)
+  - Added transform container (applies CSS transform)
+  - Nested image + all overlay canvases inside transform container
+  - Added zoom controls (-, %, +, Fit, 1:1 buttons)
+  - Added zoom percentage indicator
+  - Added cache/restore zoom state on asset change
+
+### Phase 4.1: Add Keyboard Shortcuts
+- Updated `apps/web/app/pages/edit/[id].vue`:
+  - `Z` - Toggle between fit and 100%
+  - `Cmd/Ctrl + 0` - Fit to view
+  - `Cmd/Ctrl + 1` - 100% zoom
+  - `Cmd/Ctrl + +` - Zoom in
+  - `Cmd/Ctrl + -` - Zoom out
+
+### Phase 4.2: Update Help Modal
+- Updated `apps/web/app/components/help/HelpModal.vue`:
+  - Added new "Zoom" section in Edit View column
+  - Documented all zoom keyboard shortcuts
+  - Added Space+Drag pan instruction
+
+**Files Created** (2 files):
+- `apps/web/app/utils/zoomCalculations.ts` (~220 lines)
+- `apps/web/app/composables/useZoomPan.ts` (~260 lines)
+
+**Files Modified** (4 files):
+- `apps/web/app/stores/editUI.ts` - Added zoom/pan state (~150 lines added)
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Transform container + controls
+- `apps/web/app/pages/edit/[id].vue` - Zoom keyboard shortcuts
+- `apps/web/app/components/help/HelpModal.vue` - Zoom shortcuts documentation
+
+**Tests**: Build completes successfully
+
+**Deferred Items**:
+- Overlay coordinate handling (crop/mask overlays need camera-aware coordinates when interacting while zoomed)
+- Preview quality switching (using 2x preview at high zoom levels)
+
+---
