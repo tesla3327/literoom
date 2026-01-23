@@ -125,20 +125,37 @@ export const useEditUIStore = defineStore('editUI', () => {
 
   /**
    * Set zoom preset and update camera accordingly.
+   *
+   * NOTE: Camera is only calculated if we have valid dimensions.
+   * If dimensions aren't ready yet (e.g., during asset navigation before
+   * the new image loads), the preset is set but camera calculation is
+   * deferred to initializeZoom() which runs after dimensions are set.
    */
   function setZoomPreset(preset: ZoomPreset): void {
     if (preset === 'custom') return // Can't explicitly set custom
 
-    const newCamera = createCameraForPreset(
-      preset,
-      imageDimensions.value.width,
-      imageDimensions.value.height,
-      viewportDimensions.value.width,
-      viewportDimensions.value.height,
-    )
-
-    camera.value = newCamera
+    // Always update the preset
     zoomPreset.value = preset
+
+    // Only calculate camera if we have valid dimensions
+    // This prevents incorrect calculations during asset transitions
+    const hasValidDimensions
+      = imageDimensions.value.width > 0
+      && imageDimensions.value.height > 0
+      && viewportDimensions.value.width > 0
+      && viewportDimensions.value.height > 0
+
+    if (hasValidDimensions) {
+      const newCamera = createCameraForPreset(
+        preset,
+        imageDimensions.value.width,
+        imageDimensions.value.height,
+        viewportDimensions.value.width,
+        viewportDimensions.value.height,
+      )
+      camera.value = newCamera
+    }
+    // If dimensions aren't ready, initializeZoom() will calculate when they are
   }
 
   /**
@@ -254,12 +271,19 @@ export const useEditUIStore = defineStore('editUI', () => {
   /**
    * Initialize zoom state when image/viewport dimensions change.
    * Called after both dimensions are set.
+   *
+   * This handles two scenarios:
+   * 1. Re-fitting when dimensions change while at a preset (e.g., viewport resize)
+   * 2. Initial calculation when setZoomPreset() was called before dimensions were ready
    */
   function initializeZoom(): void {
-    // If currently at fit preset, recalculate to fit new dimensions
-    if (zoomPreset.value === 'fit') {
+    const preset = zoomPreset.value
+
+    // For standard presets (fit, fill, 100%, 200%), always recalculate
+    // This handles both viewport resize and deferred preset calculations
+    if (preset === 'fit' || preset === 'fill' || preset === '100%' || preset === '200%') {
       const newCamera = createCameraForPreset(
-        'fit',
+        preset,
         imageDimensions.value.width,
         imageDimensions.value.height,
         viewportDimensions.value.width,
@@ -268,7 +292,7 @@ export const useEditUIStore = defineStore('editUI', () => {
       camera.value = newCamera
     }
     else {
-      // Recalculate pan to keep image properly positioned
+      // For custom zoom, just clamp pan to keep image properly positioned
       const clamped = clampPan(
         camera.value,
         imageDimensions.value.width,

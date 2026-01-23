@@ -110,3 +110,56 @@ Used parallel subagents to investigate:
 - 1 pre-existing failure (unrelated to crop changes)
 
 ---
+
+## Iteration 149: Fix Zoom Fit Centering and Fill
+
+**Time**: 2026-01-23 16:19 EST
+**Status**: Complete
+**Task**: Fix zoom "Fit" option not centering or filling correctly
+
+### Problem
+When using the "Fit" zoom option in the edit view:
+1. The image doesn't center properly in the edit pane
+2. The image doesn't fill the available space correctly
+
+Previous fix attempted (Iteration 147) added dimension guards but didn't fully resolve the issue.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+- Zoom fit calculation logic (mathematically correct)
+- Viewport dimension tracking (timing/race conditions)
+- Image dimension tracking (blob vs preview dimensions)
+- Centering logic (CSS transforms correct)
+- Tests and documented issues
+
+### Root Cause
+When `restoreZoomForAsset()` is called during asset navigation (before the new image loads), it calls `setZoomPreset('fit')` which immediately calculates the camera using STALE dimensions from the store (from the previous asset or 0x0). Later when the image loads and `initializeZoom()` is called, it should recalculate, but the issue was that `setZoomPreset()` unconditionally calculated camera even with invalid dimensions.
+
+### Implementation
+
+**Phase 1: Fix `setZoomPreset()` in editUI.ts**
+- Modified to only calculate camera when dimensions are valid (all > 0)
+- Preset is always set, but camera calculation is deferred if dimensions invalid
+- `initializeZoom()` will calculate camera when dimensions become valid
+
+**Phase 2: Update `initializeZoom()` in editUI.ts**
+- Extended to recalculate camera for ALL presets (fit, fill, 100%, 200%)
+- Previously only recalculated for 'fit' preset
+- Now handles deferred calculations from `setZoomPreset()`
+
+### Files Modified
+- `apps/web/app/stores/editUI.ts` - setZoomPreset and initializeZoom guards
+
+### Tests Added
+- 5 new tests in `apps/web/test/editUIStore.test.ts`:
+  - Sets preset but defers camera when image dimensions are 0
+  - Sets preset but defers camera when viewport dimensions are 0
+  - Sets preset but defers camera when all dimensions are 0
+  - Calculates camera when initializeZoom called after dimensions set
+  - Defers all preset calculations, then calculates on initializeZoom
+
+### Test Results
+- 1146 tests passed (5 new tests)
+- 1 pre-existing failure (unrelated to zoom)
+
+---

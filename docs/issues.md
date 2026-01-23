@@ -3,11 +3,12 @@
 ## Table of Contents
 
 ### Open Issues
-- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly)
-- [Preview generation is slow (Medium)](#preview-generation-is-slow)
+- [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
+- [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
 - [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying---solved)
 - [Zoom sensitivity too high (Medium)](#zoom-sensitivity-too-high---solved)
 - [Rotation causes GPU error (Critical)](#rotation-causes-gpu-error---solved)
@@ -50,25 +51,27 @@
 
 ## Open Issues
 
-### Zoom fit doesn't center or fill correctly
+### Crop re-edit should show full uncropped image
 
-**Severity**: Medium | **Type**: Bug
+**Severity**: Medium | **Type**: UX Enhancement
 
 **Problem**:
-When using the "Fit" zoom option in the edit view:
-1. The image doesn't center properly in the edit pane
-2. The image doesn't fill the available space correctly
+When re-entering the crop tool on an already-cropped image, the view only shows the currently cropped region. Users cannot see the parts of the image that were previously cropped out.
 
 **Expected Behavior**:
-- "Fit" should scale the image to fill as much of the edit pane as possible while maintaining aspect ratio
-- Image should be centered both horizontally and vertically in the pane
+When opening the crop tool on an image that already has a crop applied:
+1. Show the full original uncropped image
+2. Display the current crop region as an overlay on the full image
+3. Allow users to see and potentially include areas that were previously excluded
+4. This matches Lightroom's behavior where you can always see the full image when adjusting crop
 
-**Previous Fix Attempted** (2026-01-23):
-Updated `updateImageDimensions()` and `updateViewportDimensions()` to only call `initializeZoom()` when BOTH dimensions are valid. This did not fully resolve the issue.
+**Current Behavior**:
+The crop overlay only shows within the already-cropped boundaries, making it impossible to expand the crop to include previously excluded areas.
 
 **Files to Investigate**:
-- `apps/web/app/composables/useZoomPan.ts`
-- `apps/web/app/utils/zoomCalculations.ts`
+- `apps/web/app/composables/useCropOverlay.ts`
+- `apps/web/app/composables/useEditPreview.ts`
+- `apps/web/app/stores/editUI.ts`
 
 ---
 
@@ -122,6 +125,35 @@ Research whether staged caching would meaningfully improve performance or if it 
 ---
 
 ## Recently Solved
+
+### Zoom fit doesn't center or fill correctly - SOLVED
+
+**Severity**: Medium | **Fixed**: 2026-01-23
+
+**Problem**:
+When using the "Fit" zoom option in the edit view:
+1. The image doesn't center properly in the edit pane
+2. The image doesn't fill the available space correctly
+
+**Root Cause**:
+When `restoreZoomForAsset()` was called during asset navigation (before the new image loads), it called `setZoomPreset('fit')` which immediately calculated the camera using STALE dimensions from the store (from the previous asset or 0x0). The `setZoomPreset()` function unconditionally calculated camera even with invalid dimensions.
+
+**Fix Applied**:
+1. Modified `setZoomPreset()` in `editUI.ts` to only calculate camera when dimensions are valid (all > 0)
+2. Updated `initializeZoom()` to recalculate camera for ALL presets (fit, fill, 100%, 200%), not just 'fit'
+3. Now preset is always set, but camera calculation is deferred until `initializeZoom()` when dimensions become valid
+
+**Files Modified** (1):
+- `apps/web/app/stores/editUI.ts` - setZoomPreset and initializeZoom dimension guards
+
+**Tests Added** (5):
+- Sets preset but defers camera when image dimensions are 0
+- Sets preset but defers camera when viewport dimensions are 0
+- Sets preset but defers camera when all dimensions are 0
+- Calculates camera when initializeZoom called after dimensions set
+- Defers all preset calculations, then calculates on initializeZoom
+
+---
 
 ### Crop tool should confirm before applying - SOLVED
 

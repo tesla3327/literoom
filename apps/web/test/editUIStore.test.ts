@@ -245,6 +245,111 @@ describe('editUIStore', () => {
         expect(store.zoomPreset).toBe('fit')
       })
     })
+
+    describe('setZoomPreset with invalid dimensions', () => {
+      it('sets preset but does not calculate camera when image dimensions are 0', () => {
+        // Reset to invalid state
+        setActivePinia(createPinia())
+        store = useEditUIStore()
+
+        // Set only viewport dimensions (image still 0x0)
+        store.setViewportDimensions(1000, 800)
+
+        const initialCamera = { ...store.camera }
+
+        store.setZoomPreset('fit')
+
+        // Preset should be set
+        expect(store.zoomPreset).toBe('fit')
+        // Camera should NOT be updated (still default)
+        expect(store.camera).toEqual(initialCamera)
+      })
+
+      it('sets preset but does not calculate camera when viewport dimensions are 0', () => {
+        // Reset to invalid state
+        setActivePinia(createPinia())
+        store = useEditUIStore()
+
+        // Set only image dimensions (viewport still 0x0)
+        store.setImageDimensions(2000, 1500)
+
+        const initialCamera = { ...store.camera }
+
+        store.setZoomPreset('fit')
+
+        // Preset should be set
+        expect(store.zoomPreset).toBe('fit')
+        // Camera should NOT be updated (still default)
+        expect(store.camera).toEqual(initialCamera)
+      })
+
+      it('sets preset but does not calculate camera when all dimensions are 0', () => {
+        // Reset to invalid state (already 0x0)
+        setActivePinia(createPinia())
+        store = useEditUIStore()
+
+        const initialCamera = { ...store.camera }
+
+        store.setZoomPreset('100%')
+
+        // Preset should be set
+        expect(store.zoomPreset).toBe('100%')
+        // Camera should NOT be updated (still default)
+        expect(store.camera).toEqual(initialCamera)
+      })
+
+      it('calculates camera when initializeZoom is called after dimensions are set', () => {
+        // Reset to invalid state
+        setActivePinia(createPinia())
+        store = useEditUIStore()
+
+        // Set preset while dimensions are invalid
+        store.setZoomPreset('fit')
+        expect(store.zoomPreset).toBe('fit')
+
+        // Now set valid dimensions
+        store.setImageDimensions(2000, 1500)
+        store.setViewportDimensions(1000, 800)
+
+        // Call initializeZoom (simulates what happens when image loads)
+        store.initializeZoom()
+
+        // Camera should now be properly calculated for fit
+        expect(store.camera.scale).toBe(store.fitScale)
+        // Verify pan is centered
+        const expectedPanX = (1000 - 2000 * store.fitScale) / 2
+        const expectedPanY = (800 - 1500 * store.fitScale) / 2
+        expect(store.camera.panX).toBeCloseTo(expectedPanX, 1)
+        expect(store.camera.panY).toBeCloseTo(expectedPanY, 1)
+      })
+
+      it('defers all preset calculations when dimensions invalid, then calculates on initializeZoom', () => {
+        // Reset to invalid state
+        setActivePinia(createPinia())
+        store = useEditUIStore()
+
+        // Set various presets while dimensions are invalid
+        store.setZoomPreset('100%')
+        const cameraAfter100 = { ...store.camera }
+        store.setZoomPreset('200%')
+        const cameraAfter200 = { ...store.camera }
+
+        // Camera should be unchanged (still default)
+        expect(cameraAfter100).toEqual({ scale: 1, panX: 0, panY: 0 })
+        expect(cameraAfter200).toEqual({ scale: 1, panX: 0, panY: 0 })
+
+        // Final preset is '200%'
+        expect(store.zoomPreset).toBe('200%')
+
+        // Now set valid dimensions and initialize
+        store.setImageDimensions(2000, 1500)
+        store.setViewportDimensions(1000, 800)
+        store.initializeZoom()
+
+        // Camera should now be calculated for 200% preset
+        expect(store.camera.scale).toBe(2)
+      })
+    })
   })
 
   // ============================================================================
