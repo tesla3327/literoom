@@ -1,5 +1,16 @@
 # Iterations 161-170
 
+## 165: 2026-01-23 09:46 EST: GPU Acceleration - Phase 4.1 (Gradient Mask WGSL Shader)
+
+**Objective**: Implement the WGSL compute shader for linear and radial gradient masks.
+
+**Background**:
+Research synthesis is complete. This iteration implements the WGSL shader code following the established patterns from adjustments and tone-curve shaders. The shader must match the Rust implementation exactly for visual consistency.
+
+**In Progress**...
+
+---
+
 ## 164: 2026-01-23 08:56 EST: GPU Acceleration - Phase 4 Research (Gradient Mask Shaders)
 
 **Objective**: Create research plan and conduct research for GPU-accelerated gradient mask shaders.
