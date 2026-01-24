@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { MockCatalogService, createMockCatalogService } from './mock-catalog-service'
 import { createDemoAssets } from './demo-assets'
 import { CatalogError, ThumbnailPriority } from './types'
+import type { EditedThumbnailEditState } from '../decode/worker-messages'
 
 describe('MockCatalogService', () => {
   describe('create', () => {
@@ -307,6 +308,16 @@ describe('MockCatalogService', () => {
 
       expect(onAssetUpdated).toHaveBeenCalledTimes(3)
     })
+
+    it('throws error when configured to fail', async () => {
+      const service = await MockCatalogService.create({ failSetFlag: true })
+      await service.scanFolder()
+
+      const assets = service.getAssets().slice(0, 3)
+      const ids = assets.map(a => a.id)
+
+      await expect(service.setFlagBatch(ids, 'pick')).rejects.toThrow(CatalogError)
+    })
   })
 
   describe('requestThumbnail', () => {
@@ -388,6 +399,324 @@ describe('MockCatalogService', () => {
       // Should only fire once
       expect(onThumbnailReady).toHaveBeenCalledTimes(1)
     })
+
+    it('generates different thumbnails for different asset indices', async () => {
+      const service = await MockCatalogService.create({
+        thumbnailDelayMs: 0,
+        demoAssetOptions: { count: 10 },
+      })
+      await service.scanFolder()
+
+      const assets = service.getAssets()
+
+      // Request thumbnails for first few assets
+      service.requestThumbnail(assets[0].id, ThumbnailPriority.VISIBLE)
+      service.requestThumbnail(assets[1].id, ThumbnailPriority.VISIBLE)
+      service.requestThumbnail(assets[2].id, ThumbnailPriority.VISIBLE)
+
+      await vi.runAllTimersAsync()
+
+      const thumbnail0 = service.getAsset(assets[0].id)?.thumbnailUrl
+      const thumbnail1 = service.getAsset(assets[1].id)?.thumbnailUrl
+      const thumbnail2 = service.getAsset(assets[2].id)?.thumbnailUrl
+
+      // All should be data URLs
+      expect(thumbnail0).toMatch(/^data:image\/svg\+xml,/)
+      expect(thumbnail1).toMatch(/^data:image\/svg\+xml,/)
+      expect(thumbnail2).toMatch(/^data:image\/svg\+xml,/)
+
+      // Each should be unique (different patterns based on index)
+      expect(thumbnail0).not.toBe(thumbnail1)
+      expect(thumbnail1).not.toBe(thumbnail2)
+      expect(thumbnail0).not.toBe(thumbnail2)
+    })
+
+    it('uses green color for pick flag in thumbnails', async () => {
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 0 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      await service.setFlag(asset.id, 'pick')
+
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      const thumbnailUrl = service.getAsset(asset.id)?.thumbnailUrl
+      expect(thumbnailUrl).toBeDefined()
+      // Decode the URL-encoded SVG and check for green color
+      const decodedSvg = decodeURIComponent(thumbnailUrl!.replace('data:image/svg+xml,', ''))
+      expect(decodedSvg).toContain('#22c55e') // Green for pick
+    })
+
+    it('uses red color for reject flag in thumbnails', async () => {
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 0 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      await service.setFlag(asset.id, 'reject')
+
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      const thumbnailUrl = service.getAsset(asset.id)?.thumbnailUrl
+      expect(thumbnailUrl).toBeDefined()
+      // Decode the URL-encoded SVG and check for red color
+      const decodedSvg = decodeURIComponent(thumbnailUrl!.replace('data:image/svg+xml,', ''))
+      expect(decodedSvg).toContain('#ef4444') // Red for reject
+    })
+
+    it('uses blue color for unflagged assets in thumbnails', async () => {
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 0 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // Explicitly set flag to 'none' (demo assets may have varied flags based on index)
+      await service.setFlag(asset.id, 'none')
+
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      const thumbnailUrl = service.getAsset(asset.id)?.thumbnailUrl
+      expect(thumbnailUrl).toBeDefined()
+      // Decode the URL-encoded SVG and check for blue color
+      const decodedSvg = decodeURIComponent(thumbnailUrl!.replace('data:image/svg+xml,', ''))
+      expect(decodedSvg).toContain('#3b82f6') // Blue for unflagged
+    })
+
+    it('generates thumbnails with different colors based on flag status', async () => {
+      const service = await MockCatalogService.create({
+        thumbnailDelayMs: 0,
+        demoAssetOptions: { count: 3 },
+      })
+      await service.scanFolder()
+
+      const assets = service.getAssets()
+      // Explicitly set different flags on assets
+      await service.setFlag(assets[0].id, 'pick')
+      await service.setFlag(assets[1].id, 'reject')
+      await service.setFlag(assets[2].id, 'none') // Explicitly set to unflagged
+
+      // Request all thumbnails
+      service.requestThumbnail(assets[0].id, ThumbnailPriority.VISIBLE)
+      service.requestThumbnail(assets[1].id, ThumbnailPriority.VISIBLE)
+      service.requestThumbnail(assets[2].id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      const pickThumbnail = service.getAsset(assets[0].id)?.thumbnailUrl
+      const rejectThumbnail = service.getAsset(assets[1].id)?.thumbnailUrl
+      const unflaggedThumbnail = service.getAsset(assets[2].id)?.thumbnailUrl
+
+      // Decode SVGs
+      const pickSvg = decodeURIComponent(pickThumbnail!.replace('data:image/svg+xml,', ''))
+      const rejectSvg = decodeURIComponent(rejectThumbnail!.replace('data:image/svg+xml,', ''))
+      const unflaggedSvg = decodeURIComponent(unflaggedThumbnail!.replace('data:image/svg+xml,', ''))
+
+      // Verify each contains the correct color
+      expect(pickSvg).toContain('#22c55e')
+      expect(rejectSvg).toContain('#ef4444')
+      expect(unflaggedSvg).toContain('#3b82f6')
+
+      // Verify colors are exclusive (pick doesn't have reject color, etc.)
+      expect(pickSvg).not.toContain('#ef4444')
+      expect(rejectSvg).not.toContain('#22c55e')
+    })
+
+    it('does nothing if request already in queue', async () => {
+      const onThumbnailReady = vi.fn()
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 1000 })
+      service.onThumbnailReady = onThumbnailReady
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+
+      // Request twice before completion
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Queue should only have one entry
+      expect(service.getThumbnailQueueSize()).toBe(1)
+
+      // Run timers
+      await vi.runAllTimersAsync()
+
+      // Should only fire once
+      expect(onThumbnailReady).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('requestPreview', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('generates preview and fires onPreviewReady callback', async () => {
+      const onPreviewReady = vi.fn()
+      const service = await MockCatalogService.create({ previewDelayMs: 0 })
+      service.onPreviewReady = onPreviewReady
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Run timers
+      await vi.runAllTimersAsync()
+
+      expect(onPreviewReady).toHaveBeenCalledWith(asset.id, expect.any(String))
+    })
+
+    it('updates asset preview1xStatus to loading then ready', async () => {
+      const service = await MockCatalogService.create({ previewDelayMs: 100 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Should be loading immediately
+      expect(service.getAsset(asset.id)?.preview1xStatus).toBe('loading')
+
+      // Run timers
+      await vi.advanceTimersByTimeAsync(150)
+
+      // Should be ready after delay
+      expect(service.getAsset(asset.id)?.preview1xStatus).toBe('ready')
+      expect(service.getAsset(asset.id)?.preview1xUrl).toBeTruthy()
+    })
+
+    it('generates data URL previews (larger size than thumbnails)', async () => {
+      const service = await MockCatalogService.create({ previewDelayMs: 0, thumbnailDelayMs: 0 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+
+      // Request both thumbnail and preview
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+
+      await vi.runAllTimersAsync()
+
+      const thumbnailUrl = service.getAsset(asset.id)?.thumbnailUrl
+      const previewUrl = service.getAsset(asset.id)?.preview1xUrl
+
+      // Both should be data URLs
+      expect(thumbnailUrl).toMatch(/^data:image\/svg\+xml,/)
+      expect(previewUrl).toMatch(/^data:image\/svg\+xml,/)
+
+      // Preview should have larger dimensions (512 vs 256)
+      expect(previewUrl).toContain('width%3D%22512%22')
+      expect(thumbnailUrl).toContain('width%3D%22256%22')
+    })
+
+    it('does nothing for unknown asset', async () => {
+      const onPreviewReady = vi.fn()
+      const service = await MockCatalogService.create()
+      service.onPreviewReady = onPreviewReady
+
+      // Should not throw
+      service.requestPreview('unknown-id', ThumbnailPriority.VISIBLE)
+
+      await vi.runAllTimersAsync()
+
+      expect(onPreviewReady).not.toHaveBeenCalled()
+    })
+
+    it('does nothing if asset already has preview (no duplicate requests)', async () => {
+      const onPreviewReady = vi.fn()
+      const service = await MockCatalogService.create({ previewDelayMs: 0 })
+      service.onPreviewReady = onPreviewReady
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+
+      // Request twice
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      // Should only fire once
+      expect(onPreviewReady).toHaveBeenCalledTimes(1)
+    })
+
+    it('does nothing if request already in queue', async () => {
+      const onPreviewReady = vi.fn()
+      const service = await MockCatalogService.create({ previewDelayMs: 1000 })
+      service.onPreviewReady = onPreviewReady
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+
+      // Request twice before completion
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+      service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Run timers
+      await vi.runAllTimersAsync()
+
+      // Should only fire once
+      expect(onPreviewReady).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('updatePreviewPriority', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('updates priority of queued preview request', async () => {
+      const service = await MockCatalogService.create({ previewDelayMs: 1000 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      service.requestPreview(asset.id, ThumbnailPriority.BACKGROUND)
+
+      // Update priority (doesn't throw)
+      service.updatePreviewPriority(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Should complete successfully
+      await vi.runAllTimersAsync()
+
+      expect(service.getAsset(asset.id)?.preview1xStatus).toBe('ready')
+    })
+
+    it('does nothing for non-queued asset (does not throw)', async () => {
+      const service = await MockCatalogService.create({ previewDelayMs: 1000 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+
+      // Update priority without requesting preview first - should not throw
+      service.updatePreviewPriority(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Also try with unknown asset
+      service.updatePreviewPriority('unknown-id', ThumbnailPriority.VISIBLE)
+    })
+  })
+
+  describe('onPreviewReady callback', () => {
+    it('supports setting and getting onPreviewReady', async () => {
+      const service = await MockCatalogService.create()
+      const callback = vi.fn()
+
+      service.onPreviewReady = callback
+
+      expect(service.onPreviewReady).toBe(callback)
+    })
+
+    it('supports null callback', async () => {
+      const service = await MockCatalogService.create()
+
+      service.onPreviewReady = null
+
+      expect(service.onPreviewReady).toBeNull()
+    })
   })
 
   describe('updateThumbnailPriority', () => {
@@ -400,6 +729,177 @@ describe('MockCatalogService', () => {
 
       // Update priority (doesn't throw)
       service.updateThumbnailPriority(asset.id, ThumbnailPriority.VISIBLE)
+    })
+  })
+
+  describe('regenerateThumbnail', () => {
+    const mockEditState: EditedThumbnailEditState = {}
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('sets thumbnail status to loading and clears old URL', async () => {
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 100 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // First generate a thumbnail
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      // Verify thumbnail is ready
+      expect(service.getAsset(asset.id)?.thumbnailStatus).toBe('ready')
+      expect(service.getAsset(asset.id)?.thumbnailUrl).toBeTruthy()
+
+      // Start regeneration (don't await yet)
+      const regeneratePromise = service.regenerateThumbnail(asset.id, mockEditState)
+
+      // Status should be loading and URL should be cleared
+      expect(service.getAsset(asset.id)?.thumbnailStatus).toBe('loading')
+      expect(service.getAsset(asset.id)?.thumbnailUrl).toBeNull()
+
+      await vi.runAllTimersAsync()
+      await regeneratePromise
+    })
+
+    it('fires onAssetUpdated callback when status changes to loading', async () => {
+      const onAssetUpdated = vi.fn()
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 100 })
+      service.onAssetUpdated = onAssetUpdated
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // First generate a thumbnail
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      // Clear mock to only track regenerate calls
+      onAssetUpdated.mockClear()
+
+      // Start regeneration
+      const regeneratePromise = service.regenerateThumbnail(asset.id, mockEditState)
+
+      // Should have fired callback with loading status
+      expect(onAssetUpdated).toHaveBeenCalledTimes(1)
+      expect(onAssetUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ id: asset.id, thumbnailStatus: 'loading', thumbnailUrl: null })
+      )
+
+      await vi.runAllTimersAsync()
+      await regeneratePromise
+    })
+
+    it('schedules new thumbnail generation', async () => {
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 100 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // First generate a thumbnail
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      // Regenerate
+      const regeneratePromise = service.regenerateThumbnail(asset.id, mockEditState)
+
+      // Should be in the thumbnail queue
+      expect(service.getThumbnailQueueSize()).toBe(1)
+
+      await vi.runAllTimersAsync()
+      await regeneratePromise
+    })
+
+    it('completes and generates new thumbnail', async () => {
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 100 })
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // First generate a thumbnail
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      // Regenerate
+      const regeneratePromise = service.regenerateThumbnail(asset.id, mockEditState)
+
+      // Run timers to complete
+      await vi.advanceTimersByTimeAsync(150)
+      await regeneratePromise
+
+      // Should be ready with new thumbnail
+      expect(service.getAsset(asset.id)?.thumbnailStatus).toBe('ready')
+      expect(service.getAsset(asset.id)?.thumbnailUrl).toBeTruthy()
+      expect(service.getThumbnailQueueSize()).toBe(0)
+    })
+
+    it('fires onThumbnailReady callback when complete', async () => {
+      const onThumbnailReady = vi.fn()
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 100 })
+      service.onThumbnailReady = onThumbnailReady
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // First generate a thumbnail
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+      await vi.runAllTimersAsync()
+
+      // Clear mock to only track regenerate calls
+      onThumbnailReady.mockClear()
+
+      // Regenerate
+      const regeneratePromise = service.regenerateThumbnail(asset.id, mockEditState)
+
+      // Run timers to complete
+      await vi.advanceTimersByTimeAsync(150)
+      await regeneratePromise
+
+      expect(onThumbnailReady).toHaveBeenCalledTimes(1)
+      expect(onThumbnailReady).toHaveBeenCalledWith(asset.id, expect.any(String))
+    })
+
+    it('does nothing for unknown asset', async () => {
+      const onAssetUpdated = vi.fn()
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 100 })
+      service.onAssetUpdated = onAssetUpdated
+
+      // Regenerate for unknown asset
+      await service.regenerateThumbnail('unknown-id', mockEditState)
+
+      // Should not have called any callbacks
+      expect(onAssetUpdated).not.toHaveBeenCalled()
+      expect(service.getThumbnailQueueSize()).toBe(0)
+    })
+
+    it('cancels existing thumbnail request if one is pending', async () => {
+      const onThumbnailReady = vi.fn()
+      const service = await MockCatalogService.create({ thumbnailDelayMs: 200 })
+      service.onThumbnailReady = onThumbnailReady
+      await service.scanFolder()
+
+      const asset = service.getAssets()[0]
+      // Start initial thumbnail request
+      service.requestThumbnail(asset.id, ThumbnailPriority.VISIBLE)
+
+      // Advance partially
+      await vi.advanceTimersByTimeAsync(50)
+      expect(service.getThumbnailQueueSize()).toBe(1)
+
+      // Regenerate before first completes (this should cancel the pending request)
+      const regeneratePromise = service.regenerateThumbnail(asset.id, mockEditState)
+
+      // Still one item in queue (the new regeneration request)
+      expect(service.getThumbnailQueueSize()).toBe(1)
+
+      // Advance to when the original would have completed (but should be cancelled)
+      await vi.advanceTimersByTimeAsync(200)
+      await regeneratePromise
+
+      // Should only fire once (from regenerate, not from original request)
+      expect(onThumbnailReady).toHaveBeenCalledTimes(1)
+      expect(service.getAsset(asset.id)?.thumbnailStatus).toBe('ready')
     })
   })
 
@@ -452,6 +952,29 @@ describe('MockCatalogService', () => {
       expect(onThumbnailReady).not.toHaveBeenCalled()
       vi.useRealTimers()
     })
+
+    it('cancels pending preview requests', async () => {
+      vi.useFakeTimers()
+      const onPreviewReady = vi.fn()
+      const service = await MockCatalogService.create({ previewDelayMs: 1000 })
+      service.onPreviewReady = onPreviewReady
+      await service.scanFolder()
+
+      // Request previews
+      const assets = service.getAssets().slice(0, 5)
+      for (const asset of assets) {
+        service.requestPreview(asset.id, ThumbnailPriority.VISIBLE)
+      }
+
+      // Destroy before completion
+      service.destroy()
+
+      // Run timers - callbacks should not fire
+      await vi.advanceTimersByTimeAsync(2000)
+
+      expect(onPreviewReady).not.toHaveBeenCalled()
+      vi.useRealTimers()
+    })
   })
 
   describe('loadFromDatabase', () => {
@@ -473,6 +996,51 @@ describe('MockCatalogService', () => {
       const result = await service.loadFromDatabase()
 
       expect(result).toBe(true)
+    })
+  })
+
+  describe('listFolders', () => {
+    it('returns empty array (mock mode has no persisted folders)', async () => {
+      const service = await MockCatalogService.create()
+
+      const folders = await service.listFolders()
+
+      expect(folders).toEqual([])
+    })
+
+    it('accepts limit parameter without error', async () => {
+      const service = await MockCatalogService.create()
+
+      const folders = await service.listFolders(10)
+
+      expect(folders).toEqual([])
+    })
+
+    it('uses default limit when not specified', async () => {
+      const service = await MockCatalogService.create()
+
+      // Call without limit parameter - should use default of 5
+      const folders = await service.listFolders()
+
+      expect(folders).toEqual([])
+    })
+  })
+
+  describe('loadFolderById', () => {
+    it('returns false (mock mode does not support loading specific folders)', async () => {
+      const service = await MockCatalogService.create()
+
+      const result = await service.loadFolderById(1)
+
+      expect(result).toBe(false)
+    })
+
+    it('accepts folderId parameter without error', async () => {
+      const service = await MockCatalogService.create()
+
+      const result = await service.loadFolderById(999)
+
+      expect(result).toBe(false)
     })
   })
 
