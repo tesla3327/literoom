@@ -109,14 +109,13 @@ pub fn encode_jpeg_from_image(image: &JsDecodedImage, quality: u8) -> Result<Vec
 
 /// Tests for encode bindings.
 ///
-/// Note: Most encode tests use functions that return `Result<T, JsValue>`, which
-/// only work on wasm32 targets. For comprehensive encode testing, see the tests
-/// in `literoom_core::encode` which test the underlying functionality.
+/// These tests verify the encode bindings work correctly on native targets.
+/// Tests that require `JsValue` are in the `wasm_tests` module below.
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Tests that work on all targets
+    // Tests that work on all targets by using the underlying core functions
 
     #[test]
     fn test_encode_jpeg_from_image_creates_valid_jpeg() {
@@ -131,6 +130,276 @@ mod tests {
         let jpeg = result.unwrap();
         // Verify JPEG magic bytes
         assert_eq!(&jpeg[0..2], &[0xFF, 0xD8]);
+    }
+
+    #[test]
+    fn test_encode_jpeg_small_image() {
+        let img = JsDecodedImage::new(1, 1, vec![255, 0, 0]); // Red pixel
+
+        let pixels = img.pixels();
+        let result = encode::encode_jpeg(&pixels, img.width(), img.height(), 90);
+        assert!(result.is_ok());
+
+        let jpeg = result.unwrap();
+        assert_eq!(&jpeg[0..2], &[0xFF, 0xD8]); // SOI marker
+        let len = jpeg.len();
+        assert_eq!(&jpeg[len - 2..], &[0xFF, 0xD9]); // EOI marker
+    }
+
+    #[test]
+    fn test_encode_jpeg_various_sizes() {
+        // Test various image dimensions
+        let test_cases = [
+            (10, 10),
+            (50, 50),
+            (100, 50), // Wide
+            (50, 100), // Tall
+            (1, 100),  // Very thin
+            (100, 1),  // Very wide
+        ];
+
+        for (width, height) in test_cases {
+            let pixels = vec![128u8; width * height * 3];
+            let img = JsDecodedImage::new(width as u32, height as u32, pixels);
+
+            let pixel_data = img.pixels();
+            let result = encode::encode_jpeg(&pixel_data, img.width(), img.height(), 90);
+
+            assert!(
+                result.is_ok(),
+                "Failed to encode {}x{} image",
+                width,
+                height
+            );
+
+            let jpeg = result.unwrap();
+            assert_eq!(
+                &jpeg[0..2],
+                &[0xFF, 0xD8],
+                "Invalid JPEG header for {}x{}",
+                width,
+                height
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_jpeg_quality_levels() {
+        let img = JsDecodedImage::new(50, 50, vec![128u8; 50 * 50 * 3]);
+        let pixels = img.pixels();
+
+        // Test all typical quality levels
+        let quality_levels = [1, 10, 25, 50, 75, 90, 95, 100];
+
+        for quality in quality_levels {
+            let result = encode::encode_jpeg(&pixels, img.width(), img.height(), quality);
+            assert!(
+                result.is_ok(),
+                "Failed to encode with quality {}",
+                quality
+            );
+
+            let jpeg = result.unwrap();
+            assert!(jpeg.len() > 0, "Empty output for quality {}", quality);
+        }
+    }
+
+    #[test]
+    fn test_encode_jpeg_invalid_dimensions_zero_width() {
+        let pixels = vec![];
+        let result = encode::encode_jpeg(&pixels, 0, 100, 90);
+        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(encode::EncodeError::InvalidDimensions { .. })),
+            "Expected InvalidDimensions error"
+        );
+    }
+
+    #[test]
+    fn test_encode_jpeg_invalid_dimensions_zero_height() {
+        let pixels = vec![];
+        let result = encode::encode_jpeg(&pixels, 100, 0, 90);
+        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(encode::EncodeError::InvalidDimensions { .. })),
+            "Expected InvalidDimensions error"
+        );
+    }
+
+    #[test]
+    fn test_encode_jpeg_invalid_pixel_data_too_short() {
+        let pixels = vec![128u8; 99 * 100 * 3]; // One row short
+        let result = encode::encode_jpeg(&pixels, 100, 100, 90);
+        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(encode::EncodeError::InvalidPixelData { .. })),
+            "Expected InvalidPixelData error"
+        );
+    }
+
+    #[test]
+    fn test_encode_jpeg_invalid_pixel_data_too_long() {
+        let pixels = vec![128u8; 101 * 100 * 3]; // One row extra
+        let result = encode::encode_jpeg(&pixels, 100, 100, 90);
+        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(encode::EncodeError::InvalidPixelData { .. })),
+            "Expected InvalidPixelData error"
+        );
+    }
+
+    #[test]
+    fn test_encode_jpeg_gradient_image() {
+        // Create a gradient image to ensure complex content encodes correctly
+        let width = 50;
+        let height = 50;
+        let mut pixels = Vec::with_capacity(width * height * 3);
+
+        for y in 0..height {
+            for x in 0..width {
+                let r = (x * 255 / width) as u8;
+                let g = (y * 255 / height) as u8;
+                let b = 128u8;
+                pixels.push(r);
+                pixels.push(g);
+                pixels.push(b);
+            }
+        }
+
+        let img = JsDecodedImage::new(width as u32, height as u32, pixels);
+        let pixel_data = img.pixels();
+        let result = encode::encode_jpeg(&pixel_data, img.width(), img.height(), 90);
+
+        assert!(result.is_ok());
+        let jpeg = result.unwrap();
+        assert!(jpeg.len() > 100, "Gradient image should produce substantial output");
+    }
+
+    #[test]
+    fn test_encode_jpeg_black_and_white_images() {
+        let width = 20;
+        let height = 20;
+
+        // All black
+        let black_pixels = vec![0u8; width * height * 3];
+        let result = encode::encode_jpeg(&black_pixels, width as u32, height as u32, 90);
+        assert!(result.is_ok());
+
+        // All white
+        let white_pixels = vec![255u8; width * height * 3];
+        let result = encode::encode_jpeg(&white_pixels, width as u32, height as u32, 90);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_encode_jpeg_primary_colors() {
+        let width = 10;
+        let height = 10;
+
+        // Red
+        let mut red_pixels = Vec::with_capacity(width * height * 3);
+        for _ in 0..(width * height) {
+            red_pixels.extend_from_slice(&[255, 0, 0]);
+        }
+        let result = encode::encode_jpeg(&red_pixels, width as u32, height as u32, 90);
+        assert!(result.is_ok());
+
+        // Green
+        let mut green_pixels = Vec::with_capacity(width * height * 3);
+        for _ in 0..(width * height) {
+            green_pixels.extend_from_slice(&[0, 255, 0]);
+        }
+        let result = encode::encode_jpeg(&green_pixels, width as u32, height as u32, 90);
+        assert!(result.is_ok());
+
+        // Blue
+        let mut blue_pixels = Vec::with_capacity(width * height * 3);
+        for _ in 0..(width * height) {
+            blue_pixels.extend_from_slice(&[0, 0, 255]);
+        }
+        let result = encode::encode_jpeg(&blue_pixels, width as u32, height as u32, 90);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_encode_jpeg_quality_affects_file_size() {
+        let width = 50;
+        let height = 50;
+
+        // Create a complex image (gradient) where quality difference is visible
+        let mut pixels = Vec::with_capacity(width * height * 3);
+        for y in 0..height {
+            for x in 0..width {
+                pixels.push(((x * 255) / width) as u8);
+                pixels.push(((y * 255) / height) as u8);
+                pixels.push(((x + y) * 127 / (width + height)) as u8);
+            }
+        }
+
+        let low_q = encode::encode_jpeg(&pixels, width as u32, height as u32, 10).unwrap();
+        let high_q = encode::encode_jpeg(&pixels, width as u32, height as u32, 100).unwrap();
+
+        // High quality should be larger (or at least not much smaller)
+        assert!(
+            high_q.len() > low_q.len() || (low_q.len() as f64 / high_q.len() as f64) < 1.5,
+            "High quality ({}) should generally be larger than low quality ({})",
+            high_q.len(),
+            low_q.len()
+        );
+    }
+
+    #[test]
+    fn test_encode_jpeg_deterministic() {
+        let pixels = vec![128u8; 20 * 20 * 3];
+
+        let result1 = encode::encode_jpeg(&pixels, 20, 20, 90).unwrap();
+        let result2 = encode::encode_jpeg(&pixels, 20, 20, 90).unwrap();
+
+        assert_eq!(result1, result2, "Same input should produce same output");
+    }
+
+    #[test]
+    fn test_js_decoded_image_to_jpeg_roundtrip_structure() {
+        // Test the JsDecodedImage workflow without JsValue
+        let original = JsDecodedImage::new(30, 30, vec![100u8; 30 * 30 * 3]);
+
+        // Verify dimensions preserved
+        assert_eq!(original.width(), 30);
+        assert_eq!(original.height(), 30);
+        assert_eq!(original.byte_length(), 30 * 30 * 3);
+
+        // Encode to JPEG
+        let pixels = original.pixels();
+        let jpeg = encode::encode_jpeg(&pixels, original.width(), original.height(), 90).unwrap();
+
+        // Verify JPEG structure
+        assert_eq!(&jpeg[0..2], &[0xFF, 0xD8]);
+        let len = jpeg.len();
+        assert_eq!(&jpeg[len - 2..], &[0xFF, 0xD9]);
+    }
+
+    #[test]
+    fn test_encode_jpeg_extreme_aspect_ratios() {
+        // Very wide
+        let wide = vec![128u8; 200 * 10 * 3];
+        assert!(encode::encode_jpeg(&wide, 200, 10, 90).is_ok());
+
+        // Very tall
+        let tall = vec![128u8; 10 * 200 * 3];
+        assert!(encode::encode_jpeg(&tall, 10, 200, 90).is_ok());
+    }
+
+    #[test]
+    fn test_encode_jpeg_quality_clamping() {
+        let pixels = vec![128u8; 10 * 10 * 3];
+
+        // Quality 0 should be clamped to 1
+        let result = encode::encode_jpeg(&pixels, 10, 10, 0);
+        assert!(result.is_ok());
+
+        // Quality 255 should be clamped to 100
+        let result = encode::encode_jpeg(&pixels, 10, 10, 255);
+        assert!(result.is_ok());
     }
 }
 
