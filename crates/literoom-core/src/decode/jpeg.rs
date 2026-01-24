@@ -280,4 +280,183 @@ mod tests {
         assert_eq!(rgb_result.get_pixel(0, 0).0, [0, 255, 0]); // Green
         assert_eq!(rgb_result.get_pixel(1, 0).0, [255, 0, 0]); // Red
     }
+
+    #[test]
+    fn test_apply_orientation_flip_vertical() {
+        // Create a simple 1x2 image (vertical)
+        let pixels = vec![
+            255, 0, 0, // Red (top)
+            0, 255, 0, // Green (bottom)
+        ];
+        let rgb_img = image::RgbImage::from_raw(1, 2, pixels).unwrap();
+        let img = DynamicImage::ImageRgb8(rgb_img);
+
+        // Flip vertical should swap top and bottom
+        let result = apply_orientation(img, Orientation::FlipVertical);
+        let rgb_result = result.into_rgb8();
+
+        assert_eq!(rgb_result.dimensions(), (1, 2));
+        assert_eq!(rgb_result.get_pixel(0, 0).0, [0, 255, 0]); // Green (now on top)
+        assert_eq!(rgb_result.get_pixel(0, 1).0, [255, 0, 0]); // Red (now on bottom)
+    }
+
+    #[test]
+    fn test_apply_orientation_transpose() {
+        // Create a simple 2x1 image
+        let pixels = vec![
+            255, 0, 0, // Red (left)
+            0, 255, 0, // Green (right)
+        ];
+        let rgb_img = image::RgbImage::from_raw(2, 1, pixels).unwrap();
+        let img = DynamicImage::ImageRgb8(rgb_img);
+
+        // Transpose = rotate90 + fliph
+        let result = apply_orientation(img, Orientation::Transpose);
+        let rgb_result = result.into_rgb8();
+
+        // Dimensions should swap from 2x1 to 1x2
+        assert_eq!(rgb_result.dimensions(), (1, 2));
+    }
+
+    #[test]
+    fn test_apply_orientation_rotate270() {
+        // Create a simple 2x1 image
+        let pixels = vec![
+            255, 0, 0, // Red (left)
+            0, 255, 0, // Green (right)
+        ];
+        let rgb_img = image::RgbImage::from_raw(2, 1, pixels).unwrap();
+        let img = DynamicImage::ImageRgb8(rgb_img);
+
+        // Rotate 270 CW (same as 90 CCW) should make it 1x2 (vertical)
+        let result = apply_orientation(img, Orientation::Rotate270CW);
+        let rgb_result = result.into_rgb8();
+
+        // Dimensions should swap
+        assert_eq!(rgb_result.dimensions(), (1, 2));
+    }
+
+    #[test]
+    fn test_apply_orientation_transverse() {
+        // Create a simple 2x1 image
+        let pixels = vec![
+            255, 0, 0, // Red (left)
+            0, 255, 0, // Green (right)
+        ];
+        let rgb_img = image::RgbImage::from_raw(2, 1, pixels).unwrap();
+        let img = DynamicImage::ImageRgb8(rgb_img);
+
+        // Transverse = rotate270 + fliph
+        let result = apply_orientation(img, Orientation::Transverse);
+        let rgb_result = result.into_rgb8();
+
+        // Dimensions should swap from 2x1 to 1x2
+        assert_eq!(rgb_result.dimensions(), (1, 2));
+    }
+
+    // JPEG with EXIF orientation 6 (Rotate 90 CW)
+    // This is a minimal 1x1 JPEG with EXIF orientation tag set to 6
+    const JPEG_WITH_EXIF_ORIENTATION_6: &[u8] = &[
+        // SOI marker
+        0xFF, 0xD8,
+        // APP1 marker (EXIF)
+        0xFF, 0xE1,
+        // APP1 length (38 bytes)
+        0x00, 0x26,
+        // EXIF header
+        0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+        // TIFF header (little endian)
+        0x49, 0x49, 0x2A, 0x00,
+        // IFD0 offset (8 bytes from TIFF header)
+        0x08, 0x00, 0x00, 0x00,
+        // Number of IFD entries (1)
+        0x01, 0x00,
+        // IFD entry: Orientation tag (0x0112)
+        0x12, 0x01,
+        // Type: SHORT (3)
+        0x03, 0x00,
+        // Count: 1
+        0x01, 0x00, 0x00, 0x00,
+        // Value: 6 (Rotate 90 CW)
+        0x06, 0x00, 0x00, 0x00,
+        // Next IFD offset (0 = none)
+        0x00, 0x00, 0x00, 0x00,
+        // JFIF APP0 marker
+        0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00,
+        0x01, 0x00, 0x01, 0x00, 0x00,
+        // DQT marker
+        0xFF, 0xDB, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06,
+        0x05, 0x08, 0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B,
+        0x0C, 0x19, 0x12, 0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
+        0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29, 0x2C, 0x30, 0x31,
+        0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34, 0x32,
+        // SOF0 marker
+        0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00,
+        // DHT marker
+        0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+        // DHT marker (AC table)
+        0xFF, 0xC4, 0x00, 0xB5, 0x10, 0x00, 0x02, 0x01, 0x03, 0x03, 0x02, 0x04, 0x03, 0x05, 0x05,
+        0x04, 0x04, 0x00, 0x00, 0x01, 0x7D, 0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21,
+        0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xA1, 0x08,
+        0x23, 0x42, 0xB1, 0xC1, 0x15, 0x52, 0xD1, 0xF0, 0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0A,
+        0x16, 0x17, 0x18, 0x19, 0x1A, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x34, 0x35, 0x36, 0x37,
+        0x38, 0x39, 0x3A, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x53, 0x54, 0x55, 0x56,
+        0x57, 0x58, 0x59, 0x5A, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x73, 0x74, 0x75,
+        0x76, 0x77, 0x78, 0x79, 0x7A, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x92, 0x93,
+        0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9,
+        0xAA, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6,
+        0xC7, 0xC8, 0xC9, 0xCA, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xE1, 0xE2,
+        0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7,
+        0xF8, 0xF9, 0xFA,
+        // SOS marker
+        0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0xFB, 0xD5,
+        0xDB, 0x20, 0xA8, 0xF1, 0x7E,
+        // EOI marker
+        0xFF, 0xD9,
+    ];
+
+    #[test]
+    fn test_get_orientation_with_exif() {
+        let orientation = get_orientation(JPEG_WITH_EXIF_ORIENTATION_6);
+        assert_eq!(orientation, Orientation::Rotate90CW);
+    }
+
+    #[test]
+    fn test_decode_jpeg_with_exif_orientation() {
+        // This test verifies that decode_jpeg correctly applies EXIF orientation
+        let result = decode_jpeg(JPEG_WITH_EXIF_ORIENTATION_6);
+        assert!(result.is_ok(), "Failed to decode JPEG with EXIF: {:?}", result);
+
+        // The image should be decoded successfully
+        let img = result.unwrap();
+        // 1x1 image stays 1x1 after any rotation
+        assert_eq!(img.width, 1);
+        assert_eq!(img.height, 1);
+    }
+
+    #[test]
+    fn test_decode_jpeg_no_orientation_ignores_exif() {
+        // This test verifies that decode_jpeg_no_orientation skips EXIF processing
+        let result = decode_jpeg_no_orientation(JPEG_WITH_EXIF_ORIENTATION_6);
+        assert!(result.is_ok());
+
+        let img = result.unwrap();
+        assert_eq!(img.width, 1);
+        assert_eq!(img.height, 1);
+    }
+
+    #[test]
+    fn test_decode_jpeg_only_jpeg_header() {
+        // Just the SOI marker - not a complete JPEG
+        let incomplete = &[0xFF, 0xD8];
+        let result = decode_jpeg(incomplete);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_jpeg_no_orientation_invalid() {
+        let result = decode_jpeg_no_orientation(&[0x00, 0x01, 0x02]);
+        assert!(result.is_err());
+    }
 }
