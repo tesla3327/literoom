@@ -25,3 +25,4 @@
 - apps/web/app/stores/selection.ts (extracted getNavigatedId and findWithWrapAround helpers to DRY navigateNext, navigatePrevious, and navigateToNextUnflagged)
 - apps/web/app/components/help/HelpModal.vue (extracted shortcut data into typed Column/Section/Shortcut structures and used v-for to replace ~200 lines of repetitive HTML with ~50 lines of data-driven template)
 - apps/web/app/components/catalog/RecentFoldersDropdown.vue (extracted formatRelativeTime utility to DRY duplicate formatDate functions in RecentFoldersDropdown.vue and index.vue)
+- apps/web/app/stores/edit.ts (extracted findMaskById helper to DRY mask lookups in toggleMaskEnabled, setMaskAdjustments, setMaskAdjustment, and selectedMask computed; extracted buildEditState helper to DRY EditState construction in editState computed, saveToCache, and getEditStateForAsset)

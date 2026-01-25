@@ -46,6 +46,45 @@ import { DEFAULT_TONE_CURVE } from '@literoom/core/decode'
 
 export const useEditStore = defineStore('edit', () => {
   // ============================================================================
+  // Helpers
+  // ============================================================================
+
+  /**
+   * Find a mask by ID across both linear and radial mask arrays.
+   * Returns the mask and its type, or null if not found.
+   */
+  function findMaskById(maskStack: MaskStack | null, id: string): {
+    mask: LinearGradientMask | RadialGradientMask
+    type: 'linear' | 'radial'
+  } | null {
+    if (!maskStack) return null
+
+    const linearMask = maskStack.linearMasks.find(m => m.id === id)
+    if (linearMask) return { mask: linearMask, type: 'linear' }
+
+    const radialMask = maskStack.radialMasks.find(m => m.id === id)
+    if (radialMask) return { mask: radialMask, type: 'radial' }
+
+    return null
+  }
+
+  /**
+   * Build an EditState object from current state values.
+   */
+  function buildEditState(
+    adj: Adjustments,
+    transform: CropTransform,
+    maskStack: MaskStack | null,
+  ): EditState {
+    return {
+      version: EDIT_SCHEMA_VERSION,
+      adjustments: { ...adj },
+      cropTransform: cloneCropTransform(transform),
+      masks: maskStack ? cloneMaskStack(maskStack) : undefined,
+    }
+  }
+
+  // ============================================================================
   // State
   // ============================================================================
 
@@ -138,26 +177,16 @@ export const useEditStore = defineStore('edit', () => {
    * The currently selected mask and its type.
    */
   const selectedMask = computed(() => {
-    if (!selectedMaskId.value || !masks.value) return null
-
-    const linearMask = masks.value.linearMasks.find(m => m.id === selectedMaskId.value)
-    if (linearMask) return { type: 'linear' as const, mask: linearMask }
-
-    const radialMask = masks.value.radialMasks.find(m => m.id === selectedMaskId.value)
-    if (radialMask) return { type: 'radial' as const, mask: radialMask }
-
-    return null
+    if (!selectedMaskId.value) return null
+    return findMaskById(masks.value, selectedMaskId.value)
   })
 
   /**
    * Get the full edit state object.
    */
-  const editState = computed<EditState>(() => ({
-    version: EDIT_SCHEMA_VERSION,
-    adjustments: { ...adjustments.value },
-    cropTransform: cloneCropTransform(cropTransform.value),
-    masks: masks.value ? cloneMaskStack(masks.value) : undefined,
-  }))
+  const editState = computed<EditState>(() =>
+    buildEditState(adjustments.value, cropTransform.value, masks.value),
+  )
 
   // ============================================================================
   // Actions
@@ -275,12 +304,7 @@ export const useEditStore = defineStore('edit', () => {
    * IndexedDB persistence is async and non-blocking.
    */
   function saveToCache(assetId: string): void {
-    const state: EditState = {
-      version: EDIT_SCHEMA_VERSION,
-      adjustments: { ...adjustments.value },
-      cropTransform: cloneCropTransform(cropTransform.value),
-      masks: masks.value ? cloneMaskStack(masks.value) : undefined,
-    }
+    const state = buildEditState(adjustments.value, cropTransform.value, masks.value)
 
     // Update in-memory cache immediately
     editCache.value.set(assetId, state)
@@ -298,12 +322,7 @@ export const useEditStore = defineStore('edit', () => {
   function getEditStateForAsset(assetId: string): EditState | null {
     // If it's the current asset, return current state (which may be newer than cache)
     if (assetId === currentAssetId.value) {
-      return {
-        version: EDIT_SCHEMA_VERSION,
-        adjustments: { ...adjustments.value },
-        cropTransform: cloneCropTransform(cropTransform.value),
-        masks: masks.value ? cloneMaskStack(masks.value) : undefined,
-      }
+      return buildEditState(adjustments.value, cropTransform.value, masks.value)
     }
     return editCache.value.get(assetId) ?? null
   }
@@ -622,18 +641,9 @@ export const useEditStore = defineStore('edit', () => {
    * Toggle mask enabled state.
    */
   function toggleMaskEnabled(id: string): void {
-    if (!masks.value) return
-
-    const linearMask = masks.value.linearMasks.find(m => m.id === id)
-    if (linearMask) {
-      linearMask.enabled = !linearMask.enabled
-      markDirty()
-      return
-    }
-
-    const radialMask = masks.value.radialMasks.find(m => m.id === id)
-    if (radialMask) {
-      radialMask.enabled = !radialMask.enabled
+    const found = findMaskById(masks.value, id)
+    if (found) {
+      found.mask.enabled = !found.mask.enabled
       markDirty()
     }
   }
@@ -648,19 +658,10 @@ export const useEditStore = defineStore('edit', () => {
   /**
    * Set adjustments for a specific mask.
    */
-  function setMaskAdjustments(id: string, adjustments: MaskAdjustments): void {
-    if (!masks.value) return
-
-    const linearMask = masks.value.linearMasks.find(m => m.id === id)
-    if (linearMask) {
-      linearMask.adjustments = { ...adjustments }
-      markDirty()
-      return
-    }
-
-    const radialMask = masks.value.radialMasks.find(m => m.id === id)
-    if (radialMask) {
-      radialMask.adjustments = { ...adjustments }
+  function setMaskAdjustments(id: string, newAdjustments: MaskAdjustments): void {
+    const found = findMaskById(masks.value, id)
+    if (found) {
+      found.mask.adjustments = { ...newAdjustments }
       markDirty()
     }
   }
@@ -669,22 +670,10 @@ export const useEditStore = defineStore('edit', () => {
    * Update a single adjustment for a specific mask.
    */
   function setMaskAdjustment(id: string, key: keyof MaskAdjustments, value: number): void {
-    if (!masks.value) return
-
-    const linearMask = masks.value.linearMasks.find(m => m.id === id)
-    if (linearMask) {
-      linearMask.adjustments = {
-        ...linearMask.adjustments,
-        [key]: value,
-      }
-      markDirty()
-      return
-    }
-
-    const radialMask = masks.value.radialMasks.find(m => m.id === id)
-    if (radialMask) {
-      radialMask.adjustments = {
-        ...radialMask.adjustments,
+    const found = findMaskById(masks.value, id)
+    if (found) {
+      found.mask.adjustments = {
+        ...found.mask.adjustments,
         [key]: value,
       }
       markDirty()
