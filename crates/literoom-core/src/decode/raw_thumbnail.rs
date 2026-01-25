@@ -39,6 +39,37 @@ const TAG_COMPRESSION: u16 = 0x0103;
 const COMPRESSION_JPEG: u16 = 6;
 const COMPRESSION_JPEG_OLD: u16 = 7;
 
+// JPEG magic bytes
+const JPEG_START: [u8; 2] = [0xFF, 0xD8];
+const JPEG_END: [u8; 2] = [0xFF, 0xD9];
+
+/// Check if a byte slice starts with JPEG magic bytes.
+#[inline]
+fn is_jpeg_data(data: &[u8]) -> bool {
+    data.len() >= 2 && data[0] == JPEG_START[0] && data[1] == JPEG_START[1]
+}
+
+/// Safely extract a slice from file bytes if within bounds.
+/// Returns None if offset + length exceeds file size or length is zero.
+#[inline]
+fn extract_slice(file_bytes: &[u8], offset: usize, length: usize) -> Option<&[u8]> {
+    if length == 0 || offset.checked_add(length)? > file_bytes.len() {
+        return None;
+    }
+    Some(&file_bytes[offset..offset + length])
+}
+
+/// Extract JPEG data from file bytes if valid.
+/// Checks bounds and validates JPEG magic bytes.
+fn extract_jpeg_data(file_bytes: &[u8], offset: u32, length: u32) -> Option<Vec<u8>> {
+    let data = extract_slice(file_bytes, offset as usize, length as usize)?;
+    if is_jpeg_data(data) {
+        Some(data.to_vec())
+    } else {
+        None
+    }
+}
+
 /// Extract the embedded JPEG thumbnail from a RAW file.
 ///
 /// This extracts the raw JPEG bytes from the RAW file without decoding.
@@ -328,35 +359,20 @@ fn extract_jpeg_from_entries(
 
     // Try JPEG interchange format first (most common for thumbnails)
     if let (Some(offset), Some(length)) = (jpeg_offset, jpeg_length) {
-        let offset = offset as usize;
-        let length = length as usize;
-
-        if offset + length <= file_bytes.len() && length > 0 {
-            let jpeg_data = &file_bytes[offset..offset + length];
-            // Validate it's actually JPEG
-            if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
-                return Ok(jpeg_data.to_vec());
-            }
+        if let Some(data) = extract_jpeg_data(file_bytes, offset, length) {
+            return Ok(data);
         }
     }
 
     // Try strip-based JPEG (used by some cameras)
     if let (Some(offset), Some(length)) = (strip_offsets, strip_byte_counts) {
-        // Check if this is JPEG compressed
         let is_jpeg = compression
             .map(|c| c == COMPRESSION_JPEG || c == COMPRESSION_JPEG_OLD)
             .unwrap_or(false);
 
         if is_jpeg {
-            let offset = offset as usize;
-            let length = length as usize;
-
-            if offset + length <= file_bytes.len() && length > 0 {
-                let data = &file_bytes[offset..offset + length];
-                // Validate it's actually JPEG
-                if data.len() >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
-                    return Ok(data.to_vec());
-                }
+            if let Some(data) = extract_jpeg_data(file_bytes, offset, length) {
+                return Ok(data);
             }
         }
     }
@@ -367,20 +383,18 @@ fn extract_jpeg_from_entries(
 /// Scan for embedded JPEG by looking for JPEG markers.
 /// This is a fallback method when IFD parsing doesn't find the preview.
 fn scan_for_jpeg(bytes: &[u8]) -> Option<Vec<u8>> {
-    // Look for JPEG start marker (FFD8)
     // Skip the first few KB to avoid the main TIFF structure
     let start_offset = 8192.min(bytes.len());
+    const MIN_PREVIEW_SIZE: usize = 50_000;
 
     for i in start_offset..bytes.len().saturating_sub(2) {
-        if bytes[i] == 0xFF && bytes[i + 1] == 0xD8 {
+        if bytes[i] == JPEG_START[0] && bytes[i + 1] == JPEG_START[1] {
             // Found potential JPEG start, now find the end
             for j in (i + 2)..bytes.len().saturating_sub(1) {
-                if bytes[j] == 0xFF && bytes[j + 1] == 0xD9 {
-                    // Found JPEG end marker
+                if bytes[j] == JPEG_END[0] && bytes[j + 1] == JPEG_END[1] {
                     let jpeg_data = &bytes[i..j + 2];
-
                     // Sanity check: preview JPEGs are typically > 50KB
-                    if jpeg_data.len() > 50_000 {
+                    if jpeg_data.len() > MIN_PREVIEW_SIZE {
                         return Some(jpeg_data.to_vec());
                     }
                 }
@@ -396,26 +410,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_raw_file_tiff_le() {
-        let header = [0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00];
-        assert!(is_raw_file(&header));
-    }
+    fn test_is_raw_file() {
+        // Little-endian TIFF header (valid RAW)
+        assert!(is_raw_file(&[0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00]));
 
-    #[test]
-    fn test_is_raw_file_tiff_be() {
-        let header = [0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08];
-        assert!(is_raw_file(&header));
-    }
+        // Big-endian TIFF header (valid RAW)
+        assert!(is_raw_file(&[0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08]));
 
-    #[test]
-    fn test_is_raw_file_jpeg_not_raw() {
-        // JPEG magic bytes
-        let jpeg_header = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
-        assert!(!is_raw_file(&jpeg_header));
-    }
+        // JPEG magic bytes (not RAW)
+        assert!(!is_raw_file(&[0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]));
 
-    #[test]
-    fn test_is_raw_file_too_short() {
+        // Too short (not RAW)
         assert!(!is_raw_file(&[0x49, 0x49]));
         assert!(!is_raw_file(&[]));
     }
@@ -452,35 +457,25 @@ mod tests {
     }
 
     #[test]
-    fn test_read_u16_little_endian() {
-        let data = [0x34, 0x12];
-        let mut cursor = Cursor::new(&data[..]);
-        let value = read_u16(&mut cursor, true).unwrap();
-        assert_eq!(value, 0x1234);
+    fn test_read_u16_endianness() {
+        // Little-endian
+        let mut cursor = Cursor::new(&[0x34, 0x12][..]);
+        assert_eq!(read_u16(&mut cursor, true).unwrap(), 0x1234);
+
+        // Big-endian
+        let mut cursor = Cursor::new(&[0x12, 0x34][..]);
+        assert_eq!(read_u16(&mut cursor, false).unwrap(), 0x1234);
     }
 
     #[test]
-    fn test_read_u16_big_endian() {
-        let data = [0x12, 0x34];
-        let mut cursor = Cursor::new(&data[..]);
-        let value = read_u16(&mut cursor, false).unwrap();
-        assert_eq!(value, 0x1234);
-    }
+    fn test_read_u32_endianness() {
+        // Little-endian
+        let mut cursor = Cursor::new(&[0x78, 0x56, 0x34, 0x12][..]);
+        assert_eq!(read_u32(&mut cursor, true).unwrap(), 0x12345678);
 
-    #[test]
-    fn test_read_u32_little_endian() {
-        let data = [0x78, 0x56, 0x34, 0x12];
-        let mut cursor = Cursor::new(&data[..]);
-        let value = read_u32(&mut cursor, true).unwrap();
-        assert_eq!(value, 0x12345678);
-    }
-
-    #[test]
-    fn test_read_u32_big_endian() {
-        let data = [0x12, 0x34, 0x56, 0x78];
-        let mut cursor = Cursor::new(&data[..]);
-        let value = read_u32(&mut cursor, false).unwrap();
-        assert_eq!(value, 0x12345678);
+        // Big-endian
+        let mut cursor = Cursor::new(&[0x12, 0x34, 0x56, 0x78][..]);
+        assert_eq!(read_u32(&mut cursor, false).unwrap(), 0x12345678);
     }
 
     // Note: Tests with actual ARW files would require test fixtures.
@@ -623,67 +618,37 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_jpeg_no_start_marker() {
-        // Create buffer without JPEG start marker
+    fn test_scan_for_jpeg_not_found_cases() {
+        // No start marker
         let mut bytes = vec![0u8; 70_000];
-        // Only place end marker, no start marker
-        bytes[65_000] = 0xFF;
-        bytes[65_001] = 0xD9;
+        bytes[65_000] = JPEG_END[0];
+        bytes[65_001] = JPEG_END[1];
+        assert!(scan_for_jpeg(&bytes).is_none(), "Should not find without start marker");
 
-        let result = scan_for_jpeg(&bytes);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_scan_for_jpeg_no_end_marker() {
-        // Create buffer with start marker but no end marker
-        let mut bytes = vec![0u8; 70_000];
-        // Place JPEG start marker
-        bytes[10_000] = 0xFF;
-        bytes[10_001] = 0xD8;
         // No end marker
-
-        let result = scan_for_jpeg(&bytes);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_scan_for_jpeg_marker_before_8192() {
-        // JPEG markers before offset 8192 should be ignored
         let mut bytes = vec![0u8; 70_000];
-        // Place JPEG markers before 8192 offset
-        bytes[1_000] = 0xFF;
-        bytes[1_001] = 0xD8;
-        bytes[60_000] = 0xFF;
-        bytes[60_001] = 0xD9;
+        bytes[10_000] = JPEG_START[0];
+        bytes[10_001] = JPEG_START[1];
+        assert!(scan_for_jpeg(&bytes).is_none(), "Should not find without end marker");
 
-        let result = scan_for_jpeg(&bytes);
-        // Should not find this JPEG because start marker is before 8192
-        assert!(result.is_none());
-    }
+        // Start marker before 8192 offset (ignored)
+        let mut bytes = vec![0u8; 70_000];
+        bytes[1_000] = JPEG_START[0];
+        bytes[1_001] = JPEG_START[1];
+        bytes[60_000] = JPEG_END[0];
+        bytes[60_001] = JPEG_END[1];
+        assert!(scan_for_jpeg(&bytes).is_none(), "Should ignore markers before offset 8192");
 
-    #[test]
-    fn test_scan_for_jpeg_empty_input() {
-        let bytes: Vec<u8> = vec![];
-        let result = scan_for_jpeg(&bytes);
-        assert!(result.is_none());
-    }
+        // Empty input
+        assert!(scan_for_jpeg(&[]).is_none(), "Empty input should return None");
 
-    #[test]
-    fn test_scan_for_jpeg_small_input() {
-        // Input smaller than 8192 bytes - start_offset becomes bytes.len()
+        // Input smaller than 8192 bytes
         let mut bytes = vec![0u8; 5_000];
-        // Place markers - but since input is < 8192, start_offset = 5000
-        // and there's nothing to scan after that
-        bytes[1_000] = 0xFF;
-        bytes[1_001] = 0xD8;
-        bytes[4_000] = 0xFF;
-        bytes[4_001] = 0xD9;
-
-        let result = scan_for_jpeg(&bytes);
-        // Should return None because scanning starts at bytes.len() (5000)
-        // and there's nothing after that
-        assert!(result.is_none());
+        bytes[1_000] = JPEG_START[0];
+        bytes[1_001] = JPEG_START[1];
+        bytes[4_000] = JPEG_END[0];
+        bytes[4_001] = JPEG_END[1];
+        assert!(scan_for_jpeg(&bytes).is_none(), "Small input should return None");
     }
 
     // Helper function to create an IFD entry in little-endian format
@@ -792,225 +757,126 @@ mod tests {
         assert!(matches!(result, Err(DecodeError::NoThumbnail)));
     }
 
-    #[test]
-    fn test_extract_jpeg_from_entries_jpeg_interchange_format() {
-        // Create synthetic file bytes with JPEG data at offset 100
-        let mut file_bytes = vec![0u8; 200];
-        // Place JPEG markers at offset 100
-        file_bytes[100] = 0xFF;
-        file_bytes[101] = 0xD8;
-        // Add some content and end marker
-        file_bytes[110] = 0xFF;
-        file_bytes[111] = 0xD9;
-
-        let entries = vec![
+    /// Helper to create JPEG interchange format entries.
+    fn make_jpeg_interchange_entries(offset: u32, length: u32) -> Vec<IfdEntry> {
+        vec![
             IfdEntry {
                 tag: TAG_JPEG_OFFSET,
-                typ: 4, // LONG
+                typ: 4,
                 count: 1,
-                value_offset: 100,
+                value_offset: offset,
             },
             IfdEntry {
                 tag: TAG_JPEG_LENGTH,
-                typ: 4, // LONG
+                typ: 4,
                 count: 1,
-                value_offset: 12, // Length of JPEG data
+                value_offset: length,
             },
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_extract_jpeg_from_entries_jpeg_interchange_format() {
+        let file_bytes = make_file_with_jpeg_at(100, 12, 200);
+        let entries = make_jpeg_interchange_entries(100, 12);
 
         let result = extract_jpeg_from_entries(&entries, &file_bytes);
         assert!(result.is_ok());
         let jpeg_data = result.unwrap();
         assert_eq!(jpeg_data.len(), 12);
-        assert_eq!(jpeg_data[0], 0xFF);
-        assert_eq!(jpeg_data[1], 0xD8);
+        assert_eq!(jpeg_data[0], JPEG_START[0]);
+        assert_eq!(jpeg_data[1], JPEG_START[1]);
     }
 
-    #[test]
-    fn test_extract_jpeg_from_entries_strip_based_jpeg() {
-        // Create synthetic file bytes with JPEG data at offset 50
-        let mut file_bytes = vec![0u8; 150];
-        // Place JPEG markers at offset 50
-        file_bytes[50] = 0xFF;
-        file_bytes[51] = 0xD8;
-        // Add end marker
-        file_bytes[68] = 0xFF;
-        file_bytes[69] = 0xD9;
+    /// Helper to create file bytes with JPEG markers at a given offset.
+    fn make_file_with_jpeg_at(offset: usize, length: usize, total_size: usize) -> Vec<u8> {
+        let mut file_bytes = vec![0u8; total_size];
+        file_bytes[offset] = JPEG_START[0];
+        file_bytes[offset + 1] = JPEG_START[1];
+        if offset + length >= 2 {
+            file_bytes[offset + length - 2] = JPEG_END[0];
+            file_bytes[offset + length - 1] = JPEG_END[1];
+        }
+        file_bytes
+    }
 
-        let entries = vec![
+    /// Helper to create strip-based JPEG entries.
+    fn make_strip_entries(offset: u32, length: u32, compression: u16) -> Vec<IfdEntry> {
+        vec![
             IfdEntry {
                 tag: TAG_STRIP_OFFSETS,
-                typ: 4, // LONG
+                typ: 4,
                 count: 1,
-                value_offset: 50,
+                value_offset: offset,
             },
             IfdEntry {
                 tag: TAG_STRIP_BYTE_COUNTS,
-                typ: 4, // LONG
+                typ: 4,
                 count: 1,
-                value_offset: 20, // Length of strip data
+                value_offset: length,
             },
             IfdEntry {
                 tag: TAG_COMPRESSION,
-                typ: 3, // SHORT
+                typ: 3,
                 count: 1,
-                value_offset: COMPRESSION_JPEG as u32,
+                value_offset: compression as u32,
             },
-        ];
-
-        let result = extract_jpeg_from_entries(&entries, &file_bytes);
-        assert!(result.is_ok());
-        let jpeg_data = result.unwrap();
-        assert_eq!(jpeg_data.len(), 20);
-        assert_eq!(jpeg_data[0], 0xFF);
-        assert_eq!(jpeg_data[1], 0xD8);
+        ]
     }
 
     #[test]
-    fn test_extract_jpeg_from_entries_strip_based_old_compression() {
-        // Create synthetic file bytes with JPEG data at offset 50
-        let mut file_bytes = vec![0u8; 150];
-        // Place JPEG markers at offset 50
-        file_bytes[50] = 0xFF;
-        file_bytes[51] = 0xD8;
-        // Add end marker
-        file_bytes[68] = 0xFF;
-        file_bytes[69] = 0xD9;
+    fn test_extract_jpeg_from_entries_strip_based_both_compression_types() {
+        // Test both JPEG compression types (6 and 7)
+        for compression in [COMPRESSION_JPEG, COMPRESSION_JPEG_OLD] {
+            let file_bytes = make_file_with_jpeg_at(50, 20, 150);
+            let entries = make_strip_entries(50, 20, compression);
 
-        let entries = vec![
-            IfdEntry {
-                tag: TAG_STRIP_OFFSETS,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 50,
-            },
-            IfdEntry {
-                tag: TAG_STRIP_BYTE_COUNTS,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 20, // Length of strip data
-            },
-            IfdEntry {
-                tag: TAG_COMPRESSION,
-                typ: 3, // SHORT
-                count: 1,
-                value_offset: COMPRESSION_JPEG_OLD as u32, // Old-style JPEG compression (7)
-            },
-        ];
-
-        let result = extract_jpeg_from_entries(&entries, &file_bytes);
-        assert!(result.is_ok());
-        let jpeg_data = result.unwrap();
-        assert_eq!(jpeg_data.len(), 20);
-        assert_eq!(jpeg_data[0], 0xFF);
-        assert_eq!(jpeg_data[1], 0xD8);
+            let result = extract_jpeg_from_entries(&entries, &file_bytes);
+            assert!(result.is_ok(), "Failed for compression type {}", compression);
+            let jpeg_data = result.unwrap();
+            assert_eq!(jpeg_data.len(), 20);
+            assert_eq!(jpeg_data[0], JPEG_START[0]);
+            assert_eq!(jpeg_data[1], JPEG_START[1]);
+        }
     }
 
     #[test]
-    fn test_extract_jpeg_from_entries_invalid_jpeg_magic() {
-        // Create file bytes with data that doesn't start with JPEG magic
+    fn test_extract_jpeg_from_entries_error_cases() {
+        // Test invalid JPEG magic
         let mut file_bytes = vec![0u8; 200];
-        // Place invalid magic bytes at offset 100 (not 0xFF 0xD8)
-        file_bytes[100] = 0x00;
-        file_bytes[101] = 0x00;
+        file_bytes[100] = 0x00; // Invalid magic
+        let entries = make_jpeg_interchange_entries(100, 50);
+        assert!(matches!(
+            extract_jpeg_from_entries(&entries, &file_bytes),
+            Err(DecodeError::NoThumbnail)
+        ));
 
-        let entries = vec![
-            IfdEntry {
-                tag: TAG_JPEG_OFFSET,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 100,
-            },
-            IfdEntry {
-                tag: TAG_JPEG_LENGTH,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 50,
-            },
-        ];
-
-        let result = extract_jpeg_from_entries(&entries, &file_bytes);
-        assert!(result.is_err());
-        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
-    }
-
-    #[test]
-    fn test_extract_jpeg_from_entries_offset_out_of_bounds() {
-        // Create small file bytes
+        // Test offset out of bounds (40 + 20 > 50)
         let file_bytes = vec![0u8; 50];
+        let entries = make_jpeg_interchange_entries(40, 20);
+        assert!(matches!(
+            extract_jpeg_from_entries(&entries, &file_bytes),
+            Err(DecodeError::NoThumbnail)
+        ));
 
-        // Set offset + length to exceed file size
-        let entries = vec![
-            IfdEntry {
-                tag: TAG_JPEG_OFFSET,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 40, // Offset near end of file
-            },
-            IfdEntry {
-                tag: TAG_JPEG_LENGTH,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 20, // Length that exceeds file bounds (40 + 20 > 50)
-            },
-        ];
+        // Test zero length
+        let file_bytes = make_file_with_jpeg_at(100, 10, 200);
+        let entries = make_jpeg_interchange_entries(100, 0);
+        assert!(matches!(
+            extract_jpeg_from_entries(&entries, &file_bytes),
+            Err(DecodeError::NoThumbnail)
+        ));
 
-        let result = extract_jpeg_from_entries(&entries, &file_bytes);
-        assert!(result.is_err());
-        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
-    }
-
-    #[test]
-    fn test_extract_jpeg_from_entries_zero_length() {
-        // Create file bytes with valid JPEG magic
-        let mut file_bytes = vec![0u8; 200];
-        file_bytes[100] = 0xFF;
-        file_bytes[101] = 0xD8;
-
-        let entries = vec![
-            IfdEntry {
-                tag: TAG_JPEG_OFFSET,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 100,
-            },
-            IfdEntry {
-                tag: TAG_JPEG_LENGTH,
-                typ: 4, // LONG
-                count: 1,
-                value_offset: 0, // Zero length
-            },
-        ];
-
-        let result = extract_jpeg_from_entries(&entries, &file_bytes);
-        assert!(result.is_err());
-        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
-    }
-
-    #[test]
-    fn test_extract_jpeg_from_entries_no_jpeg_tags() {
-        // Create file bytes
+        // Test no JPEG-related tags
         let file_bytes = vec![0u8; 200];
-
-        // Entries without any JPEG-related tags
         let entries = vec![
-            IfdEntry {
-                tag: 0x0100, // ImageWidth - not a JPEG tag
-                typ: 3,     // SHORT
-                count: 1,
-                value_offset: 1920,
-            },
-            IfdEntry {
-                tag: 0x0101, // ImageLength - not a JPEG tag
-                typ: 3,     // SHORT
-                count: 1,
-                value_offset: 1080,
-            },
+            IfdEntry { tag: 0x0100, typ: 3, count: 1, value_offset: 1920 },
+            IfdEntry { tag: 0x0101, typ: 3, count: 1, value_offset: 1080 },
         ];
-
-        let result = extract_jpeg_from_entries(&entries, &file_bytes);
-        assert!(result.is_err());
-        assert!(matches!(result, Err(DecodeError::NoThumbnail)));
+        assert!(matches!(
+            extract_jpeg_from_entries(&entries, &file_bytes),
+            Err(DecodeError::NoThumbnail)
+        ));
     }
 
     #[test]
