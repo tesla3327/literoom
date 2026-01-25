@@ -65,6 +65,17 @@ impl LinearGradientMask {
         }
     }
 
+    /// Compute the direction vector from start to end and its squared length.
+    ///
+    /// Returns (dx, dy, len_sq) where len_sq = dx² + dy².
+    /// Using squared length avoids a sqrt when only comparison is needed.
+    #[inline]
+    fn direction_and_len_sq(&self) -> (f32, f32, f32) {
+        let dx = self.end_x - self.start_x;
+        let dy = self.end_y - self.start_y;
+        (dx, dy, dx * dx + dy * dy)
+    }
+
     /// Evaluate the mask strength at a given normalized coordinate.
     ///
     /// Returns a value from 0.0 (no effect) to 1.0 (full effect).
@@ -80,10 +91,7 @@ impl LinearGradientMask {
     /// 4. Apply feathering centered at the midpoint
     /// 5. Use smootherstep for natural transition
     pub fn evaluate(&self, x: f32, y: f32) -> f32 {
-        // Direction vector from start to end
-        let dx = self.end_x - self.start_x;
-        let dy = self.end_y - self.start_y;
-        let len_sq = dx * dx + dy * dy;
+        let (dx, dy, len_sq) = self.direction_and_len_sq();
 
         // Degenerate case: start and end are the same point
         if len_sq < f32::EPSILON {
@@ -114,15 +122,13 @@ impl LinearGradientMask {
 
     /// Get the line length in normalized coordinates.
     pub fn length(&self) -> f32 {
-        let dx = self.end_x - self.start_x;
-        let dy = self.end_y - self.start_y;
-        (dx * dx + dy * dy).sqrt()
+        let (_, _, len_sq) = self.direction_and_len_sq();
+        len_sq.sqrt()
     }
 
     /// Get the angle of the gradient in radians.
     pub fn angle(&self) -> f32 {
-        let dx = self.end_x - self.start_x;
-        let dy = self.end_y - self.start_y;
+        let (dx, dy, _) = self.direction_and_len_sq();
         dy.atan2(dx)
     }
 }
