@@ -5,6 +5,7 @@
 ### Open Issues
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos)
 - [Sort options don't work (High)](#sort-options-dont-work)
+- [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
@@ -134,6 +135,41 @@ Tested in Demo Mode with 50 photos. Verified by comparing first 10 photo names b
 **Screenshots**:
 - `docs/screenshots/qa-section5-05-sort-dropdown.png` - Sort dropdown showing all 6 options
 - `docs/screenshots/qa-section5-06-sort-bug.png` - Button still shows "Date (newest)" after selecting different option
+
+---
+
+### Escape key navigates away during mask drawing mode
+
+**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-25
+
+**Problem**:
+When in mask drawing mode (after clicking Linear or Radial button in the Masks panel), pressing the Escape key navigates away from the edit view back to the catalog grid instead of cancelling the drawing mode.
+
+**Steps to Reproduce**:
+1. Open a photo in edit view
+2. Expand the Masks accordion panel
+3. Click the "Linear" button to start drawing mode
+4. Verify "Click and drag on the image to create a linear gradient" message appears
+5. Press Escape key
+6. Observe: App navigates to catalog grid (http://localhost:3000/) instead of staying in edit view
+
+**Expected Behavior**:
+Pressing Escape should cancel the mask drawing mode and return to the normal edit view state, similar to clicking the "Cancel" button which works correctly.
+
+**Actual Behavior**:
+Pressing Escape navigates away from the edit view entirely, back to the catalog grid.
+
+**Technical Details**:
+The global keyboard handler for Escape in the edit view is being triggered before the mask drawing mode can intercept it. The Cancel button works correctly, so the logic exists - it's just not connected to the Escape key properly.
+
+**Files to Investigate**:
+- `apps/web/app/pages/edit/[id].vue` - Global keyboard handler
+- `apps/web/app/composables/useMaskOverlay.ts` - Mask drawing mode state
+- `apps/web/app/components/edit/EditMaskPanel.vue` - Mask panel component
+
+**Screenshots**:
+- `docs/screenshots/qa-section10-03-linear-drawing-mode.png` - Drawing mode active
+- `docs/screenshots/qa-section10-10-escape-bug.png` - After pressing Escape, now on home page
 
 ---
 

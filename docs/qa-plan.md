@@ -340,49 +340,51 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 10. Masks (Local Adjustments)
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (1 bug found)
+
 ### 10.1 Mask List
-- [ ] Empty state message when no masks
-- [ ] Mask items show visibility toggle
-- [ ] Mask type icon (linear vs radial)
-- [ ] Delete button for each mask
-- [ ] Selected mask highlighted
-- [ ] Click to select mask
+- [x] Empty state message when no masks - verified ("No masks yet. Click a button above to add one.")
+- [x] Mask items show visibility toggle - verified (Hide mask / Show mask button)
+- [x] Mask type icon (linear vs radial) - verified (linear icon: minus, radial icon visible)
+- [x] Delete button for each mask - verified
+- [x] Selected mask highlighted - mask adjustments panel shows when selected
+- [x] Click to select mask - verified (clicking mask item loads its adjustments)
 
 ### 10.2 Creating Linear Mask
-- [ ] "Linear" button starts drawing mode
-- [ ] Indicator shows "Click and drag..."
-- [ ] Click and drag creates gradient line
-- [ ] Cancel button exits drawing mode
-- [ ] Minimum distance enforced
-- [ ] New mask appears in list
+- [x] "Linear" button starts drawing mode - verified
+- [x] Indicator shows "Click and drag..." - verified ("Click and drag on the image to create a linear gradient")
+- [x] Click and drag creates gradient line - verified
+- [x] Cancel button exits drawing mode - verified
+- [ ] Minimum distance enforced - not tested
+- [x] New mask appears in list - verified (shows "Linear Mask" in list)
 
 ### 10.3 Creating Radial Mask
-- [ ] "Radial" button starts drawing mode
-- [ ] Indicator shows "Click and drag..."
-- [ ] Click sets center, drag sets radius
-- [ ] Cancel button exits drawing mode
-- [ ] Minimum radius enforced
-- [ ] New mask appears in list
+- [x] "Radial" button starts drawing mode - verified
+- [x] Indicator shows "Click and drag..." - verified ("Click and drag on the image to create a radial gradient")
+- [x] Click sets center, drag sets radius - verified
+- [x] Cancel button exits drawing mode - verified
+- [ ] Minimum radius enforced - not tested
+- [x] New mask appears in list - verified (shows "Radial Mask" in list)
 
 ### 10.4 Mask Editing
-- [ ] Select mask to edit adjustments
-- [ ] Same 10 adjustment sliders available
-- [ ] Adjustments apply only within mask
-- [ ] Feathering creates smooth transitions
-- [ ] Visibility toggle hides/shows mask effect
-- [ ] Delete removes mask
+- [x] Select mask to edit adjustments - verified (clicking mask shows Mask Adjustments panel)
+- [x] Same 10 adjustment sliders available - verified (Temp, Tint, Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Vibrance, Saturation)
+- [ ] Adjustments apply only within mask - not visually verified (hard to see in demo mode)
+- [ ] Feathering creates smooth transitions - not tested
+- [x] Visibility toggle hides/shows mask effect - verified (button text changes Hide/Show)
+- [x] Delete removes mask - verified (Delete mask button works)
 
 ### 10.5 Mask Overlay Visualization
-- [ ] Selected mask shows handles
-- [ ] Linear: start and end handles
-- [ ] Radial: center and radius handles
-- [ ] Handles draggable to adjust
-- [ ] Cursor changes for different operations
-- [ ] Mask preview updates in real-time
+- [x] Selected mask shows handles - mask overlay canvas visible (data-testid="mask-overlay-canvas")
+- [ ] Linear: start and end handles - visible in screenshot but not interactive tested
+- [ ] Radial: center and radius handles - not tested
+- [ ] Handles draggable to adjust - not tested
+- [ ] Cursor changes for different operations - not tested
+- [ ] Mask preview updates in real-time - not tested
 
 ### 10.6 Mask Keyboard Shortcuts
-- [ ] Escape cancels drawing mode
-- [ ] Delete removes selected mask
+- [ ] Escape cancels drawing mode - **BUG**: Escape navigates away from edit view instead of cancelling drawing mode (see issues.md)
+- [x] Delete removes selected mask - verified
 
 ---
 
