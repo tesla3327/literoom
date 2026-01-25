@@ -25,24 +25,20 @@ impl ToneCurveLut {
         }
 
         let tangents = compute_monotonic_tangents(&curve.points);
-        let mut lut = [0u8; 256];
-
-        for (i, lut_value) in lut.iter_mut().enumerate() {
+        let lut = core::array::from_fn(|i| {
             let x = i as f32 / 255.0;
             let y = evaluate_with_tangents(&curve.points, &tangents, x);
-            *lut_value = (y * 255.0).clamp(0.0, 255.0).round() as u8;
-        }
+            (y * 255.0).clamp(0.0, 255.0).round() as u8
+        });
 
         Self { lut }
     }
 
     /// Create identity LUT (no change).
     pub fn identity() -> Self {
-        let mut lut = [0u8; 256];
-        for (i, lut_value) in lut.iter_mut().enumerate() {
-            *lut_value = i as u8;
+        Self {
+            lut: core::array::from_fn(|i| i as u8),
         }
-        Self { lut }
     }
 
     /// Check if this LUT is identity.
@@ -130,25 +126,19 @@ fn compute_monotonic_tangents(points: &[CurvePoint]) -> Vec<f32> {
             m[i] = 0.0;
             m[i + 1] = 0.0;
         } else {
-            let alpha = m[i] / delta[i];
-            let beta = m[i + 1] / delta[i];
-
-            if alpha > 3.0 {
-                m[i] = 3.0 * delta[i];
-            }
-            if beta > 3.0 {
-                m[i + 1] = 3.0 * delta[i];
-            }
-            if alpha < -3.0 {
-                m[i] = -3.0 * delta[i].abs();
-            }
-            if beta < -3.0 {
-                m[i + 1] = -3.0 * delta[i].abs();
-            }
+            m[i] = clamp_tangent(m[i], delta[i]);
+            m[i + 1] = clamp_tangent(m[i + 1], delta[i]);
         }
     }
 
     m
+}
+
+/// Clamp tangent to maintain monotonicity (Fritsch-Carlson constraint: |m/delta| <= 3).
+#[inline]
+fn clamp_tangent(tangent: f32, delta: f32) -> f32 {
+    let max_tangent = 3.0 * delta.abs();
+    tangent.clamp(-max_tangent, max_tangent)
 }
 
 /// Evaluate curve at x with pre-computed tangents.
@@ -191,26 +181,15 @@ fn evaluate_with_tangents(points: &[CurvePoint], tangents: &[f32], x: f32) -> f3
     y.clamp(0.0, 1.0)
 }
 
-/// Binary search for interval containing x.
+/// Find the interval containing x using binary search.
 fn find_interval(points: &[CurvePoint], x: f32) -> usize {
-    let n = points.len();
-    if n <= 2 {
+    if points.len() <= 2 {
         return 0;
     }
-
-    let mut low = 0;
-    let mut high = n - 2;
-
-    while low < high {
-        let mid = (low + high).div_ceil(2);
-        if points[mid].x <= x {
-            low = mid;
-        } else {
-            high = mid - 1;
-        }
-    }
-
-    low
+    // Find the rightmost point where p.x <= x, clamped to valid interval range
+    points[..points.len() - 1]
+        .partition_point(|p| p.x <= x)
+        .saturating_sub(1)
 }
 
 // ============================================================================
