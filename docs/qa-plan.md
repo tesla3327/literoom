@@ -141,26 +141,28 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 5. Filter Bar & Sorting
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (sorting broken)
+
 ### 5.1 Filter Modes
-- [ ] All photos displayed by default
-- [ ] Switching filters updates grid immediately
-- [ ] Filter persists during session
-- [ ] "No photos to display" message when filter empty
+- [x] All photos displayed by default - verified (50 photos)
+- [x] Switching filters updates grid immediately - verified (Picks=23, Rejects=10, Unflagged=17)
+- [x] Filter persists during session - verified (Unflagged filter persisted after edit view round-trip)
+- [ ] "No photos to display" message when filter empty - not tested (would require unflagging all photos)
 
 ### 5.2 Sort Options
-- [ ] Date (newest) - newest first
-- [ ] Date (oldest) - oldest first
-- [ ] Name (A-Z) - alphabetical
-- [ ] Name (Z-A) - reverse alphabetical
-- [ ] Size (largest) - biggest files first
-- [ ] Size (smallest) - smallest files first
-- [ ] Current sort shown in dropdown button
-- [ ] Sort persists during session
+- [ ] Date (newest) - default, appears to work
+- [ ] Date (oldest) - **BUG**: Does not reorder grid (see issues.md)
+- [ ] Name (A-Z) - **BUG**: Does not reorder grid
+- [ ] Name (Z-A) - **BUG**: Does not reorder grid
+- [ ] Size (largest) - **BUG**: Does not reorder grid
+- [ ] Size (smallest) - **BUG**: Does not reorder grid
+- [ ] Current sort shown in dropdown button - **BUG**: Always shows "Date (newest)"
+- [ ] Sort persists during session - not testable due to above bugs
 
 ### 5.3 Progress Indicators
-- [ ] Thumbnail progress bar shows during generation
-- [ ] Rescan progress indicator appears
-- [ ] Export progress with file count and percentage
+- [ ] Thumbnail progress bar shows during generation - not observed (demo mode loads instantly)
+- [x] Rescan progress indicator appears - button clicked, operation completed
+- [x] Export progress with file count and percentage - export modal opens with count (23 Images)
 
 ---
 

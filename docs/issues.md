@@ -3,6 +3,7 @@
 ## Table of Contents
 
 ### Open Issues
+- [Sort options don't work (High)](#sort-options-dont-work)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
@@ -51,6 +52,44 @@
 ---
 
 ## Open Issues
+
+### Sort options don't work
+
+**Severity**: High | **Type**: Bug | **Found**: 2026-01-25
+
+**Problem**:
+Clicking on sort options in the dropdown (Date oldest, Name A-Z, Name Z-A, Size largest, Size smallest) has no effect. The grid order doesn't change and the dropdown button label always shows "Date (newest)" regardless of which option is selected.
+
+**Steps to Reproduce**:
+1. Open catalog grid view with photos loaded
+2. Click the sort dropdown button (shows "Date (newest)")
+3. Select any other sort option (e.g., "Name (A-Z)")
+4. Observe: Grid order remains unchanged
+5. Observe: Dropdown button still shows "Date (newest)"
+
+**Expected Behavior**:
+- Grid should reorder based on selected sort option
+- Dropdown button label should update to show selected sort
+- Sort selection should persist during session
+
+**Actual Behavior**:
+- Grid order never changes regardless of sort selection
+- Dropdown button always displays "Date (newest)"
+- Sort state doesn't update
+
+**Technical Details**:
+Tested in Demo Mode with 50 photos. Verified by comparing first 10 photo names before and after selecting different sort options - they remained identical.
+
+**Files to Investigate**:
+- `apps/web/app/components/catalog/FilterBar.vue` - Sort dropdown component
+- `apps/web/app/stores/catalogUI.ts` - UI state for sort selection
+- `apps/web/app/stores/catalog.ts` - Computed sortedAssetIds
+
+**Screenshots**:
+- `docs/screenshots/qa-section5-05-sort-dropdown.png` - Sort dropdown showing all 6 options
+- `docs/screenshots/qa-section5-06-sort-bug.png` - Button still shows "Date (newest)" after selecting different option
+
+---
 
 ### Keyboard flagging only affects current photo, not all selected
 
