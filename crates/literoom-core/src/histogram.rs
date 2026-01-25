@@ -3,6 +3,7 @@
 //! This module provides functions for computing RGB and luminance histograms
 //! from pixel data, used for the edit view histogram display.
 
+use crate::luminance::calculate_luminance_u8;
 use crate::Histogram;
 
 /// Compute RGB and luminance histograms from pixel data.
@@ -56,28 +57,12 @@ pub fn compute_histogram(pixels: &[u8], width: u32, height: u32) -> Histogram {
         hist.green[g] += 1;
         hist.blue[b] += 1;
 
-        // Compute and bin luminance using ITU-R BT.709 coefficients
+        // Compute and bin luminance
         let lum = calculate_luminance_u8(chunk[0], chunk[1], chunk[2]);
         hist.luminance[lum as usize] += 1;
     }
 
     hist
-}
-
-/// Calculate luminance from RGB using ITU-R BT.709 coefficients.
-///
-/// Returns a value in range 0-255.
-///
-/// # Arguments
-/// * `r` - Red channel value (0-255)
-/// * `g` - Green channel value (0-255)
-/// * `b` - Blue channel value (0-255)
-#[inline]
-fn calculate_luminance_u8(r: u8, g: u8, b: u8) -> u8 {
-    // ITU-R BT.709 coefficients: R=0.2126, G=0.7152, B=0.0722
-    let lum = 0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32;
-    // Clamp to valid range and round
-    lum.clamp(0.0, 255.0).round() as u8
 }
 
 #[cfg(test)]
@@ -174,44 +159,6 @@ mod tests {
         assert_eq!(hist.luminance[0], 1);
         assert!(!hist.has_highlight_clipping());
         assert!(hist.has_shadow_clipping());
-    }
-
-    #[test]
-    fn test_luminance_calculation_pure_white() {
-        assert_eq!(calculate_luminance_u8(255, 255, 255), 255);
-    }
-
-    #[test]
-    fn test_luminance_calculation_pure_black() {
-        assert_eq!(calculate_luminance_u8(0, 0, 0), 0);
-    }
-
-    #[test]
-    fn test_luminance_calculation_gray() {
-        let lum = calculate_luminance_u8(128, 128, 128);
-        // ITU-R BT.709: 0.2126*128 + 0.7152*128 + 0.0722*128 = 128
-        assert!((lum as i32 - 128).abs() <= 1);
-    }
-
-    #[test]
-    fn test_luminance_calculation_pure_red() {
-        let lum = calculate_luminance_u8(255, 0, 0);
-        // ITU-R BT.709: 0.2126*255 = 54.21
-        assert!((lum as i32 - 54).abs() <= 1);
-    }
-
-    #[test]
-    fn test_luminance_calculation_pure_green() {
-        let lum = calculate_luminance_u8(0, 255, 0);
-        // ITU-R BT.709: 0.7152*255 = 182.38
-        assert!((lum as i32 - 182).abs() <= 1);
-    }
-
-    #[test]
-    fn test_luminance_calculation_pure_blue() {
-        let lum = calculate_luminance_u8(0, 0, 255);
-        // ITU-R BT.709: 0.0722*255 = 18.41
-        assert!((lum as i32 - 18).abs() <= 1);
     }
 
     #[test]
@@ -360,21 +307,6 @@ mod proptests {
             prop_assert_eq!(hist.max_value(), expected_max);
         }
 
-        /// Property: Luminance is bounded by RGB values.
-        #[test]
-        fn prop_luminance_bounded_by_rgb(r in 0u8..=255, g in 0u8..=255, b in 0u8..=255) {
-            let lum = calculate_luminance_u8(r, g, b);
-
-            // Luminance should be between min and max of RGB values
-            // This is not strictly true for weighted luminance, but it should be
-            // within a reasonable range
-            let min_rgb = r.min(g).min(b);
-            let max_rgb = r.max(g).max(b);
-
-            // Luminance can be outside min/max RGB due to weights, but should be in [0, 255]
-            prop_assert!(lum <= 255, "Luminance {} exceeds 255", lum);
-        }
-
         /// Property: Grayscale pixels have identical R, G, B histogram contributions.
         #[test]
         fn prop_grayscale_channels_equal(v in 0u8..=255, count in 1usize..=100) {
@@ -390,22 +322,6 @@ mod proptests {
             prop_assert_eq!(hist.red[v as usize], count as u32);
             prop_assert_eq!(hist.green[v as usize], count as u32);
             prop_assert_eq!(hist.blue[v as usize], count as u32);
-        }
-
-        /// Property: Luminance coefficients sum to approximately 1 (sanity check).
-        #[test]
-        fn prop_luminance_coefficients_valid(_dummy in 0..1i32) {
-            // Test that the coefficients are correct by checking a gray pixel
-            // For gray (r=g=b), luminance should equal that gray value
-            for v in [0u8, 64, 128, 192, 255] {
-                let lum = calculate_luminance_u8(v, v, v);
-                prop_assert!(
-                    (lum as i32 - v as i32).abs() <= 1,
-                    "Luminance {} != gray value {} for grayscale",
-                    lum,
-                    v
-                );
-            }
         }
 
         /// Property: Empty pixel array produces zero histogram.

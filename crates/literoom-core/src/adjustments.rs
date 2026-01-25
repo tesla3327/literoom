@@ -14,6 +14,7 @@
 //! 9. Saturation
 //! 10. Vibrance
 
+use crate::luminance::calculate_luminance;
 use crate::BasicAdjustments;
 
 /// Apply all adjustments to an image's pixel data in place.
@@ -160,12 +161,6 @@ fn apply_tint(r: f32, g: f32, b: f32, tint: f32) -> (f32, f32, f32) {
         // Magenta tint (red + blue)
         (r * (1.0 + shift), g * (1.0 - shift), b * (1.0 + shift))
     }
-}
-
-/// Calculate luminance using ITU-R BT.709 coefficients.
-#[inline]
-fn calculate_luminance(r: f32, g: f32, b: f32) -> f32 {
-    0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
 /// Smooth interpolation function.

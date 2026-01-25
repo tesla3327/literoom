@@ -8,6 +8,7 @@ pub mod curve;
 pub mod decode;
 pub mod encode;
 pub mod histogram;
+pub mod luminance;
 pub mod mask;
 pub mod transform;
 
