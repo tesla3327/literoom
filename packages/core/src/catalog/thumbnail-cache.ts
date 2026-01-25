@@ -150,29 +150,33 @@ export class MemoryThumbnailCache {
 }
 
 // ============================================================================
-// OPFS Cache
+// OPFS Cache (Generic Base)
 // ============================================================================
 
 /**
- * Persistent thumbnail cache using Origin Private File System (OPFS).
- *
- * OPFS provides:
- * - Fast synchronous access via FileSystemSyncAccessHandle (in workers)
- * - Persistence across page reloads
- * - No storage quota prompts (uses site storage)
- *
- * Note: This implementation uses the async API. For maximum performance
- * in workers, the sync API can be used instead.
+ * Configuration for OPFS cache instances.
  */
-export class OPFSThumbnailCache {
+interface OPFSCacheConfig {
+  /** Directory name in OPFS root */
+  dirName: string
+  /** Type name for log messages (e.g., 'thumbnail', 'preview') */
+  typeName: string
+}
+
+/**
+ * Generic OPFS cache implementation.
+ * Used as base for thumbnail and preview caches.
+ */
+class OPFSCache {
   private rootDir: FileSystemDirectoryHandle | null = null
   private initialized = false
   private initPromise: Promise<void> | null = null
+  private readonly config: OPFSCacheConfig
 
-  /**
-   * Initialize OPFS access.
-   * Must be called before other methods.
-   */
+  constructor(config: OPFSCacheConfig) {
+    this.config = config
+  }
+
   async init(): Promise<void> {
     if (this.initialized) {
       return
@@ -190,283 +194,105 @@ export class OPFSThumbnailCache {
   private async doInit(): Promise<void> {
     try {
       const root = await navigator.storage.getDirectory()
-      this.rootDir = await root.getDirectoryHandle(OPFS_THUMBNAILS_DIR, { create: true })
+      this.rootDir = await root.getDirectoryHandle(this.config.dirName, { create: true })
       this.initialized = true
     } catch (error) {
-      // OPFS not available - cache will be disabled
-      console.warn('OPFS not available for thumbnail caching:', error)
-      this.initialized = true // Mark as initialized to prevent retry
+      console.warn(`OPFS not available for ${this.config.typeName} caching:`, error)
+      this.initialized = true
     }
   }
 
-  /**
-   * Get a thumbnail blob from OPFS.
-   */
   async get(assetId: string): Promise<Blob | null> {
     await this.init()
-
-    if (!this.rootDir) {
-      return null
-    }
+    if (!this.rootDir) return null
 
     try {
-      const filename = this.getFilename(assetId)
-      const fileHandle = await this.rootDir.getFileHandle(filename)
-      const file = await fileHandle.getFile()
-      return file
+      const fileHandle = await this.rootDir.getFileHandle(this.getFilename(assetId))
+      return await fileHandle.getFile()
     } catch {
-      // File not found
       return null
     }
   }
 
-  /**
-   * Store a thumbnail blob in OPFS.
-   */
   async set(assetId: string, blob: Blob): Promise<void> {
     await this.init()
-
-    if (!this.rootDir) {
-      return
-    }
+    if (!this.rootDir) return
 
     try {
-      const filename = this.getFilename(assetId)
-      const fileHandle = await this.rootDir.getFileHandle(filename, { create: true })
+      const fileHandle = await this.rootDir.getFileHandle(this.getFilename(assetId), { create: true })
       const writable = await fileHandle.createWritable()
       await writable.write(blob)
       await writable.close()
     } catch (error) {
-      console.warn('Failed to write thumbnail to OPFS:', error)
+      console.warn(`Failed to write ${this.config.typeName} to OPFS:`, error)
     }
   }
 
-  /**
-   * Check if a thumbnail exists in OPFS.
-   */
   async has(assetId: string): Promise<boolean> {
     await this.init()
-
-    if (!this.rootDir) {
-      return false
-    }
+    if (!this.rootDir) return false
 
     try {
-      const filename = this.getFilename(assetId)
-      await this.rootDir.getFileHandle(filename)
+      await this.rootDir.getFileHandle(this.getFilename(assetId))
       return true
     } catch {
       return false
     }
   }
 
-  /**
-   * Remove a thumbnail from OPFS.
-   */
   async delete(assetId: string): Promise<void> {
     await this.init()
-
-    if (!this.rootDir) {
-      return
-    }
+    if (!this.rootDir) return
 
     try {
-      const filename = this.getFilename(assetId)
-      await this.rootDir.removeEntry(filename)
+      await this.rootDir.removeEntry(this.getFilename(assetId))
     } catch {
       // File not found - ignore
     }
   }
 
-  /**
-   * Clear all thumbnails from OPFS.
-   */
   async clear(): Promise<void> {
     await this.init()
-
-    if (!this.rootDir) {
-      return
-    }
+    if (!this.rootDir) return
 
     try {
-      // Get parent to recreate directory
       const root = await navigator.storage.getDirectory()
-      await root.removeEntry(OPFS_THUMBNAILS_DIR, { recursive: true })
-      this.rootDir = await root.getDirectoryHandle(OPFS_THUMBNAILS_DIR, { create: true })
+      await root.removeEntry(this.config.dirName, { recursive: true })
+      this.rootDir = await root.getDirectoryHandle(this.config.dirName, { create: true })
     } catch (error) {
-      console.warn('Failed to clear OPFS thumbnail cache:', error)
+      console.warn(`Failed to clear OPFS ${this.config.typeName} cache:`, error)
     }
   }
 
-  /**
-   * Check if OPFS is available and initialized.
-   */
   get isAvailable(): boolean {
     return this.initialized && this.rootDir !== null
   }
 
-  /**
-   * Convert asset ID to safe filename.
-   */
   private getFilename(assetId: string): string {
-    // UUIDs are already safe for filenames, but encode to be safe
     return `${encodeURIComponent(assetId)}.jpg`
+  }
+}
+
+// ============================================================================
+// OPFS Cache Implementations (Thin wrappers for backward compatibility)
+// ============================================================================
+
+/**
+ * Persistent thumbnail cache using Origin Private File System (OPFS).
+ */
+export class OPFSThumbnailCache extends OPFSCache {
+  constructor() {
+    super({ dirName: OPFS_THUMBNAILS_DIR, typeName: 'thumbnail' })
   }
 }
 
 /**
  * Persistent preview cache using Origin Private File System (OPFS).
- *
  * Uses a separate directory from thumbnails due to larger file sizes.
- * Previews are 2560px (vs 512px for thumbnails), so they're much larger.
  */
-export class OPFSPreviewCache {
-  private rootDir: FileSystemDirectoryHandle | null = null
-  private initialized = false
-  private initPromise: Promise<void> | null = null
-
-  /**
-   * Initialize OPFS access.
-   * Must be called before other methods.
-   */
-  async init(): Promise<void> {
-    if (this.initialized) {
-      return
-    }
-
-    if (this.initPromise) {
-      return this.initPromise
-    }
-
-    this.initPromise = this.doInit()
-    await this.initPromise
-    this.initPromise = null
-  }
-
-  private async doInit(): Promise<void> {
-    try {
-      const root = await navigator.storage.getDirectory()
-      this.rootDir = await root.getDirectoryHandle(OPFS_PREVIEWS_DIR, { create: true })
-      this.initialized = true
-    } catch (error) {
-      // OPFS not available - cache will be disabled
-      console.warn('OPFS not available for preview caching:', error)
-      this.initialized = true // Mark as initialized to prevent retry
-    }
-  }
-
-  /**
-   * Get a preview blob from OPFS.
-   */
-  async get(assetId: string): Promise<Blob | null> {
-    await this.init()
-
-    if (!this.rootDir) {
-      return null
-    }
-
-    try {
-      const filename = this.getFilename(assetId)
-      const fileHandle = await this.rootDir.getFileHandle(filename)
-      const file = await fileHandle.getFile()
-      return file
-    } catch {
-      // File not found
-      return null
-    }
-  }
-
-  /**
-   * Store a preview blob in OPFS.
-   */
-  async set(assetId: string, blob: Blob): Promise<void> {
-    await this.init()
-
-    if (!this.rootDir) {
-      return
-    }
-
-    try {
-      const filename = this.getFilename(assetId)
-      const fileHandle = await this.rootDir.getFileHandle(filename, { create: true })
-      const writable = await fileHandle.createWritable()
-      await writable.write(blob)
-      await writable.close()
-    } catch (error) {
-      console.warn('Failed to write preview to OPFS:', error)
-    }
-  }
-
-  /**
-   * Check if a preview exists in OPFS.
-   */
-  async has(assetId: string): Promise<boolean> {
-    await this.init()
-
-    if (!this.rootDir) {
-      return false
-    }
-
-    try {
-      const filename = this.getFilename(assetId)
-      await this.rootDir.getFileHandle(filename)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * Remove a preview from OPFS.
-   */
-  async delete(assetId: string): Promise<void> {
-    await this.init()
-
-    if (!this.rootDir) {
-      return
-    }
-
-    try {
-      const filename = this.getFilename(assetId)
-      await this.rootDir.removeEntry(filename)
-    } catch {
-      // File not found - ignore
-    }
-  }
-
-  /**
-   * Clear all previews from OPFS.
-   */
-  async clear(): Promise<void> {
-    await this.init()
-
-    if (!this.rootDir) {
-      return
-    }
-
-    try {
-      // Get parent to recreate directory
-      const root = await navigator.storage.getDirectory()
-      await root.removeEntry(OPFS_PREVIEWS_DIR, { recursive: true })
-      this.rootDir = await root.getDirectoryHandle(OPFS_PREVIEWS_DIR, { create: true })
-    } catch (error) {
-      console.warn('Failed to clear OPFS preview cache:', error)
-    }
-  }
-
-  /**
-   * Check if OPFS is available and initialized.
-   */
-  get isAvailable(): boolean {
-    return this.initialized && this.rootDir !== null
-  }
-
-  /**
-   * Convert asset ID to safe filename.
-   */
-  private getFilename(assetId: string): string {
-    // UUIDs are already safe for filenames, but encode to be safe
-    return `${encodeURIComponent(assetId)}.jpg`
+export class OPFSPreviewCache extends OPFSCache {
+  constructor() {
+    super({ dirName: OPFS_PREVIEWS_DIR, typeName: 'preview' })
   }
 }
 
@@ -475,42 +301,28 @@ export class OPFSPreviewCache {
 // ============================================================================
 
 /**
- * Interface for the combined thumbnail cache.
+ * Interface for combined memory + OPFS caches.
  */
-export interface IThumbnailCache {
-  /**
-   * Get a thumbnail URL, checking memory first, then OPFS.
-   */
+export interface ICombinedCache {
   get(assetId: string): Promise<string | null>
-
-  /**
-   * Store a thumbnail in both memory and OPFS.
-   */
   set(assetId: string, blob: Blob): Promise<string>
-
-  /**
-   * Check if a thumbnail exists (memory or OPFS).
-   */
   has(assetId: string): Promise<boolean>
-
-  /**
-   * Delete a thumbnail from both caches.
-   */
   delete(assetId: string): Promise<void>
-
-  /**
-   * Clear the memory cache only (for memory pressure).
-   */
   clearMemory(): void
-
-  /**
-   * Clear both caches.
-   */
   clearAll(): Promise<void>
 }
 
+/** @deprecated Use ICombinedCache instead */
+export type IThumbnailCache = ICombinedCache
+/** @deprecated Use ICombinedCache instead */
+export type IPreviewCache = ICombinedCache
+
+// ============================================================================
+// Combined Cache Base Class
+// ============================================================================
+
 /**
- * Combined thumbnail cache with memory LRU and OPFS persistence.
+ * Combined cache with memory LRU and OPFS persistence.
  *
  * Read path:
  * 1. Check memory cache (fast)
@@ -521,103 +333,82 @@ export interface IThumbnailCache {
  * 1. Store in memory cache (immediate)
  * 2. Persist to OPFS (async, fire-and-forget)
  */
-export class ThumbnailCache implements IThumbnailCache {
+class CombinedCache implements ICombinedCache {
   private memoryCache: MemoryThumbnailCache
-  private opfsCache: OPFSThumbnailCache
+  private opfsCache: OPFSCache
+  private readonly typeName: string
 
-  constructor(memoryCacheSize?: number) {
-    this.memoryCache = new MemoryThumbnailCache(memoryCacheSize)
-    this.opfsCache = new OPFSThumbnailCache()
+  constructor(memorySize: number, opfsCache: OPFSCache, typeName: string) {
+    this.memoryCache = new MemoryThumbnailCache(memorySize)
+    this.opfsCache = opfsCache
+    this.typeName = typeName
   }
 
-  /**
-   * Get a thumbnail URL.
-   *
-   * Checks memory cache first, then OPFS.
-   * OPFS results are promoted to memory cache.
-   */
   async get(assetId: string): Promise<string | null> {
-    // Check memory cache first (fast path)
     const memoryUrl = this.memoryCache.get(assetId)
-    if (memoryUrl) {
-      return memoryUrl
-    }
+    if (memoryUrl) return memoryUrl
 
-    // Check OPFS cache
     const blob = await this.opfsCache.get(assetId)
-    if (blob) {
-      // Promote to memory cache
-      const url = this.memoryCache.set(assetId, blob)
-      return url
-    }
+    if (blob) return this.memoryCache.set(assetId, blob)
 
     return null
   }
 
-  /**
-   * Store a thumbnail.
-   *
-   * Stores immediately in memory cache and asynchronously in OPFS.
-   * Returns the Object URL for immediate use.
-   */
   async set(assetId: string, blob: Blob): Promise<string> {
-    // Store in memory cache (immediate)
     const url = this.memoryCache.set(assetId, blob)
-
-    // Persist to OPFS (fire-and-forget)
     this.opfsCache.set(assetId, blob).catch((error) => {
-      console.warn('Failed to persist thumbnail to OPFS:', error)
+      console.warn(`Failed to persist ${this.typeName} to OPFS:`, error)
     })
-
     return url
   }
 
-  /**
-   * Check if a thumbnail exists.
-   */
   async has(assetId: string): Promise<boolean> {
-    if (this.memoryCache.has(assetId)) {
-      return true
-    }
-    return this.opfsCache.has(assetId)
+    return this.memoryCache.has(assetId) || this.opfsCache.has(assetId)
   }
 
-  /**
-   * Delete a thumbnail from both caches.
-   */
   async delete(assetId: string): Promise<void> {
     this.memoryCache.delete(assetId)
     await this.opfsCache.delete(assetId)
   }
 
-  /**
-   * Clear only the memory cache.
-   * Useful when experiencing memory pressure.
-   */
   clearMemory(): void {
     this.memoryCache.clear()
   }
 
-  /**
-   * Clear both memory and OPFS caches.
-   */
   async clearAll(): Promise<void> {
     this.memoryCache.clear()
     await this.opfsCache.clear()
   }
 
-  /**
-   * Get the size of the memory cache.
-   */
   get memoryCacheSize(): number {
     return this.memoryCache.size
   }
 
-  /**
-   * Check if OPFS cache is available.
-   */
   get isOPFSAvailable(): boolean {
     return this.opfsCache.isAvailable
+  }
+}
+
+// ============================================================================
+// Combined Cache Implementations
+// ============================================================================
+
+/**
+ * Combined thumbnail cache with memory LRU and OPFS persistence.
+ */
+export class ThumbnailCache extends CombinedCache {
+  constructor(memoryCacheSize: number = DEFAULT_MEMORY_CACHE_SIZE) {
+    super(memoryCacheSize, new OPFSThumbnailCache(), 'thumbnail')
+  }
+}
+
+/**
+ * Combined preview cache with memory LRU and OPFS persistence.
+ * Uses smaller memory limit (20 vs 150) due to larger preview sizes.
+ */
+export class PreviewCache extends CombinedCache {
+  constructor(memoryCacheSize: number = DEFAULT_PREVIEW_MEMORY_CACHE_SIZE) {
+    super(memoryCacheSize, new OPFSPreviewCache(), 'preview')
   }
 }
 
@@ -625,184 +416,18 @@ export class ThumbnailCache implements IThumbnailCache {
 // Factory Functions
 // ============================================================================
 
-/**
- * Create a new memory-only thumbnail cache.
- */
 export function createMemoryCache(maxSize?: number): MemoryThumbnailCache {
   return new MemoryThumbnailCache(maxSize)
 }
 
-/**
- * Create a new OPFS thumbnail cache.
- */
 export function createOPFSCache(): OPFSThumbnailCache {
   return new OPFSThumbnailCache()
 }
 
-/**
- * Create a new combined thumbnail cache.
- */
 export function createThumbnailCache(memoryCacheSize?: number): ThumbnailCache {
   return new ThumbnailCache(memoryCacheSize)
 }
 
-// ============================================================================
-// Preview Cache (Larger Images)
-// ============================================================================
-
-/**
- * Interface for the combined preview cache.
- */
-export interface IPreviewCache {
-  /**
-   * Get a preview URL, checking memory first, then OPFS.
-   */
-  get(assetId: string): Promise<string | null>
-
-  /**
-   * Store a preview in both memory and OPFS.
-   */
-  set(assetId: string, blob: Blob): Promise<string>
-
-  /**
-   * Check if a preview exists (memory or OPFS).
-   */
-  has(assetId: string): Promise<boolean>
-
-  /**
-   * Delete a preview from both caches.
-   */
-  delete(assetId: string): Promise<void>
-
-  /**
-   * Clear the memory cache only (for memory pressure).
-   */
-  clearMemory(): void
-
-  /**
-   * Clear both caches.
-   */
-  clearAll(): Promise<void>
-}
-
-/**
- * Combined preview cache with memory LRU and OPFS persistence.
- *
- * Same pattern as ThumbnailCache but with smaller memory limit
- * (20 items vs 150) due to larger preview sizes (~20MB decoded).
- *
- * Read path:
- * 1. Check memory cache (fast)
- * 2. If miss, check OPFS
- * 3. If found in OPFS, load into memory cache
- *
- * Write path:
- * 1. Store in memory cache (immediate)
- * 2. Persist to OPFS (async, fire-and-forget)
- */
-export class PreviewCache implements IPreviewCache {
-  private memoryCache: MemoryThumbnailCache // Reuse same memory cache implementation
-  private opfsCache: OPFSPreviewCache
-
-  constructor(memoryCacheSize: number = DEFAULT_PREVIEW_MEMORY_CACHE_SIZE) {
-    this.memoryCache = new MemoryThumbnailCache(memoryCacheSize)
-    this.opfsCache = new OPFSPreviewCache()
-  }
-
-  /**
-   * Get a preview URL.
-   *
-   * Checks memory cache first, then OPFS.
-   * OPFS results are promoted to memory cache.
-   */
-  async get(assetId: string): Promise<string | null> {
-    // Check memory cache first (fast path)
-    const memoryUrl = this.memoryCache.get(assetId)
-    if (memoryUrl) {
-      return memoryUrl
-    }
-
-    // Check OPFS cache
-    const blob = await this.opfsCache.get(assetId)
-    if (blob) {
-      // Promote to memory cache
-      const url = this.memoryCache.set(assetId, blob)
-      return url
-    }
-
-    return null
-  }
-
-  /**
-   * Store a preview.
-   *
-   * Stores immediately in memory cache and asynchronously in OPFS.
-   * Returns the Object URL for immediate use.
-   */
-  async set(assetId: string, blob: Blob): Promise<string> {
-    // Store in memory cache (immediate)
-    const url = this.memoryCache.set(assetId, blob)
-
-    // Persist to OPFS (fire-and-forget)
-    this.opfsCache.set(assetId, blob).catch((error) => {
-      console.warn('Failed to persist preview to OPFS:', error)
-    })
-
-    return url
-  }
-
-  /**
-   * Check if a preview exists.
-   */
-  async has(assetId: string): Promise<boolean> {
-    if (this.memoryCache.has(assetId)) {
-      return true
-    }
-    return this.opfsCache.has(assetId)
-  }
-
-  /**
-   * Delete a preview from both caches.
-   */
-  async delete(assetId: string): Promise<void> {
-    this.memoryCache.delete(assetId)
-    await this.opfsCache.delete(assetId)
-  }
-
-  /**
-   * Clear only the memory cache.
-   * Useful when experiencing memory pressure.
-   */
-  clearMemory(): void {
-    this.memoryCache.clear()
-  }
-
-  /**
-   * Clear both memory and OPFS caches.
-   */
-  async clearAll(): Promise<void> {
-    this.memoryCache.clear()
-    await this.opfsCache.clear()
-  }
-
-  /**
-   * Get the size of the memory cache.
-   */
-  get memoryCacheSize(): number {
-    return this.memoryCache.size
-  }
-
-  /**
-   * Check if OPFS cache is available.
-   */
-  get isOPFSAvailable(): boolean {
-    return this.opfsCache.isAvailable
-  }
-}
-
-/**
- * Create a new combined preview cache.
- */
 export function createPreviewCache(memoryCacheSize?: number): PreviewCache {
   return new PreviewCache(memoryCacheSize)
 }
