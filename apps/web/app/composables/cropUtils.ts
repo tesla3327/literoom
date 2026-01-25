@@ -33,8 +33,8 @@ export const COLORS = {
 export const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 export type HandlePosition = (typeof HANDLES)[number]
 
-// Import toCanvas for internal use
-import { toCanvas as toCanvasInternal } from '~/utils/canvasCoords'
+// Import coordinate utilities
+import { toCanvas as toCanvasInternal, distance } from '~/utils/canvasCoords'
 
 /**
  * Get handle positions in canvas coordinates.
@@ -76,8 +76,7 @@ export function findHandleAt(
   const positions = getHandlePositions(crop, canvasWidth, canvasHeight)
   for (const handle of HANDLES) {
     const pos = positions[handle]
-    const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= CROP_CROP_HANDLE_HIT_RADIUS) return handle
+    if (distance(canvasX, canvasY, pos.x, pos.y) <= CROP_CROP_HANDLE_HIT_RADIUS) return handle
   }
   return null
 }

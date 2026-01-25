@@ -14,6 +14,8 @@ import {
   toNormalized as toNormalizedBase,
   getCanvasCoords as getCanvasCoordsBase,
   debounce as debounceBase,
+  distance,
+  clamp01,
 } from '~/utils/canvasCoords'
 
 // ============================================================================
@@ -37,6 +39,25 @@ export const MASK_COLORS = {
   // Drawing mode
   drawingLine: '#22c55e',
   drawingHandle: '#22c55e',
+}
+
+// ============================================================================
+// Color Selection Helper
+// ============================================================================
+
+interface MaskRenderColors {
+  line: string
+  handle: string
+  fill: string
+}
+
+/**
+ * Get mask rendering colors based on selection state.
+ */
+function getMaskColors(isSelected: boolean): MaskRenderColors {
+  return isSelected
+    ? { line: MASK_COLORS.selectedLine, handle: MASK_COLORS.selectedHandle, fill: MASK_COLORS.selectedFill }
+    : { line: MASK_COLORS.unselectedLine, handle: MASK_COLORS.unselectedHandle, fill: MASK_COLORS.unselectedFill }
 }
 
 // ============================================================================
@@ -111,8 +132,7 @@ export function findLinearHandleAt(
 
   for (const handle of ['start', 'end'] as LinearHandle[]) {
     const pos = positions[handle]
-    const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= MASK_HANDLE_HIT_RADIUS) return handle
+    if (distance(canvasX, canvasY, pos.x, pos.y) <= MASK_HANDLE_HIT_RADIUS) return handle
   }
 
   return null
@@ -139,19 +159,17 @@ export function isNearLinearGradient(
 
   if (lengthSq === 0) {
     // Start and end are the same point
-    return Math.sqrt((canvasX - start.x) ** 2 + (canvasY - start.y) ** 2) <= threshold
+    return distance(canvasX, canvasY, start.x, start.y) <= threshold
   }
 
-  // Parameter t for closest point on line
-  let t = ((canvasX - start.x) * dx + (canvasY - start.y) * dy) / lengthSq
-  t = Math.max(0, Math.min(1, t))
+  // Parameter t for closest point on line (clamped to segment)
+  const t = clamp01(((canvasX - start.x) * dx + (canvasY - start.y) * dy) / lengthSq)
 
   // Closest point on line segment
   const closestX = start.x + t * dx
   const closestY = start.y + t * dy
 
-  const dist = Math.sqrt((canvasX - closestX) ** 2 + (canvasY - closestY) ** 2)
-  return dist <= threshold
+  return distance(canvasX, canvasY, closestX, closestY) <= threshold
 }
 
 // ============================================================================
@@ -194,14 +212,14 @@ export function findRadialHandleAt(
   const positions = getRadialHandlePositions(mask, canvasWidth, canvasHeight)
 
   // Check center first (higher priority)
-  const centerDist = Math.sqrt((canvasX - positions.center.x) ** 2 + (canvasY - positions.center.y) ** 2)
-  if (centerDist <= MASK_HANDLE_HIT_RADIUS) return 'center'
+  if (distance(canvasX, canvasY, positions.center.x, positions.center.y) <= MASK_HANDLE_HIT_RADIUS) {
+    return 'center'
+  }
 
   // Check radius handles
   for (const handle of ['radiusX+', 'radiusX-', 'radiusY+', 'radiusY-'] as RadialHandle[]) {
     const pos = positions[handle]
-    const dist = Math.sqrt((canvasX - pos.x) ** 2 + (canvasY - pos.y) ** 2)
-    if (dist <= MASK_HANDLE_HIT_RADIUS) return handle
+    if (distance(canvasX, canvasY, pos.x, pos.y) <= MASK_HANDLE_HIT_RADIUS) return handle
   }
 
   return null
@@ -252,16 +270,7 @@ export function drawLinearMask(
   isSelected: boolean,
   activeHandle: LinearHandle | null,
 ): void {
-  const colors = isSelected ? {
-    line: MASK_COLORS.selectedLine,
-    handle: MASK_COLORS.selectedHandle,
-    fill: MASK_COLORS.selectedFill,
-  } : {
-    line: MASK_COLORS.unselectedLine,
-    handle: MASK_COLORS.unselectedHandle,
-    fill: MASK_COLORS.unselectedFill,
-  }
-
+  const colors = getMaskColors(isSelected)
   const positions = getLinearHandlePositions(mask, canvasWidth, canvasHeight)
   const { start, end } = positions
 
@@ -339,16 +348,7 @@ export function drawRadialMask(
   isSelected: boolean,
   activeHandle: RadialHandle | null,
 ): void {
-  const colors = isSelected ? {
-    line: MASK_COLORS.selectedLine,
-    handle: MASK_COLORS.selectedHandle,
-    fill: MASK_COLORS.selectedFill,
-  } : {
-    line: MASK_COLORS.unselectedLine,
-    handle: MASK_COLORS.unselectedHandle,
-    fill: MASK_COLORS.unselectedFill,
-  }
-
+  const colors = getMaskColors(isSelected)
   const center = toCanvasCoords(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
   const rx = mask.radiusX * canvasWidth
   const ry = mask.radiusY * canvasHeight
@@ -541,8 +541,8 @@ export function updateLinearHandlePosition(
   normalizedX: number,
   normalizedY: number,
 ): Partial<LinearGradientMask> {
-  const clampedX = Math.max(0, Math.min(1, normalizedX))
-  const clampedY = Math.max(0, Math.min(1, normalizedY))
+  const clampedX = clamp01(normalizedX)
+  const clampedY = clamp01(normalizedY)
 
   if (handle === 'start') {
     return { start: { x: clampedX, y: clampedY } }
@@ -564,8 +564,8 @@ export function updateRadialHandlePosition(
   canvasWidth: number,
   canvasHeight: number,
 ): Partial<RadialGradientMask> {
-  const clampedX = Math.max(0, Math.min(1, normalizedX))
-  const clampedY = Math.max(0, Math.min(1, normalizedY))
+  const clampedX = clamp01(normalizedX)
+  const clampedY = clamp01(normalizedY)
 
   if (handle === 'center') {
     return { center: { x: clampedX, y: clampedY } }

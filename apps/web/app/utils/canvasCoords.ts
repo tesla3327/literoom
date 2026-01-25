@@ -6,6 +6,24 @@
  */
 
 // ============================================================================
+// Math Utilities
+// ============================================================================
+
+/**
+ * Calculate Euclidean distance between two points.
+ */
+export function distance(x1: number, y1: number, x2: number, y2: number): number {
+  return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+}
+
+/**
+ * Clamp a value to the range [0, 1].
+ */
+export function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
+}
+
+// ============================================================================
 // Coordinate Conversion
 // ============================================================================
 
@@ -25,8 +43,8 @@ export function toNormalized(
   canvasHeight: number,
 ): { x: number; y: number } {
   return {
-    x: Math.max(0, Math.min(1, canvasX / canvasWidth)),
-    y: Math.max(0, Math.min(1, canvasY / canvasHeight)),
+    x: clamp01(canvasX / canvasWidth),
+    y: clamp01(canvasY / canvasHeight),
   }
 }
 
