@@ -5,6 +5,7 @@
  * Displays the current folder with a dropdown to switch between recent folders
  * or select a new folder. Shows folder accessibility status and loading states.
  */
+import { formatRelativeTime } from '~/utils/formatRelativeTime'
 
 const catalogStore = useCatalogStore()
 const {
@@ -59,35 +60,6 @@ async function handleSelectNew() {
   }
 }
 
-// Format last scan date for display
-function formatDate(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  // Less than 1 minute
-  if (diff < 60000) return 'Just now'
-
-  // Less than 1 hour
-  if (diff < 3600000) {
-    const mins = Math.floor(diff / 60000)
-    return `${mins} minute${mins > 1 ? 's' : ''} ago`
-  }
-
-  // Less than 24 hours
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000)
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  }
-
-  // Less than 7 days
-  if (diff < 604800000) {
-    const days = Math.floor(diff / 86400000)
-    return `${days} day${days > 1 ? 's' : ''} ago`
-  }
-
-  // Older - show date
-  return date.toLocaleDateString()
-}
 
 // Build dropdown items from recent folders
 const dropdownItems = computed(() => {
@@ -99,7 +71,7 @@ const dropdownItems = computed(() => {
       label: folder.name,
       icon: folder.isAccessible ? 'i-heroicons-folder' : 'i-heroicons-lock-closed',
       disabled: isLoadingFolderId.value === folder.id,
-      suffix: formatDate(folder.lastScanDate),
+      suffix: formatRelativeTime(folder.lastScanDate),
       suffixClass: 'text-xs text-gray-500',
       click: () => folder.isAccessible && handleSelectRecent(folder.id),
       // Show loading spinner when this folder is loading

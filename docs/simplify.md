@@ -24,3 +24,4 @@
 - apps/web/app/utils/zoomCalculations.ts (extracted Dimensions interface and helpers to DRY calculateFitScale, calculateFillScale, clampPan, calculateCenteredPan, and detectPreset)
 - apps/web/app/stores/selection.ts (extracted getNavigatedId and findWithWrapAround helpers to DRY navigateNext, navigatePrevious, and navigateToNextUnflagged)
 - apps/web/app/components/help/HelpModal.vue (extracted shortcut data into typed Column/Section/Shortcut structures and used v-for to replace ~200 lines of repetitive HTML with ~50 lines of data-driven template)
+- apps/web/app/components/catalog/RecentFoldersDropdown.vue (extracted formatRelativeTime utility to DRY duplicate formatDate functions in RecentFoldersDropdown.vue and index.vue)

@@ -9,6 +9,7 @@
  *
  * Uses the useCatalog composable for service access.
  */
+import { formatRelativeTime } from '~/utils/formatRelativeTime'
 
 // ============================================================================
 // Stores and Composables
@@ -97,29 +98,6 @@ function handleContinue() {
 // ============================================================================
 // Recent Folders
 // ============================================================================
-
-/**
- * Format date for display in recent folders list.
- */
-function formatDate(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  if (diff < 60000) return 'Just now'
-  if (diff < 3600000) {
-    const mins = Math.floor(diff / 60000)
-    return `${mins} minute${mins > 1 ? 's' : ''} ago`
-  }
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000)
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  }
-  if (diff < 604800000) {
-    const days = Math.floor(diff / 86400000)
-    return `${days} day${days > 1 ? 's' : ''} ago`
-  }
-  return date.toLocaleDateString()
-}
 
 /**
  * Handle selecting a recent folder from the welcome screen.
@@ -294,7 +272,7 @@ onUnmounted(() => {
                     Permission required
                   </template>
                   <template v-else>
-                    {{ formatDate(folder.lastScanDate) }}
+                    {{ formatRelativeTime(folder.lastScanDate) }}
                   </template>
                 </p>
               </div>
