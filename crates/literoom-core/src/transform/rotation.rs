@@ -176,6 +176,17 @@ pub fn apply_rotation(
     }
 }
 
+/// Get a pixel as [f64; 3] from an image at the given coordinates.
+#[inline]
+fn get_pixel_f64(image: &DecodedImage, px: usize, py: usize) -> [f64; 3] {
+    let idx = (py * image.width as usize + px) * 3;
+    [
+        image.pixels[idx] as f64,
+        image.pixels[idx + 1] as f64,
+        image.pixels[idx + 2] as f64,
+    ]
+}
+
 /// Sample a pixel using bilinear interpolation.
 ///
 /// Bilinear interpolation considers the 4 nearest pixels and weights
@@ -197,22 +208,10 @@ fn sample_bilinear(image: &DecodedImage, x: f64, y: f64) -> [u8; 3] {
     let fx = x - x0 as f64;
     let fy = y - y0 as f64;
 
-    let w = image.width as usize;
-
-    // Get the four corner pixels
-    let get_pixel = |px: usize, py: usize| -> [f64; 3] {
-        let idx = (py * w + px) * 3;
-        [
-            image.pixels[idx] as f64,
-            image.pixels[idx + 1] as f64,
-            image.pixels[idx + 2] as f64,
-        ]
-    };
-
-    let p00 = get_pixel(x0, y0);
-    let p10 = get_pixel(x1, y0);
-    let p01 = get_pixel(x0, y1);
-    let p11 = get_pixel(x1, y1);
+    let p00 = get_pixel_f64(image, x0, y0);
+    let p10 = get_pixel_f64(image, x1, y0);
+    let p01 = get_pixel_f64(image, x0, y1);
+    let p11 = get_pixel_f64(image, x1, y1);
 
     // Bilinear interpolation formula
     let mut result = [0u8; 3];
@@ -256,10 +255,10 @@ fn sample_lanczos3(image: &DecodedImage, x: f64, y: f64) -> [u8; 3] {
                 let dy = y - py as f64;
                 let weight = lanczos_weight(dx, 3.0) * lanczos_weight(dy, 3.0);
 
-                let idx = ((py as u32 * image.width + px as u32) * 3) as usize;
-                sum[0] += image.pixels[idx] as f64 * weight;
-                sum[1] += image.pixels[idx + 1] as f64 * weight;
-                sum[2] += image.pixels[idx + 2] as f64 * weight;
+                let pixel = get_pixel_f64(image, px as usize, py as usize);
+                sum[0] += pixel[0] * weight;
+                sum[1] += pixel[1] * weight;
+                sum[2] += pixel[2] * weight;
                 weight_sum += weight;
             }
         }
