@@ -32,6 +32,16 @@ export interface Point {
   y: number
 }
 
+/**
+ * Combined image and viewport dimensions for zoom calculations.
+ */
+export interface Dimensions {
+  imageWidth: number
+  imageHeight: number
+  viewportWidth: number
+  viewportHeight: number
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -52,6 +62,27 @@ export const ZOOM_CACHE_DEBOUNCE = 300
 // Scale Calculations
 // ============================================================================
 
+/** Check if dimensions are valid (non-zero) */
+function hasValidDimensions(d: Dimensions): boolean {
+  return d.imageWidth > 0 && d.imageHeight > 0 && d.viewportWidth > 0 && d.viewportHeight > 0
+}
+
+/** Calculate X and Y scale factors */
+function calculateScaleFactors(d: Dimensions): { scaleX: number; scaleY: number } {
+  return {
+    scaleX: d.viewportWidth / d.imageWidth,
+    scaleY: d.viewportHeight / d.imageHeight,
+  }
+}
+
+/** Calculate centered pan position for scaled image */
+function calculateCenteredPosition(scaledWidth: number, scaledHeight: number, viewportWidth: number, viewportHeight: number): { centerX: number; centerY: number } {
+  return {
+    centerX: (viewportWidth - scaledWidth) / 2,
+    centerY: (viewportHeight - scaledHeight) / 2,
+  }
+}
+
 /**
  * Calculate the scale needed to fit the entire image within the viewport.
  * Returns a scale where the image fits completely with possible letterboxing.
@@ -62,12 +93,9 @@ export function calculateFitScale(
   viewportWidth: number,
   viewportHeight: number,
 ): number {
-  if (imageWidth === 0 || imageHeight === 0) return 1
-  if (viewportWidth === 0 || viewportHeight === 0) return 1
-
-  const scaleX = viewportWidth / imageWidth
-  const scaleY = viewportHeight / imageHeight
-
+  const d: Dimensions = { imageWidth, imageHeight, viewportWidth, viewportHeight }
+  if (!hasValidDimensions(d)) return 1
+  const { scaleX, scaleY } = calculateScaleFactors(d)
   return Math.min(scaleX, scaleY)
 }
 
@@ -81,12 +109,9 @@ export function calculateFillScale(
   viewportWidth: number,
   viewportHeight: number,
 ): number {
-  if (imageWidth === 0 || imageHeight === 0) return 1
-  if (viewportWidth === 0 || viewportHeight === 0) return 1
-
-  const scaleX = viewportWidth / imageWidth
-  const scaleY = viewportHeight / imageHeight
-
+  const d: Dimensions = { imageWidth, imageHeight, viewportWidth, viewportHeight }
+  if (!hasValidDimensions(d)) return 1
+  const { scaleX, scaleY } = calculateScaleFactors(d)
   return Math.max(scaleX, scaleY)
 }
 
@@ -149,33 +174,21 @@ export function clampPan(
 ): Camera {
   const scaledWidth = imageWidth * camera.scale
   const scaledHeight = imageHeight * camera.scale
-
-  // Calculate the centered position
-  const centerX = (viewportWidth - scaledWidth) / 2
-  const centerY = (viewportHeight - scaledHeight) / 2
+  const { centerX, centerY } = calculateCenteredPosition(scaledWidth, scaledHeight, viewportWidth, viewportHeight)
 
   // If image fits in viewport, center it (no pan)
   if (scaledWidth <= viewportWidth && scaledHeight <= viewportHeight) {
-    return {
-      ...camera,
-      panX: centerX,
-      panY: centerY,
-    }
+    return { ...camera, panX: centerX, panY: centerY }
   }
 
-  // Calculate max pan distances from center
-  // Allow panning so that at most half the image is outside viewport
+  // Calculate max pan distances from center (allow panning so at most half the image is outside viewport)
   const maxPanX = Math.max(0, (scaledWidth - viewportWidth) / 2)
   const maxPanY = Math.max(0, (scaledHeight - viewportHeight) / 2)
 
-  // Pan is relative to center, so clamp around center position
-  const clampedPanX = clamp(camera.panX, centerX - maxPanX, centerX + maxPanX)
-  const clampedPanY = clamp(camera.panY, centerY - maxPanY, centerY + maxPanY)
-
   return {
     ...camera,
-    panX: clampedPanX,
-    panY: clampedPanY,
+    panX: clamp(camera.panX, centerX - maxPanX, centerX + maxPanX),
+    panY: clamp(camera.panY, centerY - maxPanY, centerY + maxPanY),
   }
 }
 
@@ -189,13 +202,8 @@ export function calculateCenteredPan(
   viewportWidth: number,
   viewportHeight: number,
 ): { panX: number; panY: number } {
-  const scaledWidth = imageWidth * scale
-  const scaledHeight = imageHeight * scale
-
-  return {
-    panX: (viewportWidth - scaledWidth) / 2,
-    panY: (viewportHeight - scaledHeight) / 2,
-  }
+  const { centerX, centerY } = calculateCenteredPosition(imageWidth * scale, imageHeight * scale, viewportWidth, viewportHeight)
+  return { panX: centerX, panY: centerY }
 }
 
 // ============================================================================
@@ -344,6 +352,11 @@ export function getZoomPercentage(scale: number): number {
   return Math.round(scale * 100)
 }
 
+/** Check if two scales are approximately equal */
+function scalesMatch(a: number, b: number, tolerance = 0.001): boolean {
+  return Math.abs(a - b) < tolerance
+}
+
 /**
  * Determine which preset (if any) matches the current camera state.
  * Returns 'custom' if no preset matches.
@@ -355,16 +368,11 @@ export function detectPreset(
   viewportWidth: number,
   viewportHeight: number,
 ): ZoomPreset {
-  const fitScale = calculateFitScale(imageWidth, imageHeight, viewportWidth, viewportHeight)
-  const fillScale = calculateFillScale(imageWidth, imageHeight, viewportWidth, viewportHeight)
-
-  const tolerance = 0.001
-
-  if (Math.abs(camera.scale - fitScale) < tolerance) return 'fit'
-  if (Math.abs(camera.scale - fillScale) < tolerance) return 'fill'
-  if (Math.abs(camera.scale - 0.5) < tolerance) return '50%'
-  if (Math.abs(camera.scale - 1.0) < tolerance) return '100%'
-  if (Math.abs(camera.scale - 2.0) < tolerance) return '200%'
-
+  const scale = camera.scale
+  if (scalesMatch(scale, calculateFitScale(imageWidth, imageHeight, viewportWidth, viewportHeight))) return 'fit'
+  if (scalesMatch(scale, calculateFillScale(imageWidth, imageHeight, viewportWidth, viewportHeight))) return 'fill'
+  if (scalesMatch(scale, 0.5)) return '50%'
+  if (scalesMatch(scale, 1.0)) return '100%'
+  if (scalesMatch(scale, 2.0)) return '200%'
   return 'custom'
 }

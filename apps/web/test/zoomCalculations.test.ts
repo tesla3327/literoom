@@ -26,6 +26,7 @@ import {
   ZOOM_STEP,
   type Camera,
   type ZoomPreset,
+  type Dimensions,
 } from '~/utils/zoomCalculations'
 
 // ============================================================================
@@ -613,5 +614,24 @@ describe('constants', () => {
   it('has valid ZOOM_STEP', () => {
     expect(ZOOM_STEP).toBe(1.1)
     expect(ZOOM_STEP).toBeGreaterThan(1)
+  })
+})
+
+// ============================================================================
+// Types
+// ============================================================================
+
+describe('Dimensions type', () => {
+  it('can be created and used', () => {
+    const dims: Dimensions = {
+      imageWidth: 1000,
+      imageHeight: 800,
+      viewportWidth: 500,
+      viewportHeight: 400,
+    }
+    expect(dims.imageWidth).toBe(1000)
+    expect(dims.imageHeight).toBe(800)
+    expect(dims.viewportWidth).toBe(500)
+    expect(dims.viewportHeight).toBe(400)
   })
 })
