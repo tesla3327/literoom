@@ -40,7 +40,8 @@ import type {
   EncodeJpegResponse,
   GenerateEditedThumbnailResponse
 } from './worker-messages'
-import type { ErrorCode } from './types'
+import type { ErrorCode, Adjustments } from './types'
+import type { MaskStackData } from './worker-messages'
 
 /** Whether WASM module has been initialized */
 let initialized = false
@@ -101,6 +102,108 @@ function sendError(id: string, error: unknown, code: ErrorCode): void {
     code
   }
   self.postMessage(response)
+}
+
+/**
+ * Create a BasicAdjustments WASM object from a TypeScript adjustments object.
+ * Caller is responsible for calling .free() on the returned object.
+ */
+function createWasmAdjustments(adjustments: Partial<Adjustments>): BasicAdjustments {
+  const wasmAdj = new BasicAdjustments()
+  wasmAdj.temperature = adjustments.temperature ?? 0
+  wasmAdj.tint = adjustments.tint ?? 0
+  wasmAdj.exposure = adjustments.exposure ?? 0
+  wasmAdj.contrast = adjustments.contrast ?? 0
+  wasmAdj.highlights = adjustments.highlights ?? 0
+  wasmAdj.shadows = adjustments.shadows ?? 0
+  wasmAdj.whites = adjustments.whites ?? 0
+  wasmAdj.blacks = adjustments.blacks ?? 0
+  wasmAdj.vibrance = adjustments.vibrance ?? 0
+  wasmAdj.saturation = adjustments.saturation ?? 0
+  return wasmAdj
+}
+
+/**
+ * Convert a TypeScript mask adjustments object to WASM format (all fields defaulted to 0).
+ */
+function toWasmMaskAdjustments(adjustments: Partial<Adjustments>) {
+  return {
+    exposure: adjustments.exposure ?? 0,
+    contrast: adjustments.contrast ?? 0,
+    highlights: adjustments.highlights ?? 0,
+    shadows: adjustments.shadows ?? 0,
+    whites: adjustments.whites ?? 0,
+    blacks: adjustments.blacks ?? 0,
+    temperature: adjustments.temperature ?? 0,
+    tint: adjustments.tint ?? 0,
+    saturation: adjustments.saturation ?? 0,
+    vibrance: adjustments.vibrance ?? 0,
+  }
+}
+
+/** Linear mask type from MaskStackData */
+type LinearMask = MaskStackData['linearMasks'][number]
+
+/** Radial mask type from MaskStackData */
+type RadialMask = MaskStackData['radialMasks'][number]
+
+/**
+ * Convert a linear mask to WASM format (snake_case field names).
+ */
+function toWasmLinearMask(m: LinearMask) {
+  return {
+    start_x: m.startX,
+    start_y: m.startY,
+    end_x: m.endX,
+    end_y: m.endY,
+    feather: m.feather,
+    enabled: true,
+    adjustments: toWasmMaskAdjustments(m.adjustments),
+  }
+}
+
+/**
+ * Convert a radial mask to WASM format (snake_case field names).
+ */
+function toWasmRadialMask(m: RadialMask) {
+  return {
+    center_x: m.centerX,
+    center_y: m.centerY,
+    radius_x: m.radiusX,
+    radius_y: m.radiusY,
+    rotation: m.rotation,
+    feather: m.feather,
+    invert: m.invert,
+    enabled: true,
+    adjustments: toWasmMaskAdjustments(m.adjustments),
+  }
+}
+
+/**
+ * Convert a mask stack to WASM format.
+ */
+function toWasmMaskStack(maskStack: MaskStackData) {
+  return {
+    linear_masks: maskStack.linearMasks.filter(m => m.enabled).map(toWasmLinearMask),
+    radial_masks: maskStack.radialMasks.filter(m => m.enabled).map(toWasmRadialMask),
+  }
+}
+
+/**
+ * Process an output image and send a success response.
+ * Extracts pixels, sends with transfer, and frees WASM memory.
+ */
+function sendImageSuccess(id: string, outputImage: JsDecodedImage): void {
+  const outputPixels = outputImage.pixels()
+  const response: DecodeSuccessResponse = {
+    id,
+    type: 'success',
+    width: outputImage.width,
+    height: outputImage.height,
+    pixels: outputPixels
+  }
+  self.postMessage(response, [outputPixels.buffer])
+  outputImage.free()
 }
 
 /**
@@ -211,46 +314,12 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
       case 'apply-adjustments': {
         const { pixels, width, height, adjustments } = request
-
-        // Create BasicAdjustments instance and set values
-        const wasmAdj = new BasicAdjustments()
-        wasmAdj.temperature = adjustments.temperature
-        wasmAdj.tint = adjustments.tint
-        wasmAdj.exposure = adjustments.exposure
-        wasmAdj.contrast = adjustments.contrast
-        wasmAdj.highlights = adjustments.highlights
-        wasmAdj.shadows = adjustments.shadows
-        wasmAdj.whites = adjustments.whites
-        wasmAdj.blacks = adjustments.blacks
-        wasmAdj.vibrance = adjustments.vibrance
-        wasmAdj.saturation = adjustments.saturation
-
-        // Create input image from pixels
+        const wasmAdj = createWasmAdjustments(adjustments)
         const inputImage = new JsDecodedImage(width, height, pixels)
-
-        // Apply adjustments (returns new image)
         const outputImage = apply_adjustments(inputImage, wasmAdj)
-        const outputPixels = outputImage.pixels()
-        const outputWidth = outputImage.width
-        const outputHeight = outputImage.height
-
-        // Free WASM memory
         inputImage.free()
         wasmAdj.free()
-
-        const response: DecodeSuccessResponse = {
-          id,
-          type: 'success',
-          width: outputWidth,
-          height: outputHeight,
-          pixels: outputPixels
-        }
-
-        // Transfer the pixel buffer to avoid copying
-        self.postMessage(response, [outputPixels.buffer])
-
-        // Free output image WASM memory
-        outputImage.free()
+        sendImageSuccess(id, outputImage)
         break
       }
 
@@ -296,104 +365,40 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
       case 'apply-tone-curve': {
         const { pixels, width, height, points } = request
-
-        // Create LUT from curve points
         const lut = new JsToneCurveLut(points)
-
-        // Create image wrapper
         const inputImage = new JsDecodedImage(width, height, pixels)
-
-        // Apply tone curve
         const outputImage = apply_tone_curve(inputImage, lut)
-
-        // Extract result
-        const outputPixels = outputImage.pixels()
-        const outputWidth = outputImage.width
-        const outputHeight = outputImage.height
-
-        // Free WASM memory
         lut.free()
         inputImage.free()
 
+        const outputPixels = outputImage.pixels()
         const response: ToneCurveResponse = {
           id,
           type: 'tone-curve-result',
           pixels: outputPixels,
-          width: outputWidth,
-          height: outputHeight
+          width: outputImage.width,
+          height: outputImage.height
         }
-
-        // Transfer pixel buffer to avoid copying
         self.postMessage(response, [outputPixels.buffer])
-
-        // Free output image WASM memory
         outputImage.free()
         break
       }
 
       case 'apply-rotation': {
         const { pixels, width, height, angleDegrees, useLanczos } = request
-
-        // Create image wrapper
         const inputImage = new JsDecodedImage(width, height, pixels)
-
-        // Apply rotation
         const outputImage = apply_rotation(inputImage, angleDegrees, useLanczos)
-
-        // Extract result
-        const outputPixels = outputImage.pixels()
-        const outputWidth = outputImage.width
-        const outputHeight = outputImage.height
-
-        // Free WASM memory
         inputImage.free()
-
-        const response: DecodeSuccessResponse = {
-          id,
-          type: 'success',
-          pixels: outputPixels,
-          width: outputWidth,
-          height: outputHeight
-        }
-
-        // Transfer pixel buffer to avoid copying
-        self.postMessage(response, [outputPixels.buffer])
-
-        // Free output image WASM memory
-        outputImage.free()
+        sendImageSuccess(id, outputImage)
         break
       }
 
       case 'apply-crop': {
         const { pixels, width, height, left, top, cropWidth, cropHeight } = request
-
-        // Create image wrapper
         const inputImage = new JsDecodedImage(width, height, pixels)
-
-        // Apply crop using normalized coordinates
         const outputImage = apply_crop(inputImage, left, top, cropWidth, cropHeight)
-
-        // Extract result
-        const outputPixels = outputImage.pixels()
-        const outputWidth = outputImage.width
-        const outputHeight = outputImage.height
-
-        // Free WASM memory
         inputImage.free()
-
-        const response: DecodeSuccessResponse = {
-          id,
-          type: 'success',
-          pixels: outputPixels,
-          width: outputWidth,
-          height: outputHeight
-        }
-
-        // Transfer pixel buffer to avoid copying
-        self.postMessage(response, [outputPixels.buffer])
-
-        // Free output image WASM memory
-        outputImage.free()
+        sendImageSuccess(id, outputImage)
         break
       }
 
@@ -416,109 +421,33 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
 
       case 'apply-masked-adjustments': {
         const { pixels, width, height, maskStack } = request
-
-        // Create input image from pixels
         const inputImage = new JsDecodedImage(width, height, pixels)
-
-        // Convert mask stack to WASM format
-        // The WASM function expects snake_case field names
-        const wasmMaskData = {
-          linear_masks: maskStack.linearMasks
-            .filter(m => m.enabled)
-            .map(m => ({
-              start_x: m.startX,
-              start_y: m.startY,
-              end_x: m.endX,
-              end_y: m.endY,
-              feather: m.feather,
-              enabled: true,
-              adjustments: {
-                exposure: m.adjustments.exposure ?? 0,
-                contrast: m.adjustments.contrast ?? 0,
-                highlights: m.adjustments.highlights ?? 0,
-                shadows: m.adjustments.shadows ?? 0,
-                whites: m.adjustments.whites ?? 0,
-                blacks: m.adjustments.blacks ?? 0,
-                temperature: m.adjustments.temperature ?? 0,
-                tint: m.adjustments.tint ?? 0,
-                saturation: m.adjustments.saturation ?? 0,
-                vibrance: m.adjustments.vibrance ?? 0,
-              },
-            })),
-          radial_masks: maskStack.radialMasks
-            .filter(m => m.enabled)
-            .map(m => ({
-              center_x: m.centerX,
-              center_y: m.centerY,
-              radius_x: m.radiusX,
-              radius_y: m.radiusY,
-              rotation: m.rotation, // WASM converts degrees to radians
-              feather: m.feather,
-              invert: m.invert,
-              enabled: true,
-              adjustments: {
-                exposure: m.adjustments.exposure ?? 0,
-                contrast: m.adjustments.contrast ?? 0,
-                highlights: m.adjustments.highlights ?? 0,
-                shadows: m.adjustments.shadows ?? 0,
-                whites: m.adjustments.whites ?? 0,
-                blacks: m.adjustments.blacks ?? 0,
-                temperature: m.adjustments.temperature ?? 0,
-                tint: m.adjustments.tint ?? 0,
-                saturation: m.adjustments.saturation ?? 0,
-                vibrance: m.adjustments.vibrance ?? 0,
-              },
-            })),
-        }
-
-        // Apply masked adjustments (returns new image)
+        const wasmMaskData = toWasmMaskStack(maskStack)
         const outputImage = apply_masked_adjustments(inputImage, wasmMaskData)
-        const outputPixels = outputImage.pixels()
-        const outputWidth = outputImage.width
-        const outputHeight = outputImage.height
-
-        // Free WASM memory
         inputImage.free()
-
-        const maskedResponse: DecodeSuccessResponse = {
-          id,
-          type: 'success',
-          width: outputWidth,
-          height: outputHeight,
-          pixels: outputPixels
-        }
-
-        // Transfer the pixel buffer to avoid copying
-        self.postMessage(maskedResponse, [outputPixels.buffer])
-
-        // Free output image WASM memory
-        outputImage.free()
+        sendImageSuccess(id, outputImage)
         break
       }
 
       case 'generate-edited-thumbnail': {
         const { bytes, size, editState } = request
 
-        // Step 1: Decode source image
-        let currentImage: JsDecodedImage
-        if (is_raw_file(bytes)) {
-          currentImage = decode_raw_thumbnail(bytes)
-        } else {
-          currentImage = decode_jpeg(bytes)
-        }
+        // Decode source image
+        let currentImage: JsDecodedImage = is_raw_file(bytes)
+          ? decode_raw_thumbnail(bytes)
+          : decode_jpeg(bytes)
 
-        // Step 2: Apply rotation (if any)
+        // Apply rotation (if any)
         if (editState.rotation) {
-          const totalAngle =
-            (editState.rotation.angle ?? 0) + (editState.rotation.straighten ?? 0)
+          const totalAngle = (editState.rotation.angle ?? 0) + (editState.rotation.straighten ?? 0)
           if (totalAngle !== 0) {
-            const rotatedImage = apply_rotation(currentImage, totalAngle, false) // bilinear for speed
+            const rotatedImage = apply_rotation(currentImage, totalAngle, false)
             currentImage.free()
             currentImage = rotatedImage
           }
         }
 
-        // Step 3: Apply crop (if any)
+        // Apply crop (if any)
         if (editState.crop) {
           const croppedImage = apply_crop(
             currentImage,
@@ -531,28 +460,17 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
           currentImage = croppedImage
         }
 
-        // Step 4: Apply basic adjustments (if any)
+        // Apply basic adjustments (if any)
         if (editState.adjustments) {
-          const wasmAdj = new BasicAdjustments()
-          wasmAdj.temperature = editState.adjustments.temperature ?? 0
-          wasmAdj.tint = editState.adjustments.tint ?? 0
-          wasmAdj.exposure = editState.adjustments.exposure ?? 0
-          wasmAdj.contrast = editState.adjustments.contrast ?? 0
-          wasmAdj.highlights = editState.adjustments.highlights ?? 0
-          wasmAdj.shadows = editState.adjustments.shadows ?? 0
-          wasmAdj.whites = editState.adjustments.whites ?? 0
-          wasmAdj.blacks = editState.adjustments.blacks ?? 0
-          wasmAdj.vibrance = editState.adjustments.vibrance ?? 0
-          wasmAdj.saturation = editState.adjustments.saturation ?? 0
-
+          const wasmAdj = createWasmAdjustments(editState.adjustments)
           const adjustedImage = apply_adjustments(currentImage, wasmAdj)
           currentImage.free()
           wasmAdj.free()
           currentImage = adjustedImage
         }
 
-        // Step 5: Apply tone curve (if any)
-        if (editState.toneCurve && editState.toneCurve.points && editState.toneCurve.points.length > 0) {
+        // Apply tone curve (if any)
+        if (editState.toneCurve?.points?.length) {
           const lut = new JsToneCurveLut(editState.toneCurve.points)
           const curvedImage = apply_tone_curve(currentImage, lut)
           currentImage.free()
@@ -560,81 +478,23 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
           currentImage = curvedImage
         }
 
-        // Step 6: Apply masked adjustments (if any)
+        // Apply masked adjustments (if any)
         if (editState.masks) {
-          const hasEnabledMasks =
-            (editState.masks.linearMasks?.length ?? 0) > 0 ||
-            (editState.masks.radialMasks?.length ?? 0) > 0
-
-          if (hasEnabledMasks) {
-            const wasmMaskData = {
-              linear_masks: (editState.masks.linearMasks || [])
-                .filter(m => m.enabled)
-                .map(m => ({
-                  start_x: m.startX,
-                  start_y: m.startY,
-                  end_x: m.endX,
-                  end_y: m.endY,
-                  feather: m.feather,
-                  enabled: true,
-                  adjustments: {
-                    exposure: m.adjustments.exposure ?? 0,
-                    contrast: m.adjustments.contrast ?? 0,
-                    highlights: m.adjustments.highlights ?? 0,
-                    shadows: m.adjustments.shadows ?? 0,
-                    whites: m.adjustments.whites ?? 0,
-                    blacks: m.adjustments.blacks ?? 0,
-                    temperature: m.adjustments.temperature ?? 0,
-                    tint: m.adjustments.tint ?? 0,
-                    saturation: m.adjustments.saturation ?? 0,
-                    vibrance: m.adjustments.vibrance ?? 0,
-                  },
-                })),
-              radial_masks: (editState.masks.radialMasks || [])
-                .filter(m => m.enabled)
-                .map(m => ({
-                  center_x: m.centerX,
-                  center_y: m.centerY,
-                  radius_x: m.radiusX,
-                  radius_y: m.radiusY,
-                  rotation: m.rotation,
-                  feather: m.feather,
-                  invert: m.invert,
-                  enabled: true,
-                  adjustments: {
-                    exposure: m.adjustments.exposure ?? 0,
-                    contrast: m.adjustments.contrast ?? 0,
-                    highlights: m.adjustments.highlights ?? 0,
-                    shadows: m.adjustments.shadows ?? 0,
-                    whites: m.adjustments.whites ?? 0,
-                    blacks: m.adjustments.blacks ?? 0,
-                    temperature: m.adjustments.temperature ?? 0,
-                    tint: m.adjustments.tint ?? 0,
-                    saturation: m.adjustments.saturation ?? 0,
-                    vibrance: m.adjustments.vibrance ?? 0,
-                  },
-                })),
-            }
-
+          const linearMasks = editState.masks.linearMasks || []
+          const radialMasks = editState.masks.radialMasks || []
+          if (linearMasks.length > 0 || radialMasks.length > 0) {
+            const wasmMaskData = toWasmMaskStack({ linearMasks, radialMasks })
             const maskedImage = apply_masked_adjustments(currentImage, wasmMaskData)
             currentImage.free()
             currentImage = maskedImage
           }
         }
 
-        // Step 7: Resize to thumbnail size
+        // Resize to thumbnail size and encode to JPEG
         const resizedImage = generate_thumbnail(currentImage, size)
         currentImage.free()
-
-        // Step 8: Encode to JPEG
         const resizedPixels = resizedImage.pixels()
-        const thumbnailBytes = encode_jpeg(
-          resizedPixels,
-          resizedImage.width,
-          resizedImage.height,
-          85 // JPEG quality for thumbnails
-        )
-
+        const thumbnailBytes = encode_jpeg(resizedPixels, resizedImage.width, resizedImage.height, 85)
         resizedImage.free()
 
         const editedThumbResponse: GenerateEditedThumbnailResponse = {
@@ -642,8 +502,6 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
           type: 'generate-edited-thumbnail-result',
           bytes: thumbnailBytes
         }
-
-        // Transfer the JPEG buffer to avoid copying
         self.postMessage(editedThumbResponse, [thumbnailBytes.buffer])
         break
       }
