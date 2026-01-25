@@ -82,6 +82,23 @@ pub enum Orientation {
     Rotate270CW = 8,
 }
 
+impl Orientation {
+    /// Returns true if this orientation swaps width and height dimensions.
+    ///
+    /// Rotations of 90° and 270° (and their flip variants Transpose/Transverse)
+    /// swap the image dimensions.
+    #[inline]
+    pub fn swaps_dimensions(self) -> bool {
+        matches!(
+            self,
+            Orientation::Transpose
+                | Orientation::Rotate90CW
+                | Orientation::Transverse
+                | Orientation::Rotate270CW
+        )
+    }
+}
+
 impl From<u32> for Orientation {
     fn from(value: u32) -> Self {
         match value {
@@ -126,15 +143,10 @@ pub struct ImageMetadata {
 impl ImageMetadata {
     /// Get the effective dimensions after orientation correction.
     pub fn oriented_dimensions(&self) -> (u32, u32) {
-        match self.orientation {
-            Orientation::Normal
-            | Orientation::FlipHorizontal
-            | Orientation::Rotate180
-            | Orientation::FlipVertical => (self.width, self.height),
-            Orientation::Transpose
-            | Orientation::Rotate90CW
-            | Orientation::Transverse
-            | Orientation::Rotate270CW => (self.height, self.width),
+        if self.orientation.swaps_dimensions() {
+            (self.height, self.width)
+        } else {
+            (self.width, self.height)
         }
     }
 }
@@ -223,6 +235,21 @@ mod tests {
         assert_eq!(Orientation::from(1), Orientation::Normal);
         assert_eq!(Orientation::from(6), Orientation::Rotate90CW);
         assert_eq!(Orientation::from(99), Orientation::Normal); // Invalid defaults to Normal
+    }
+
+    #[test]
+    fn test_orientation_swaps_dimensions() {
+        // Non-swapping orientations
+        assert!(!Orientation::Normal.swaps_dimensions());
+        assert!(!Orientation::FlipHorizontal.swaps_dimensions());
+        assert!(!Orientation::Rotate180.swaps_dimensions());
+        assert!(!Orientation::FlipVertical.swaps_dimensions());
+
+        // Swapping orientations (90° and 270° rotations and their flip variants)
+        assert!(Orientation::Transpose.swaps_dimensions());
+        assert!(Orientation::Rotate90CW.swaps_dimensions());
+        assert!(Orientation::Transverse.swaps_dimensions());
+        assert!(Orientation::Rotate270CW.swaps_dimensions());
     }
 
     #[test]

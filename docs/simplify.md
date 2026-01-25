@@ -11,3 +11,4 @@
 - crates/literoom-core/src/lib.rs (Histogram impl)
 - crates/literoom-core/src/decode/jpeg.rs
 - crates/literoom-core/src/histogram.rs (extracted luminance to shared module)
+- crates/literoom-core/src/decode/types.rs (extracted swaps_dimensions helper to simplify oriented_dimensions)
