@@ -133,22 +133,30 @@ impl Histogram {
         Self::default()
     }
 
-    /// Find the maximum value across all channels for normalization
+    /// Find the maximum value across all RGB channels for normalization
     pub fn max_value(&self) -> u32 {
-        let max_r = *self.red.iter().max().unwrap_or(&0);
-        let max_g = *self.green.iter().max().unwrap_or(&0);
-        let max_b = *self.blue.iter().max().unwrap_or(&0);
-        max_r.max(max_g).max(max_b)
+        self.red
+            .iter()
+            .chain(self.green.iter())
+            .chain(self.blue.iter())
+            .copied()
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Check if any RGB channel has a non-zero value at the given bin index
+    fn has_value_at(&self, index: usize) -> bool {
+        self.red[index] > 0 || self.green[index] > 0 || self.blue[index] > 0
     }
 
     /// Check for highlight clipping (values at 255)
     pub fn has_highlight_clipping(&self) -> bool {
-        self.red[255] > 0 || self.green[255] > 0 || self.blue[255] > 0
+        self.has_value_at(255)
     }
 
     /// Check for shadow clipping (values at 0)
     pub fn has_shadow_clipping(&self) -> bool {
-        self.red[0] > 0 || self.green[0] > 0 || self.blue[0] > 0
+        self.has_value_at(0)
     }
 }
 

@@ -342,15 +342,17 @@ mod proptests {
             }
         }
 
-        /// Property: max_value is correct (equals the maximum bin count).
+        /// Property: max_value is correct (equals the maximum bin count across RGB).
+        /// Note: max_value() only considers RGB channels, not luminance,
+        /// since luminance is typically displayed separately in histograms.
         #[test]
         fn prop_max_value_is_correct((pixels, width, height) in small_image_strategy()) {
             let hist = compute_histogram(&pixels, width, height);
 
+            // max_value() only considers RGB channels (not luminance)
             let expected_max = hist.red.iter()
                 .chain(hist.green.iter())
                 .chain(hist.blue.iter())
-                .chain(hist.luminance.iter())
                 .copied()
                 .max()
                 .unwrap_or(0);

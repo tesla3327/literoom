@@ -8,3 +8,4 @@
 - crates/literoom-core/src/transform/crop.rs
 - crates/literoom-core/src/mask/radial.rs
 - crates/literoom-core/src/mask/linear.rs
+- crates/literoom-core/src/lib.rs (Histogram impl)
