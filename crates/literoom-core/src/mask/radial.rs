@@ -93,6 +93,28 @@ impl RadialGradientMask {
         Self::new(center_x, center_y, radius, radius, 0.0, feather, false)
     }
 
+    /// Compute the normalized distance squared from center in ellipse space.
+    ///
+    /// Returns the squared distance where 1.0 means on the ellipse boundary.
+    /// Using squared distance avoids a sqrt when only comparison is needed.
+    #[inline]
+    fn normalized_distance_sq(&self, x: f32, y: f32) -> f32 {
+        // Translate to center
+        let dx = x - self.center_x;
+        let dy = y - self.center_y;
+
+        // Rotate to local coordinate space (inverse rotation)
+        let (cos_r, sin_r) = (self.rotation.cos(), self.rotation.sin());
+        let local_x = dx * cos_r + dy * sin_r;
+        let local_y = -dx * sin_r + dy * cos_r;
+
+        // Normalize by radii (min 0.001 to avoid division by zero)
+        let rx = self.radius_x.max(0.001);
+        let ry = self.radius_y.max(0.001);
+
+        (local_x / rx).powi(2) + (local_y / ry).powi(2)
+    }
+
     /// Evaluate the mask strength at a given normalized coordinate.
     ///
     /// Returns a value from 0.0 (no effect) to 1.0 (full effect).
@@ -108,21 +130,7 @@ impl RadialGradientMask {
     /// 4. Apply feathering based on distance
     /// 5. Optionally invert the result
     pub fn evaluate(&self, x: f32, y: f32) -> f32 {
-        // Translate to center
-        let dx = x - self.center_x;
-        let dy = y - self.center_y;
-
-        // Rotate to local coordinate space (inverse rotation)
-        let (cos_r, sin_r) = (self.rotation.cos(), self.rotation.sin());
-        let local_x = dx * cos_r + dy * sin_r;
-        let local_y = -dx * sin_r + dy * cos_r;
-
-        // Avoid division by zero
-        let rx = self.radius_x.max(0.001);
-        let ry = self.radius_y.max(0.001);
-
-        // Normalized distance from center (1.0 = on ellipse edge)
-        let norm_dist = ((local_x / rx).powi(2) + (local_y / ry).powi(2)).sqrt();
+        let norm_dist = self.normalized_distance_sq(x, y).sqrt();
 
         // Calculate inner boundary based on feather
         // feather = 0: inner = 1.0 (hard edge at ellipse boundary)
@@ -156,19 +164,7 @@ impl RadialGradientMask {
 
     /// Check if a point is inside the ellipse boundary (ignoring feather).
     pub fn contains(&self, x: f32, y: f32) -> bool {
-        let dx = x - self.center_x;
-        let dy = y - self.center_y;
-
-        // Rotate to local coordinate space
-        let (cos_r, sin_r) = (self.rotation.cos(), self.rotation.sin());
-        let local_x = dx * cos_r + dy * sin_r;
-        let local_y = -dx * sin_r + dy * cos_r;
-
-        let rx = self.radius_x.max(0.001);
-        let ry = self.radius_y.max(0.001);
-
-        let norm_dist_sq = (local_x / rx).powi(2) + (local_y / ry).powi(2);
-        norm_dist_sq <= 1.0
+        self.normalized_distance_sq(x, y) <= 1.0
     }
 }
 
