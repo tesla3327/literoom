@@ -290,47 +290,51 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 9. Crop & Transform
 
+**Tested**: 2026-01-25 | **Status**: PASS (minor discrepancies)
+
 ### 9.1 Rotation Controls
-- [ ] "↺ 90°" rotates counter-clockwise
-- [ ] "↻ 90°" rotates clockwise
-- [ ] Angle slider: -180° to +180° (0.1° step)
-- [ ] Straighten slider: -45° to +45° (0.1° step)
-- [ ] Total rotation display shows combined angle
-- [ ] Reset button clears rotation
+- [x] "↺ 90°" rotates counter-clockwise - verified (Angle shows -90.0°)
+- [x] "↻ 90°" rotates clockwise - verified (Angle shows +90.0°)
+- [x] Angle slider: -180° to +180° (0.1° step) - verified via DOM attributes
+- [x] Straighten slider: -45° to +45° (0.1° step) - verified via DOM attributes
+- [x] Total rotation display shows combined angle - verified (45° + 15° = 60.0°)
+- [x] Reset button clears rotation - verified
 
 ### 9.2 Crop Aspect Ratios
-- [ ] Free (unconstrained) works
-- [ ] 1:1 (square) constrains correctly
-- [ ] 16:9 constrains correctly
-- [ ] 3:2 constrains correctly
-- [ ] 4:5 constrains correctly
-- [ ] 5:7 constrains correctly
-- [ ] Aspect ratio maintained during resize
+- [x] Free (unconstrained) works
+- [x] 1:1 (square) constrains correctly - verified (W:56%, H:100%)
+- [x] 16:9 constrains correctly
+- [ ] 3:2 constrains correctly - **NOT AVAILABLE** (aspect ratio not in UI)
+- [x] 4:5 constrains correctly - verified (W:45%, H:100%)
+- [ ] 5:7 constrains correctly - **NOT AVAILABLE** (aspect ratio not in UI)
+- [x] Aspect ratio maintained during resize - verified
+
+**Note**: Available aspect ratios are: Free, Original, 1:1, 4:5, 5:4, 16:9, 9:16
 
 ### 9.3 Crop Canvas Interaction
-- [ ] Crop overlay visible when tool active
-- [ ] 8 handles visible (corners + edges)
-- [ ] Drag corners to resize
-- [ ] Drag edges to resize single dimension
-- [ ] Drag inside to move crop region
-- [ ] Rule of thirds grid visible
-- [ ] Dark overlay outside crop area
+- [x] Crop overlay visible when tool active
+- [x] 8 handles visible (corners + edges) - visible in screenshots
+- [ ] Drag corners to resize - interaction difficult to test via automation
+- [ ] Drag edges to resize single dimension - interaction difficult to test
+- [ ] Drag inside to move crop region - interaction difficult to test
+- [x] Rule of thirds grid visible
+- [x] Dark overlay outside crop area
 
 ### 9.4 Crop Confirmation Workflow
-- [ ] Action bar appears when crop active
-- [ ] "Apply" button commits crop
-- [ ] "Cancel" button reverts changes
-- [ ] "Reset" button clears crop
-- [ ] Enter key applies crop
-- [ ] Escape key cancels crop
-- [ ] Changes not applied until confirmed
+- [x] Action bar appears when crop active - "Cancel" and "Set Crop" buttons
+- [x] "Set Crop" button commits crop - verified
+- [x] "Cancel" button reverts changes - verified
+- [x] "Reset Crop" button clears crop - verified
+- [x] Enter key applies crop - verified
+- [x] Escape key cancels crop - verified
+- [x] Changes not applied until confirmed - verified
 
 ### 9.5 Crop Values
-- [ ] X (left) shows as percentage
-- [ ] Y (top) shows as percentage
-- [ ] W (width) shows as percentage
-- [ ] H (height) shows as percentage
-- [ ] "Adjusting..." shows during drag
+- [x] X (left) shows as percentage
+- [x] Y (top) shows as percentage
+- [x] W (width) shows as percentage
+- [x] H (height) shows as percentage
+- [ ] "Adjusting..." shows during drag - not observed
 
 ---
 
