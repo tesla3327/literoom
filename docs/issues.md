@@ -3,6 +3,7 @@
 ## Table of Contents
 
 ### Open Issues
+- [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
@@ -50,6 +51,43 @@
 ---
 
 ## Open Issues
+
+### Keyboard flagging only affects current photo, not all selected
+
+**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-25
+
+**Problem**:
+When multiple photos are selected in the grid view and a flag shortcut is pressed (P, X, or U), only the currently focused photo is flagged - the other selected photos remain unchanged.
+
+**Steps to Reproduce**:
+1. Open catalog grid view with multiple photos
+2. Click on a photo to select it
+3. Cmd/Ctrl+Click on 2 more photos to add to selection (header shows "3 selected")
+4. Press P to mark as Pick
+5. Observe: Only the current photo gets the green checkmark badge
+6. The other 2 selected photos remain unchanged
+
+**Expected Behavior**:
+All 3 selected photos should be marked as Pick when P is pressed.
+
+**Actual Behavior**:
+Only the current/focused photo is affected by the flag shortcut.
+
+**Technical Details**:
+Verified by checking `data-flag` attribute on grid cells:
+- After selecting 3 unflagged photos and pressing P, only 1 has `data-flag="pick"`
+- The other 2 still have `data-flag="none"` despite showing selection indicators
+
+**Files to Investigate**:
+- `apps/web/app/components/catalog/CatalogGrid.vue` - keyboard event handlers
+- `apps/web/app/stores/selection.ts` - selection state
+- `apps/web/app/composables/useCatalogKeyboard.ts` - keyboard shortcut handling
+
+**Screenshots**:
+- `docs/screenshots/qa-flagging-10-multi-select.png` - 3 photos selected
+- `docs/screenshots/qa-flagging-11-multi-flag-bug.png` - After P pressed, only 1 flagged
+
+---
 
 ### Crop re-edit should show full uncropped image
 

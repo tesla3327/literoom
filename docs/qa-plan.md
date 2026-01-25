@@ -114,26 +114,28 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 4. Photo Flagging (Culling)
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (1 bug found)
+
 ### 4.1 Flag Status Display
-- [ ] Green checkmark badge for "Pick" (top-left)
-- [ ] Red X badge for "Reject" (top-left)
-- [ ] No badge for unflagged photos
-- [ ] Badges update in real-time
+- [x] Green checkmark badge for "Pick" (top-left) - verified, badge present in DOM with green icon
+- [x] Red X badge for "Reject" (top-left) - verified, visible as small red circle
+- [x] No badge for unflagged photos - verified
+- [x] Badges update in real-time - verified, counts update immediately
 
 ### 4.2 Keyboard Flagging
-- [ ] P key marks as Pick
-- [ ] X key marks as Reject
-- [ ] U key removes flag (unflag)
-- [ ] Flag changes persist after page refresh
-- [ ] Flagging works on multiple selected photos
+- [x] P key marks as Pick - verified
+- [x] X key marks as Reject - verified
+- [x] U key removes flag (unflag) - verified
+- [ ] Flag changes persist after page refresh - NOT IN DEMO MODE (resets to mock data)
+- [ ] Flagging works on multiple selected photos - **BUG**: Only flags current photo, not all selected (see issues.md)
 
 ### 4.3 Flag Filters
-- [ ] "All" filter shows all photos with count
-- [ ] "Picks" filter shows only picks with count
-- [ ] "Rejects" filter shows only rejects with count
-- [ ] "Unflagged" filter shows unflagged with count
-- [ ] Badge counts are accurate
-- [ ] Zero counts hide the badge
+- [x] "All" filter shows all photos with count - verified (50 photos)
+- [x] "Picks" filter shows only picks with count - verified (shows only green-badged photos)
+- [x] "Rejects" filter shows only rejects with count - verified (shows only red-badged photos)
+- [x] "Unflagged" filter shows unflagged with count - verified (shows photos without badges)
+- [x] Badge counts are accurate - verified (23 picks + 10 rejects + 17 unflagged = 50 total)
+- [ ] Zero counts hide the badge - not tested (would require unflagging all)
 
 ---
 
