@@ -1576,6 +1576,32 @@ vi.mock('../texture-utils', () => ({
     OUTPUT: 0x0d,
     PINGPONG: 0x0f,
   },
+  // RGB/RGBA conversion functions (imported and re-exported via _internal)
+  rgbToRgba: vi.fn((rgb: Uint8Array, width: number, height: number) => {
+    const pixelCount = width * height
+    const rgba = new Uint8Array(pixelCount * 4)
+    for (let i = 0; i < pixelCount; i++) {
+      const rgbIdx = i * 3
+      const rgbaIdx = i * 4
+      rgba[rgbaIdx] = rgb[rgbIdx]!
+      rgba[rgbaIdx + 1] = rgb[rgbIdx + 1]!
+      rgba[rgbaIdx + 2] = rgb[rgbIdx + 2]!
+      rgba[rgbaIdx + 3] = 255
+    }
+    return rgba
+  }),
+  rgbaToRgb: vi.fn((rgba: Uint8Array, width: number, height: number) => {
+    const pixelCount = width * height
+    const rgb = new Uint8Array(pixelCount * 3)
+    for (let i = 0; i < pixelCount; i++) {
+      const rgbaIdx = i * 4
+      const rgbIdx = i * 3
+      rgb[rgbIdx] = rgba[rgbaIdx]!
+      rgb[rgbIdx + 1] = rgba[rgbaIdx + 1]!
+      rgb[rgbIdx + 2] = rgba[rgbaIdx + 2]!
+    }
+    return rgb
+  }),
 }))
 
 // Mock tone curve LUT generation

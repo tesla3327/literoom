@@ -14,6 +14,8 @@ import {
   createOutputTexture,
   readTexturePixels,
   TextureUsage,
+  rgbToRgba,
+  rgbaToRgb,
 } from '../texture-utils'
 import {
   getAdjustmentsPipeline,
@@ -449,43 +451,6 @@ function shouldApplyMasks(masks: MaskStackInput | undefined): boolean {
   const hasEnabledRadial = masks.radialMasks?.some((m) => m.enabled) ?? false
 
   return hasEnabledLinear || hasEnabledRadial
-}
-
-/**
- * Convert RGB pixels to RGBA (add alpha channel).
- */
-function rgbToRgba(rgb: Uint8Array, width: number, height: number): Uint8Array {
-  const pixelCount = width * height
-  const rgba = new Uint8Array(pixelCount * 4)
-
-  for (let i = 0; i < pixelCount; i++) {
-    const rgbIdx = i * 3
-    const rgbaIdx = i * 4
-    rgba[rgbaIdx] = rgb[rgbIdx]!
-    rgba[rgbaIdx + 1] = rgb[rgbIdx + 1]!
-    rgba[rgbaIdx + 2] = rgb[rgbIdx + 2]!
-    rgba[rgbaIdx + 3] = 255 // Fully opaque
-  }
-
-  return rgba
-}
-
-/**
- * Convert RGBA pixels to RGB (discard alpha channel).
- */
-function rgbaToRgb(rgba: Uint8Array, width: number, height: number): Uint8Array {
-  const pixelCount = width * height
-  const rgb = new Uint8Array(pixelCount * 3)
-
-  for (let i = 0; i < pixelCount; i++) {
-    const rgbaIdx = i * 4
-    const rgbIdx = i * 3
-    rgb[rgbIdx] = rgba[rgbaIdx]!
-    rgb[rgbIdx + 1] = rgba[rgbaIdx + 1]!
-    rgb[rgbIdx + 2] = rgba[rgbaIdx + 2]!
-  }
-
-  return rgb
 }
 
 // ============================================================================

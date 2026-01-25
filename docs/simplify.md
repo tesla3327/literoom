@@ -17,3 +17,4 @@
 - packages/core/src/gpu/texture-utils.ts (extracted rgbToRgba and rgbaToRgb to DRY gpu-adjustments-service, gpu-histogram-service, gpu-mask-service, and gpu-tone-curve-service)
 - packages/core/src/catalog/thumbnail-cache.ts (extracted OPFSCache and CombinedCache base classes to DRY OPFSThumbnailCache/OPFSPreviewCache and ThumbnailCache/PreviewCache)
 - packages/core/src/decode/decode-worker.ts (extracted createWasmAdjustments, toWasmMaskAdjustments, toWasmLinearMask, toWasmRadialMask, toWasmMaskStack, and sendImageSuccess helpers to DRY apply-adjustments, apply-rotation, apply-crop, apply-masked-adjustments, and generate-edited-thumbnail handlers)
+- packages/core/src/gpu/pipelines/rotation-pipeline.ts (removed duplicate rgbToRgba/rgbaToRgb functions, now imports from texture-utils.ts)
