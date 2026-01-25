@@ -44,6 +44,48 @@ import { db, type AssetRecord, type FolderRecord } from './db'
 /** Key prefix for storing folder handles */
 const FOLDER_HANDLE_KEY_PREFIX = 'literoom-folder-'
 
+/** IndexedDB database name for handle storage */
+const HANDLE_DB_NAME = 'literoom-fs'
+
+/** IndexedDB store name for handles */
+const HANDLE_STORE_NAME = 'handles'
+
+// ============================================================================
+// IndexedDB Helper
+// ============================================================================
+
+/**
+ * Execute an operation on the handle store in IndexedDB.
+ * Handles database setup and cleanup automatically.
+ */
+async function withHandleDB<T>(
+  mode: IDBTransactionMode,
+  operation: (store: IDBObjectStore) => IDBRequest<T>
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(HANDLE_DB_NAME, 1)
+
+    request.onerror = () => reject(request.error)
+
+    request.onsuccess = () => {
+      const database = request.result
+      const tx = database.transaction(HANDLE_STORE_NAME, mode)
+      const store = tx.objectStore(HANDLE_STORE_NAME)
+      const opRequest = operation(store)
+
+      opRequest.onsuccess = () => resolve(opRequest.result)
+      opRequest.onerror = () => reject(opRequest.error)
+    }
+
+    request.onupgradeneeded = (event) => {
+      const database = (event.target as IDBOpenDBRequest).result
+      if (!database.objectStoreNames.contains(HANDLE_STORE_NAME)) {
+        database.createObjectStore(HANDLE_STORE_NAME)
+      }
+    }
+  })
+}
+
 // ============================================================================
 // Catalog Service Implementation
 // ============================================================================
@@ -211,31 +253,7 @@ export class CatalogService implements ICatalogService {
    * Persist a folder handle using IndexedDB.
    */
   private async persistHandle(key: string, handle: FileSystemDirectoryHandle): Promise<void> {
-    const DB_NAME = 'literoom-fs'
-    const STORE_NAME = 'handles'
-
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1)
-
-      request.onerror = () => reject(request.error)
-
-      request.onsuccess = () => {
-        const database = request.result
-        const tx = database.transaction(STORE_NAME, 'readwrite')
-        const store = tx.objectStore(STORE_NAME)
-        const putRequest = store.put(handle, key)
-
-        putRequest.onsuccess = () => resolve()
-        putRequest.onerror = () => reject(putRequest.error)
-      }
-
-      request.onupgradeneeded = (event) => {
-        const database = (event.target as IDBOpenDBRequest).result
-        if (!database.objectStoreNames.contains(STORE_NAME)) {
-          database.createObjectStore(STORE_NAME)
-        }
-      }
-    })
+    await withHandleDB('readwrite', store => store.put(handle, key))
   }
 
   // ==========================================================================
@@ -891,33 +909,11 @@ export class CatalogService implements ICatalogService {
    * Load a persisted folder handle from IndexedDB.
    */
   private async loadHandle(key: string): Promise<FileSystemDirectoryHandle | null> {
-    const DB_NAME = 'literoom-fs'
-    const STORE_NAME = 'handles'
-
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1)
-
-      request.onerror = () => reject(request.error)
-
-      request.onsuccess = () => {
-        const database = request.result
-        const tx = database.transaction(STORE_NAME, 'readonly')
-        const store = tx.objectStore(STORE_NAME)
-        const getRequest = store.get(key)
-
-        getRequest.onsuccess = () => {
-          resolve(getRequest.result ?? null)
-        }
-        getRequest.onerror = () => reject(getRequest.error)
-      }
-
-      request.onupgradeneeded = (event) => {
-        const database = (event.target as IDBOpenDBRequest).result
-        if (!database.objectStoreNames.contains(STORE_NAME)) {
-          database.createObjectStore(STORE_NAME)
-        }
-      }
-    })
+    const result = await withHandleDB<FileSystemDirectoryHandle | undefined>(
+      'readonly',
+      store => store.get(key)
+    )
+    return result ?? null
   }
 }
 
