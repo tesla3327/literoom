@@ -85,6 +85,10 @@ Tested in Demo Mode (`LITEROOM_DEMO_MODE=true`). The issue may be specific to De
 - Reset button enables when changes are made (working)
 - After navigation: Reset button disabled, all sliders at 0 (BUG)
 
+**Affects Multiple Features**:
+- Basic Adjustments (Exposure, Contrast, etc.)
+- Tone Curve (custom control points reset to linear diagonal)
+
 **Files to Investigate**:
 - `apps/web/app/stores/edit.ts` - Edit state management and persistence
 - `packages/core/src/catalog/mock-catalog-service.ts` - Demo mode persistence

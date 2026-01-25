@@ -255,29 +255,36 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 8. Tone Curve
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (persistence bug - same as Section 7)
+
 ### 8.1 Canvas Interaction
-- [ ] Click adds control point
-- [ ] Drag adjusts point position
-- [ ] Double-click deletes point
-- [ ] Cannot delete anchor points (first/last)
-- [ ] Minimum 2 points maintained
+- [x] Click adds control point - verified, clicking on curve adds new point
+- [x] Drag adjusts point position - verified, dragging moves point and curves updates
+- [x] Double-click deletes point - verified, dispatched dblclick event deletes non-anchor points
+- [x] Cannot delete anchor points (first/last) - verified, double-click on corners has no effect
+- [x] Minimum 2 points maintained - verified, always at least 2 anchor points present
 
 ### 8.2 Visual Feedback
-- [ ] Grid lines visible
-- [ ] Diagonal reference line (dashed)
-- [ ] Curve line renders smoothly
-- [ ] Control points visible with outlines
-- [ ] Hovered point changes color (blue)
-- [ ] Dragging point changes color (light blue)
-- [ ] Cursor changes to grab/grabbing
+- [x] Grid lines visible - verified, gray grid lines in background
+- [x] Diagonal reference line (dashed) - visible as light reference line
+- [x] Curve line renders smoothly - verified, smooth bezier-like curves
+- [x] Control points visible with outlines - verified, white circles with outlines
+- [x] Hovered point changes color (blue) - verified, point turns blue on hover
+- [x] Dragging point changes color (light blue) - verified, blue indicates active state
+- [x] Cursor changes to grab/grabbing - verified (cursor-grab class on canvas)
 
 ### 8.3 Curve Behavior
-- [ ] Curve is monotonic (no crossing)
-- [ ] Preview updates during drag
-- [ ] "Adjusting..." status during drag
-- [ ] Reset button appears when modified
-- [ ] Reset restores linear curve
-- [ ] Changes persist when navigating
+- [x] Curve is monotonic (no crossing) - verified, multiple points maintain smooth S-curve
+- [x] Preview updates during drag - verified, histogram and image update in real-time
+- [x] "Adjusting..." status during drag - verified, status text appears during drag
+- [x] Reset button appears when modified - verified, appears next to "Tone Curve" label
+- [x] Reset restores linear curve - verified, resets to straight diagonal line
+- [ ] Changes persist when navigating - **BUG**: Tone curve resets to linear when navigating away and back (same as Section 7 persistence bug)
+
+### Additional Notes
+- Instructions text at bottom: "Click to add point | Drag to adjust | Double-click to delete"
+- Curve supports multiple control points (tested with 4+ points)
+- S-curves and inverse curves render correctly
 
 ---
 
