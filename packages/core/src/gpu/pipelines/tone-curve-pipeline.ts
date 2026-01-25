@@ -8,7 +8,7 @@
 
 import { getGPUCapabilityService } from '../capabilities'
 import { TONE_CURVE_SHADER_SOURCE } from '../shaders'
-import { alignTo256, removeRowPadding } from '../texture-utils'
+import { alignTo256, removeRowPadding, calculateDispatchSize } from '../texture-utils'
 
 /**
  * Tone curve LUT - 256-entry lookup table for tone mapping.
@@ -271,8 +271,7 @@ export class ToneCurvePipeline {
     })
 
     // Calculate dispatch sizes
-    const workgroupsX = Math.ceil(width / ToneCurvePipeline.WORKGROUP_SIZE)
-    const workgroupsY = Math.ceil(height / ToneCurvePipeline.WORKGROUP_SIZE)
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, ToneCurvePipeline.WORKGROUP_SIZE)
 
     // Create command encoder
     const encoder = this.device.createCommandEncoder({
@@ -377,8 +376,7 @@ export class ToneCurvePipeline {
       })
 
     // Calculate dispatch sizes
-    const workgroupsX = Math.ceil(width / ToneCurvePipeline.WORKGROUP_SIZE)
-    const workgroupsY = Math.ceil(height / ToneCurvePipeline.WORKGROUP_SIZE)
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, ToneCurvePipeline.WORKGROUP_SIZE)
 
     // Begin compute pass
     const pass = commandEncoder.beginComputePass({

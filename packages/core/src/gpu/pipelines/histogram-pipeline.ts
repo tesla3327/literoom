@@ -8,6 +8,7 @@
 
 import { getGPUCapabilityService } from '../capabilities'
 import { HISTOGRAM_SHADER_SOURCE } from '../shaders'
+import { calculateDispatchSize } from '../texture-utils'
 
 /**
  * Histogram result containing 256 bins for each channel.
@@ -167,8 +168,7 @@ export class HistogramPipeline {
     })
 
     // Calculate dispatch sizes
-    const workgroupsX = Math.ceil(width / HistogramPipeline.WORKGROUP_SIZE)
-    const workgroupsY = Math.ceil(height / HistogramPipeline.WORKGROUP_SIZE)
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, HistogramPipeline.WORKGROUP_SIZE)
 
     // Create command encoder
     const encoder = this.device.createCommandEncoder({

@@ -8,6 +8,13 @@
 
 import { getGPUCapabilityService } from '../capabilities'
 import { MASKS_SHADER_SOURCE } from '../shaders'
+import {
+  createTextureFromPixels,
+  createOutputTexture,
+  readTexturePixels,
+  calculateDispatchSize,
+  TextureUsage,
+} from '../texture-utils'
 
 /**
  * Maximum number of masks supported (must match shader constant).
@@ -336,42 +343,28 @@ export class MaskPipeline {
       return inputPixels.slice() // Return copy
     }
 
-    // Create input texture
-    const inputTexture = this.device.createTexture({
-      label: 'Mask Input Texture',
-      size: { width, height, depthOrArrayLayers: 1 },
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    })
-
-    // Upload input pixels
-    this.device.queue.writeTexture(
-      { texture: inputTexture },
-      inputPixels.buffer,
-      { bytesPerRow: width * 4, rowsPerImage: height, offset: inputPixels.byteOffset },
-      { width, height, depthOrArrayLayers: 1 }
+    // Create textures using shared utilities
+    const inputTexture = createTextureFromPixels(
+      this.device,
+      inputPixels,
+      width,
+      height,
+      TextureUsage.INPUT,
+      'Mask Input Texture'
+    )
+    const outputTexture = createOutputTexture(
+      this.device,
+      width,
+      height,
+      TextureUsage.OUTPUT,
+      'Mask Output Texture'
     )
 
-    // Create output texture
-    const outputTexture = this.device.createTexture({
-      label: 'Mask Output Texture',
-      size: { width, height, depthOrArrayLayers: 1 },
-      format: 'rgba8unorm',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.COPY_SRC |
-        GPUTextureUsage.TEXTURE_BINDING,
-    })
+    // Update uniform buffers
+    this.device.queue.writeBuffer(this.maskParamsBuffer!, 0, this.packMaskParams(masks))
+    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, new Uint32Array([width, height, 0, 0]))
 
-    // Update mask params uniform buffer
-    const maskParamsData = this.packMaskParams(masks)
-    this.device.queue.writeBuffer(this.maskParamsBuffer!, 0, maskParamsData)
-
-    // Update dimensions uniform buffer
-    const dimensionsData = new Uint32Array([width, height, 0, 0])
-    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, dimensionsData.buffer)
-
-    // Create bind group
+    // Create bind group and dispatch
     const bindGroup = this.device.createBindGroup({
       label: 'Mask Bind Group',
       layout: this.bindGroupLayout,
@@ -383,50 +376,21 @@ export class MaskPipeline {
       ],
     })
 
-    // Calculate dispatch sizes
-    const workgroupsX = Math.ceil(width / MaskPipeline.WORKGROUP_SIZE)
-    const workgroupsY = Math.ceil(height / MaskPipeline.WORKGROUP_SIZE)
-
-    // Create command encoder
-    const encoder = this.device.createCommandEncoder({
-      label: 'Mask Command Encoder',
-    })
-
-    // Begin compute pass
-    const pass = encoder.beginComputePass({
-      label: 'Mask Compute Pass',
-    })
+    const encoder = this.device.createCommandEncoder({ label: 'Mask Command Encoder' })
+    const pass = encoder.beginComputePass({ label: 'Mask Compute Pass' })
     pass.setPipeline(this.pipeline)
     pass.setBindGroup(0, bindGroup)
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, MaskPipeline.WORKGROUP_SIZE)
     pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
     pass.end()
-
-    // Create staging buffer for readback
-    const stagingBuffer = this.device.createBuffer({
-      label: 'Mask Staging Buffer',
-      size: width * height * 4,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    })
-
-    // Copy output texture to staging buffer
-    encoder.copyTextureToBuffer(
-      { texture: outputTexture },
-      { buffer: stagingBuffer, bytesPerRow: width * 4, rowsPerImage: height },
-      { width, height, depthOrArrayLayers: 1 }
-    )
-
-    // Submit commands
     this.device.queue.submit([encoder.finish()])
 
-    // Wait for GPU to finish and read back results
-    await stagingBuffer.mapAsync(GPUMapMode.READ)
-    const resultData = new Uint8Array(stagingBuffer.getMappedRange()).slice()
-    stagingBuffer.unmap()
+    // Read back results using shared utility
+    const resultData = await readTexturePixels(this.device, outputTexture, width, height)
 
-    // Cleanup temporary resources
+    // Cleanup
     inputTexture.destroy()
     outputTexture.destroy()
-    stagingBuffer.destroy()
 
     return resultData
   }
@@ -457,13 +421,9 @@ export class MaskPipeline {
       throw new Error('Pipeline not initialized. Call initialize() first.')
     }
 
-    // Update mask params uniform buffer
-    const maskParamsData = this.packMaskParams(masks)
-    this.device.queue.writeBuffer(this.maskParamsBuffer!, 0, maskParamsData)
-
-    // Update dimensions uniform buffer
-    const dimensionsData = new Uint32Array([width, height, 0, 0])
-    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, dimensionsData.buffer)
+    // Update uniform buffers
+    this.device.queue.writeBuffer(this.maskParamsBuffer!, 0, this.packMaskParams(masks))
+    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, new Uint32Array([width, height, 0, 0]))
 
     // Create bind group
     const bindGroup = this.device.createBindGroup({
@@ -477,23 +437,11 @@ export class MaskPipeline {
       ],
     })
 
-    // Create encoder if not provided
-    const commandEncoder =
-      encoder ||
-      this.device.createCommandEncoder({
-        label: 'Mask Command Encoder',
-      })
-
-    // Calculate dispatch sizes
-    const workgroupsX = Math.ceil(width / MaskPipeline.WORKGROUP_SIZE)
-    const workgroupsY = Math.ceil(height / MaskPipeline.WORKGROUP_SIZE)
-
-    // Begin compute pass
-    const pass = commandEncoder.beginComputePass({
-      label: 'Mask Compute Pass',
-    })
+    const commandEncoder = encoder || this.device.createCommandEncoder({ label: 'Mask Command Encoder' })
+    const pass = commandEncoder.beginComputePass({ label: 'Mask Compute Pass' })
     pass.setPipeline(this.pipeline)
     pass.setBindGroup(0, bindGroup)
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, MaskPipeline.WORKGROUP_SIZE)
     pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
     pass.end()
 
