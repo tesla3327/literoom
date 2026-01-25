@@ -23,3 +23,4 @@
 - packages/core/src/catalog/catalog-service.ts (extracted withHandleDB helper to DRY persistHandle and loadHandle IndexedDB operations)
 - apps/web/app/utils/zoomCalculations.ts (extracted Dimensions interface and helpers to DRY calculateFitScale, calculateFillScale, clampPan, calculateCenteredPan, and detectPreset)
 - apps/web/app/stores/selection.ts (extracted getNavigatedId and findWithWrapAround helpers to DRY navigateNext, navigatePrevious, and navigateToNextUnflagged)
+- apps/web/app/components/help/HelpModal.vue (extracted shortcut data into typed Column/Section/Shortcut structures and used v-for to replace ~200 lines of repetitive HTML with ~50 lines of data-driven template)
