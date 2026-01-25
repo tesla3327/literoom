@@ -16,6 +16,7 @@ import {
   type MaskStackInput,
   getMaskPipeline,
 } from './pipelines'
+import { rgbToRgba, rgbaToRgb } from './texture-utils'
 
 /**
  * Convert WASM mask adjustments (Partial<Adjustments>) to GPU mask adjustments.
@@ -212,52 +213,6 @@ export class GPUMaskService {
     this.pipeline = null
     this._initialized = false
   }
-}
-
-/**
- * Convert RGB pixel data to RGBA.
- */
-function rgbToRgba(
-  rgb: Uint8Array,
-  width: number,
-  height: number
-): Uint8Array {
-  const pixelCount = width * height
-  const rgba = new Uint8Array(pixelCount * 4)
-
-  for (let i = 0; i < pixelCount; i++) {
-    const rgbIdx = i * 3
-    const rgbaIdx = i * 4
-    rgba[rgbaIdx] = rgb[rgbIdx]! // R
-    rgba[rgbaIdx + 1] = rgb[rgbIdx + 1]! // G
-    rgba[rgbaIdx + 2] = rgb[rgbIdx + 2]! // B
-    rgba[rgbaIdx + 3] = 255 // A (fully opaque)
-  }
-
-  return rgba
-}
-
-/**
- * Convert RGBA pixel data to RGB.
- */
-function rgbaToRgb(
-  rgba: Uint8Array,
-  width: number,
-  height: number
-): Uint8Array {
-  const pixelCount = width * height
-  const rgb = new Uint8Array(pixelCount * 3)
-
-  for (let i = 0; i < pixelCount; i++) {
-    const rgbaIdx = i * 4
-    const rgbIdx = i * 3
-    rgb[rgbIdx] = rgba[rgbaIdx]! // R
-    rgb[rgbIdx + 1] = rgba[rgbaIdx + 1]! // G
-    rgb[rgbIdx + 2] = rgba[rgbaIdx + 2]! // B
-    // Alpha is discarded
-  }
-
-  return rgb
 }
 
 /**

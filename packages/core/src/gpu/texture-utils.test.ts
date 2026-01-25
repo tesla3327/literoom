@@ -61,6 +61,8 @@ import {
   WEBGPU_BYTES_PER_ROW_ALIGNMENT,
   alignTo256,
   removeRowPadding,
+  rgbToRgba,
+  rgbaToRgb,
 } from './texture-utils'
 
 // Re-export for use in tests
@@ -1202,5 +1204,200 @@ describe('edge cases', () => {
       expect(stats.poolCount).toBe(3) // 3 different dimension pools
       expect(stats.totalTextures).toBe(3)
     })
+  })
+})
+
+// ============================================================================
+// Pixel Format Conversion Tests
+// ============================================================================
+
+describe('rgbToRgba', () => {
+  it('converts single pixel', () => {
+    const rgb = new Uint8Array([255, 128, 64])
+    const result = rgbToRgba(rgb, 1, 1)
+
+    expect(result.length).toBe(4)
+    expect(result[0]).toBe(255) // R
+    expect(result[1]).toBe(128) // G
+    expect(result[2]).toBe(64) // B
+    expect(result[3]).toBe(255) // A (fully opaque)
+  })
+
+  it('converts multiple pixels', () => {
+    // 2x2 image, 4 pixels
+    const rgb = new Uint8Array([
+      255, 0, 0, // Red
+      0, 255, 0, // Green
+      0, 0, 255, // Blue
+      255, 255, 255, // White
+    ])
+    const result = rgbToRgba(rgb, 2, 2)
+
+    expect(result.length).toBe(16) // 4 pixels * 4 bytes
+
+    // Check red pixel
+    expect(result[0]).toBe(255)
+    expect(result[1]).toBe(0)
+    expect(result[2]).toBe(0)
+    expect(result[3]).toBe(255)
+
+    // Check green pixel
+    expect(result[4]).toBe(0)
+    expect(result[5]).toBe(255)
+    expect(result[6]).toBe(0)
+    expect(result[7]).toBe(255)
+
+    // Check blue pixel
+    expect(result[8]).toBe(0)
+    expect(result[9]).toBe(0)
+    expect(result[10]).toBe(255)
+    expect(result[11]).toBe(255)
+
+    // Check white pixel
+    expect(result[12]).toBe(255)
+    expect(result[13]).toBe(255)
+    expect(result[14]).toBe(255)
+    expect(result[15]).toBe(255)
+  })
+
+  it('handles empty image', () => {
+    const rgb = new Uint8Array(0)
+    const result = rgbToRgba(rgb, 0, 0)
+
+    expect(result.length).toBe(0)
+  })
+
+  it('handles large image', () => {
+    const width = 100
+    const height = 100
+    const rgb = new Uint8Array(width * height * 3)
+
+    // Fill with gradient
+    for (let i = 0; i < rgb.length; i += 3) {
+      rgb[i] = (i / 3) % 256
+      rgb[i + 1] = ((i / 3) * 2) % 256
+      rgb[i + 2] = ((i / 3) * 3) % 256
+    }
+
+    const result = rgbToRgba(rgb, width, height)
+
+    expect(result.length).toBe(width * height * 4)
+
+    // Verify first pixel
+    expect(result[0]).toBe(rgb[0])
+    expect(result[1]).toBe(rgb[1])
+    expect(result[2]).toBe(rgb[2])
+    expect(result[3]).toBe(255)
+
+    // Verify last pixel
+    const lastRgbIdx = (width * height - 1) * 3
+    const lastRgbaIdx = (width * height - 1) * 4
+    expect(result[lastRgbaIdx]).toBe(rgb[lastRgbIdx])
+    expect(result[lastRgbaIdx + 1]).toBe(rgb[lastRgbIdx + 1])
+    expect(result[lastRgbaIdx + 2]).toBe(rgb[lastRgbIdx + 2])
+    expect(result[lastRgbaIdx + 3]).toBe(255)
+  })
+})
+
+describe('rgbaToRgb', () => {
+  it('converts single pixel', () => {
+    const rgba = new Uint8Array([255, 128, 64, 200])
+    const result = rgbaToRgb(rgba, 1, 1)
+
+    expect(result.length).toBe(3)
+    expect(result[0]).toBe(255) // R
+    expect(result[1]).toBe(128) // G
+    expect(result[2]).toBe(64) // B (alpha discarded)
+  })
+
+  it('converts multiple pixels', () => {
+    // 2x2 image, 4 pixels
+    const rgba = new Uint8Array([
+      255, 0, 0, 255, // Red (opaque)
+      0, 255, 0, 128, // Green (semi-transparent)
+      0, 0, 255, 0, // Blue (transparent)
+      255, 255, 255, 255, // White (opaque)
+    ])
+    const result = rgbaToRgb(rgba, 2, 2)
+
+    expect(result.length).toBe(12) // 4 pixels * 3 bytes
+
+    // Check red pixel
+    expect(result[0]).toBe(255)
+    expect(result[1]).toBe(0)
+    expect(result[2]).toBe(0)
+
+    // Check green pixel
+    expect(result[3]).toBe(0)
+    expect(result[4]).toBe(255)
+    expect(result[5]).toBe(0)
+
+    // Check blue pixel
+    expect(result[6]).toBe(0)
+    expect(result[7]).toBe(0)
+    expect(result[8]).toBe(255)
+
+    // Check white pixel
+    expect(result[9]).toBe(255)
+    expect(result[10]).toBe(255)
+    expect(result[11]).toBe(255)
+  })
+
+  it('handles empty image', () => {
+    const rgba = new Uint8Array(0)
+    const result = rgbaToRgb(rgba, 0, 0)
+
+    expect(result.length).toBe(0)
+  })
+
+  it('discards alpha channel', () => {
+    // Test with various alpha values to ensure they are discarded
+    const rgba = new Uint8Array([
+      100, 150, 200, 0, // Transparent
+      100, 150, 200, 128, // Semi-transparent
+      100, 150, 200, 255, // Opaque
+    ])
+    const result = rgbaToRgb(rgba, 3, 1)
+
+    expect(result.length).toBe(9)
+
+    // All three pixels should have the same RGB values
+    for (let i = 0; i < 3; i++) {
+      expect(result[i * 3]).toBe(100)
+      expect(result[i * 3 + 1]).toBe(150)
+      expect(result[i * 3 + 2]).toBe(200)
+    }
+  })
+})
+
+describe('rgbToRgba and rgbaToRgb roundtrip', () => {
+  it('preserves RGB data through roundtrip', () => {
+    const originalRgb = new Uint8Array([
+      255, 0, 0, // Red
+      0, 255, 0, // Green
+      0, 0, 255, // Blue
+      128, 64, 32, // Brown
+    ])
+
+    const rgba = rgbToRgba(originalRgb, 2, 2)
+    const resultRgb = rgbaToRgb(rgba, 2, 2)
+
+    expect(resultRgb).toEqual(originalRgb)
+  })
+
+  it('handles large image roundtrip', () => {
+    const width = 50
+    const height = 50
+    const originalRgb = new Uint8Array(width * height * 3)
+
+    // Fill with pattern
+    for (let i = 0; i < originalRgb.length; i++) {
+      originalRgb[i] = i % 256
+    }
+
+    const rgba = rgbToRgba(originalRgb, width, height)
+    const resultRgb = rgbaToRgb(rgba, width, height)
+
+    expect(resultRgb).toEqual(originalRgb)
   })
 })

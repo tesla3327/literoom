@@ -14,3 +14,4 @@
 - crates/literoom-core/src/decode/types.rs (extracted swaps_dimensions helper to simplify oriented_dimensions)
 - crates/literoom-core/src/decode/resize.rs (simplified calculate_fit_dimensions to use single scale factor)
 - packages/core/src/gpu/capabilities.ts (extracted buildCapabilities and getAdapterInfo helpers to DRY detectGPUCapabilities and GPUCapabilityService.initialize)
+- packages/core/src/gpu/texture-utils.ts (extracted rgbToRgba and rgbaToRgb to DRY gpu-adjustments-service, gpu-histogram-service, gpu-mask-service, and gpu-tone-curve-service)

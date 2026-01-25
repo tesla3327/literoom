@@ -12,6 +12,7 @@ import {
   getHistogramPipeline,
   type HistogramResult,
 } from './pipelines'
+import { rgbToRgba } from './texture-utils'
 
 /**
  * GPU histogram service.
@@ -108,29 +109,6 @@ export class GPUHistogramService {
     this.pipeline = null
     this.initialized = false
   }
-}
-
-/**
- * Convert RGB pixel data to RGBA.
- */
-function rgbToRgba(
-  rgb: Uint8Array,
-  width: number,
-  height: number
-): Uint8Array {
-  const pixelCount = width * height
-  const rgba = new Uint8Array(pixelCount * 4)
-
-  for (let i = 0; i < pixelCount; i++) {
-    const rgbIdx = i * 3
-    const rgbaIdx = i * 4
-    rgba[rgbaIdx] = rgb[rgbIdx]! // R
-    rgba[rgbaIdx + 1] = rgb[rgbIdx + 1]! // G
-    rgba[rgbaIdx + 2] = rgb[rgbIdx + 2]! // B
-    rgba[rgbaIdx + 3] = 255 // A (fully opaque)
-  }
-
-  return rgba
 }
 
 /**

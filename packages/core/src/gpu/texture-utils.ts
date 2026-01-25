@@ -452,3 +452,63 @@ export function calculateDispatchSize(
     1,
   ]
 }
+
+// ============================================================================
+// Pixel Format Conversion
+// ============================================================================
+
+/**
+ * Convert RGB pixel data to RGBA.
+ *
+ * @param rgb - RGB pixel data (3 bytes per pixel)
+ * @param width - Image width in pixels
+ * @param height - Image height in pixels
+ * @returns RGBA pixel data (4 bytes per pixel) with alpha set to 255
+ */
+export function rgbToRgba(
+  rgb: Uint8Array,
+  width: number,
+  height: number
+): Uint8Array {
+  const pixelCount = width * height
+  const rgba = new Uint8Array(pixelCount * 4)
+
+  for (let i = 0; i < pixelCount; i++) {
+    const rgbIdx = i * 3
+    const rgbaIdx = i * 4
+    rgba[rgbaIdx] = rgb[rgbIdx]! // R
+    rgba[rgbaIdx + 1] = rgb[rgbIdx + 1]! // G
+    rgba[rgbaIdx + 2] = rgb[rgbIdx + 2]! // B
+    rgba[rgbaIdx + 3] = 255 // A (fully opaque)
+  }
+
+  return rgba
+}
+
+/**
+ * Convert RGBA pixel data to RGB.
+ *
+ * @param rgba - RGBA pixel data (4 bytes per pixel)
+ * @param width - Image width in pixels
+ * @param height - Image height in pixels
+ * @returns RGB pixel data (3 bytes per pixel), alpha channel discarded
+ */
+export function rgbaToRgb(
+  rgba: Uint8Array,
+  width: number,
+  height: number
+): Uint8Array {
+  const pixelCount = width * height
+  const rgb = new Uint8Array(pixelCount * 3)
+
+  for (let i = 0; i < pixelCount; i++) {
+    const rgbaIdx = i * 4
+    const rgbIdx = i * 3
+    rgb[rgbIdx] = rgba[rgbaIdx]! // R
+    rgb[rgbIdx + 1] = rgba[rgbaIdx + 1]! // G
+    rgb[rgbIdx + 2] = rgba[rgbaIdx + 2]! // B
+    // Alpha is discarded
+  }
+
+  return rgb
+}

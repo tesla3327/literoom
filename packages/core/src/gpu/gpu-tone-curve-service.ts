@@ -15,6 +15,7 @@ import {
   isIdentityLut,
 } from './pipelines/tone-curve-pipeline'
 import { getAdaptiveProcessor } from './adaptive-processor'
+import { rgbToRgba, rgbaToRgb } from './texture-utils'
 import type { CurvePoint } from '../decode/types'
 
 // Re-export types
@@ -248,27 +249,13 @@ export class GPUToneCurveService {
     }
 
     // Convert RGB to RGBA
-    const pixelCount = width * height
-    const rgbaPixels = new Uint8Array(pixelCount * 4)
-    for (let i = 0; i < pixelCount; i++) {
-      rgbaPixels[i * 4 + 0] = pixels[i * 3 + 0]
-      rgbaPixels[i * 4 + 1] = pixels[i * 3 + 1]
-      rgbaPixels[i * 4 + 2] = pixels[i * 3 + 2]
-      rgbaPixels[i * 4 + 3] = 255 // Alpha
-    }
+    const rgbaPixels = rgbToRgba(pixels, width, height)
 
     // Apply tone curve on GPU
     const resultRgba = await this.pipeline.apply(rgbaPixels, width, height, lut)
 
     // Convert RGBA back to RGB
-    const resultRgb = new Uint8Array(pixelCount * 3)
-    for (let i = 0; i < pixelCount; i++) {
-      resultRgb[i * 3 + 0] = resultRgba[i * 4 + 0]
-      resultRgb[i * 3 + 1] = resultRgba[i * 4 + 1]
-      resultRgb[i * 3 + 2] = resultRgba[i * 4 + 2]
-    }
-
-    return resultRgb
+    return rgbaToRgb(resultRgba, width, height)
   }
 
   /**
