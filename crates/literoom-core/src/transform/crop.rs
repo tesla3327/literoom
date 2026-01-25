@@ -19,6 +19,25 @@
 
 use crate::decode::DecodedImage;
 
+/// Create a test image where each pixel has a unique value based on position.
+#[cfg(test)]
+fn create_test_image(width: u32, height: u32) -> DecodedImage {
+    let mut pixels = Vec::with_capacity((width * height * 3) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            let v = ((y * width + x) % 256) as u8;
+            pixels.push(v); // R
+            pixels.push(v); // G
+            pixels.push(v); // B
+        }
+    }
+    DecodedImage {
+        width,
+        height,
+        pixels,
+    }
+}
+
 /// Apply crop to an image using normalized coordinates.
 ///
 /// The crop region is specified as normalized values (0.0 to 1.0) relative
@@ -91,21 +110,13 @@ pub fn apply_crop(
 
     let mut output = vec![0u8; (out_width * out_height * 3) as usize];
 
-    // Copy pixel data row by row for efficiency
+    // Copy pixel data row by row using slice copy for efficiency
+    let row_bytes = (out_width * 3) as usize;
     for y in 0..out_height {
-        let src_y = px_top + y;
-        let src_row_start = (src_y * image.width * 3) as usize;
-        let dst_row_start = (y * out_width * 3) as usize;
-
-        for x in 0..out_width {
-            let src_x = px_left + x;
-            let src_idx = src_row_start + (src_x * 3) as usize;
-            let dst_idx = dst_row_start + (x * 3) as usize;
-
-            output[dst_idx] = image.pixels[src_idx];
-            output[dst_idx + 1] = image.pixels[src_idx + 1];
-            output[dst_idx + 2] = image.pixels[src_idx + 2];
-        }
+        let src_start = ((px_top + y) * image.width + px_left) as usize * 3;
+        let dst_start = (y * out_width) as usize * 3;
+        output[dst_start..dst_start + row_bytes]
+            .copy_from_slice(&image.pixels[src_start..src_start + row_bytes]);
     }
 
     DecodedImage {
@@ -119,28 +130,9 @@ pub fn apply_crop(
 mod tests {
     use super::*;
 
-    /// Create a test image where each pixel has a unique value based on position.
-    fn test_image(width: u32, height: u32) -> DecodedImage {
-        let mut pixels = Vec::with_capacity((width * height * 3) as usize);
-        for y in 0..height {
-            for x in 0..width {
-                // Use position to create unique pixel values
-                let v = ((y * width + x) % 256) as u8;
-                pixels.push(v); // R
-                pixels.push(v); // G
-                pixels.push(v); // B
-            }
-        }
-        DecodedImage {
-            width,
-            height,
-            pixels,
-        }
-    }
-
     #[test]
     fn test_full_crop() {
-        let img = test_image(100, 100);
+        let img = create_test_image(100, 100);
         let result = apply_crop(&img, 0.0, 0.0, 1.0, 1.0);
 
         assert_eq!(result.width, 100);
@@ -150,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_half_crop() {
-        let img = test_image(100, 100);
+        let img = create_test_image(100, 100);
         let result = apply_crop(&img, 0.0, 0.0, 0.5, 0.5);
 
         assert_eq!(result.width, 50);
@@ -159,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_center_crop() {
-        let img = test_image(10, 10);
+        let img = create_test_image(10, 10);
         let result = apply_crop(&img, 0.2, 0.2, 0.6, 0.6);
 
         // 0.2 * 10 = 2, 0.6 * 10 = 6
@@ -173,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_crop_clamps_to_bounds() {
-        let img = test_image(10, 10);
+        let img = create_test_image(10, 10);
 
         // Start at 80% and request 50% - should clamp
         let result = apply_crop(&img, 0.8, 0.8, 0.5, 0.5);
@@ -185,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_crop_handles_negative_coords() {
-        let img = test_image(100, 100);
+        let img = create_test_image(100, 100);
 
         // Negative coords should clamp to 0
         let result = apply_crop(&img, -0.1, -0.1, 0.5, 0.5);
@@ -197,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_crop_handles_oversized_region() {
-        let img = test_image(100, 100);
+        let img = create_test_image(100, 100);
 
         // Region larger than 1.0 should clamp
         let result = apply_crop(&img, 0.0, 0.0, 1.5, 1.5);
@@ -209,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_crop_pixel_values_preserved() {
-        let img = test_image(10, 10);
+        let img = create_test_image(10, 10);
 
         // Crop from (3, 3) with size (4, 4)
         let result = apply_crop(&img, 0.3, 0.3, 0.4, 0.4);
@@ -223,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_crop_rectangular() {
-        let img = test_image(200, 100);
+        let img = create_test_image(200, 100);
 
         // Crop a vertical strip
         let result = apply_crop(&img, 0.0, 0.0, 0.25, 1.0);
@@ -234,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_crop_minimum_dimension() {
-        let img = test_image(100, 100);
+        let img = create_test_image(100, 100);
 
         // Very small crop region
         let result = apply_crop(&img, 0.99, 0.99, 0.001, 0.001);
@@ -247,7 +239,7 @@ mod tests {
     #[test]
     fn test_small_image_crop() {
         // Test with very small image
-        let img = test_image(4, 4);
+        let img = create_test_image(4, 4);
         let result = apply_crop(&img, 0.25, 0.25, 0.5, 0.5);
 
         assert!(result.width >= 1);
@@ -256,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_identity_crop() {
-        let img = test_image(50, 50);
+        let img = create_test_image(50, 50);
         let result = apply_crop(&img, 0.0, 0.0, 1.0, 1.0);
 
         // Pixels should be identical
@@ -286,24 +278,6 @@ mod proptests {
             0.0f64..=1.0,  // width
             0.0f64..=1.0,  // height
         )
-    }
-
-    /// Create a test image with unique pixel values based on position.
-    fn create_test_image(width: u32, height: u32) -> DecodedImage {
-        let mut pixels = Vec::with_capacity((width * height * 3) as usize);
-        for y in 0..height {
-            for x in 0..width {
-                let v = ((y * width + x) % 256) as u8;
-                pixels.push(v);
-                pixels.push(v);
-                pixels.push(v);
-            }
-        }
-        DecodedImage {
-            width,
-            height,
-            pixels,
-        }
     }
 
     proptest! {
