@@ -41,6 +41,55 @@ interface ExtendedGPUAdapter {
 }
 
 /**
+ * Build a GPUCapabilities object from device and adapter info.
+ */
+function buildCapabilities(
+  device: GPUDevice,
+  adapterInfo: GPUAdapterInfoLike,
+  isFallbackAdapter: boolean
+): GPUCapabilities {
+  const limits = device.limits
+  const features = device.features
+
+  return {
+    available: true,
+    backend: 'webgpu',
+    isFallbackAdapter,
+    adapterInfo: {
+      vendor: adapterInfo.vendor || 'Unknown',
+      architecture: adapterInfo.architecture || 'Unknown',
+      device: adapterInfo.device || 'Unknown',
+      description: adapterInfo.description || 'Unknown',
+    },
+    limits: {
+      maxTextureSize: limits.maxTextureDimension2D,
+      maxBufferSize: Number(limits.maxStorageBufferBindingSize),
+      maxComputeWorkgroupSize: Math.min(
+        limits.maxComputeWorkgroupSizeX,
+        limits.maxComputeWorkgroupSizeY,
+        limits.maxComputeWorkgroupSizeZ
+      ),
+      maxComputeWorkgroupsPerDimension: limits.maxComputeWorkgroupsPerDimension,
+    },
+    features: {
+      float32Filtering: features.has('float32-filterable'),
+      textureCompressionBC: features.has('texture-compression-bc'),
+    },
+  }
+}
+
+/**
+ * Get adapter info from an extended adapter (handles different API versions).
+ */
+async function getAdapterInfo(
+  adapter: ExtendedGPUAdapter
+): Promise<GPUAdapterInfoLike> {
+  return adapter.requestAdapterInfo
+    ? await adapter.requestAdapterInfo()
+    : adapter.info
+}
+
+/**
  * Detect WebGPU capabilities.
  *
  * This function attempts to initialize WebGPU and query the device
@@ -96,49 +145,15 @@ export async function detectGPUCapabilities(
       }
     }
 
-    // Query adapter info (use info property or requestAdapterInfo method)
-    const adapterInfo = adapter.requestAdapterInfo
-      ? await adapter.requestAdapterInfo()
-      : adapter.info
+    const adapterInfo = await getAdapterInfo(adapter)
 
-    // Request device to get accurate limits
-    // Note: We don't keep the device here - just query capabilities
-    // The actual device will be created and managed by GPUService
+    // Request device to get accurate limits (temporary - just for querying)
     const device = await adapter.requestDevice({
       requiredFeatures: [],
       requiredLimits: {},
     })
 
-    const limits = device.limits
-    const features = device.features
-
-    // Build capabilities object
-    const capabilities: GPUCapabilities = {
-      available: true,
-      backend: 'webgpu',
-      isFallbackAdapter: isFallback,
-      adapterInfo: {
-        vendor: adapterInfo.vendor || 'Unknown',
-        architecture: adapterInfo.architecture || 'Unknown',
-        device: adapterInfo.device || 'Unknown',
-        description: adapterInfo.description || 'Unknown',
-      },
-      limits: {
-        maxTextureSize: limits.maxTextureDimension2D,
-        maxBufferSize: Number(limits.maxStorageBufferBindingSize),
-        maxComputeWorkgroupSize: Math.min(
-          limits.maxComputeWorkgroupSizeX,
-          limits.maxComputeWorkgroupSizeY,
-          limits.maxComputeWorkgroupSizeZ
-        ),
-        maxComputeWorkgroupsPerDimension:
-          limits.maxComputeWorkgroupsPerDimension,
-      },
-      features: {
-        float32Filtering: features.has('float32-filterable'),
-        textureCompressionBC: features.has('texture-compression-bc'),
-      },
-    }
+    const capabilities = buildCapabilities(device, adapterInfo, isFallback)
 
     // Destroy the test device
     device.destroy()
@@ -288,19 +303,17 @@ export class GPUCapabilityService {
 
       // Cast to extended adapter for checking fallback
       const extAdapter = adapter as unknown as ExtendedGPUAdapter
+      const isFallback = extAdapter.isFallbackAdapter ?? false
 
       // Check for fallback adapter
-      if (extAdapter.isFallbackAdapter && !this._options.allowFallbackAdapter) {
+      if (isFallback && !this._options.allowFallbackAdapter) {
         throw new GPUError(
           'Only fallback (software) adapter available',
           'ADAPTER_NOT_FOUND'
         )
       }
 
-      // Query adapter info (use info property or requestAdapterInfo method)
-      const adapterInfo = extAdapter.requestAdapterInfo
-        ? await extAdapter.requestAdapterInfo()
-        : extAdapter.info
+      const adapterInfo = await getAdapterInfo(extAdapter)
 
       // Request device
       this._device = await this._adapter.requestDevice({
@@ -314,38 +327,10 @@ export class GPUCapabilityService {
       // Set up error handling
       this._setupErrorHandling()
 
-      const limits = this._device.limits
-      const features = this._device.features
-
       // Update state with capabilities
       this._state = {
         status: 'ready',
-        capabilities: {
-          available: true,
-          backend: 'webgpu',
-          isFallbackAdapter: extAdapter.isFallbackAdapter ?? false,
-          adapterInfo: {
-            vendor: adapterInfo.vendor || 'Unknown',
-            architecture: adapterInfo.architecture || 'Unknown',
-            device: adapterInfo.device || 'Unknown',
-            description: adapterInfo.description || 'Unknown',
-          },
-          limits: {
-            maxTextureSize: limits.maxTextureDimension2D,
-            maxBufferSize: Number(limits.maxStorageBufferBindingSize),
-            maxComputeWorkgroupSize: Math.min(
-              limits.maxComputeWorkgroupSizeX,
-              limits.maxComputeWorkgroupSizeY,
-              limits.maxComputeWorkgroupSizeZ
-            ),
-            maxComputeWorkgroupsPerDimension:
-              limits.maxComputeWorkgroupsPerDimension,
-          },
-          features: {
-            float32Filtering: features.has('float32-filterable'),
-            textureCompressionBC: features.has('texture-compression-bc'),
-          },
-        },
+        capabilities: buildCapabilities(this._device, adapterInfo, isFallback),
       }
 
       console.log(
