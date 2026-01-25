@@ -34,29 +34,16 @@ use crate::BasicAdjustments;
 /// // Pixel is now brighter (clamped at 255)
 /// ```
 pub fn apply_all_adjustments(pixels: &mut [u8], adjustments: &BasicAdjustments) {
-    // Early exit if no adjustments
     if adjustments.is_default() {
         return;
     }
 
     for chunk in pixels.chunks_exact_mut(3) {
-        let mut r = chunk[0] as f32 / 255.0;
-        let mut g = chunk[1] as f32 / 255.0;
-        let mut b = chunk[2] as f32 / 255.0;
+        let r = chunk[0] as f32 / 255.0;
+        let g = chunk[1] as f32 / 255.0;
+        let b = chunk[2] as f32 / 255.0;
 
-        // Apply adjustments in order
-        (r, g, b) = apply_exposure(r, g, b, adjustments.exposure);
-        (r, g, b) = apply_contrast(r, g, b, adjustments.contrast);
-        (r, g, b) = apply_temperature(r, g, b, adjustments.temperature);
-        (r, g, b) = apply_tint(r, g, b, adjustments.tint);
-
-        let luminance = calculate_luminance(r, g, b);
-        (r, g, b) = apply_highlights(r, g, b, luminance, adjustments.highlights);
-        (r, g, b) = apply_shadows(r, g, b, luminance, adjustments.shadows);
-        (r, g, b) = apply_whites(r, g, b, adjustments.whites);
-        (r, g, b) = apply_blacks(r, g, b, adjustments.blacks);
-        (r, g, b) = apply_saturation(r, g, b, adjustments.saturation);
-        (r, g, b) = apply_vibrance(r, g, b, adjustments.vibrance);
+        let (r, g, b) = apply_adjustments_to_pixel(r, g, b, adjustments);
 
         chunk[0] = (r.clamp(0.0, 1.0) * 255.0) as u8;
         chunk[1] = (g.clamp(0.0, 1.0) * 255.0) as u8;
