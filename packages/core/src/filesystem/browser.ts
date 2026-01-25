@@ -112,6 +112,27 @@ export class BrowserFileSystemProvider implements FileSystemProvider {
     })
   }
 
+  /**
+   * Execute an IndexedDB transaction operation
+   */
+  private async withTransaction<T>(
+    mode: IDBTransactionMode,
+    operation: (store: IDBObjectStore) => IDBRequest<T>,
+    errorMessage: string
+  ): Promise<T> {
+    const db = await this.getDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.STORE_NAME, mode)
+      const store = tx.objectStore(this.STORE_NAME)
+      const request = operation(store)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => {
+        reject(new FileSystemError(errorMessage, 'UNKNOWN', request.error ?? undefined))
+      }
+    })
+  }
+
   async selectDirectory(): Promise<DirectoryHandle> {
     if (!isFileSystemAccessSupported()) {
       throw new FileSystemError(
@@ -300,74 +321,35 @@ export class BrowserFileSystemProvider implements FileSystemProvider {
 
   async saveHandle(key: string, handle: DirectoryHandle): Promise<void> {
     const native = unwrapDirectoryHandle(handle)
-    const db = await this.getDB()
-
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readwrite')
-      const store = tx.objectStore(this.STORE_NAME)
-      const request = store.put(native, key)
-
-      request.onsuccess = () => resolve()
-      request.onerror = () => {
-        reject(new FileSystemError('Failed to save handle', 'UNKNOWN', request.error ?? undefined))
-      }
-    })
+    await this.withTransaction(
+      'readwrite',
+      store => store.put(native, key),
+      'Failed to save handle'
+    )
   }
 
   async loadHandle(key: string): Promise<DirectoryHandle | null> {
-    const db = await this.getDB()
-
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readonly')
-      const store = tx.objectStore(this.STORE_NAME)
-      const request = store.get(key)
-
-      request.onsuccess = () => {
-        const native = request.result as FileSystemDirectoryHandle | undefined
-        if (native) {
-          resolve(wrapDirectoryHandle(native))
-        }
-        else {
-          resolve(null)
-        }
-      }
-
-      request.onerror = () => {
-        reject(new FileSystemError('Failed to load handle', 'UNKNOWN', request.error ?? undefined))
-      }
-    })
+    const native = await this.withTransaction<FileSystemDirectoryHandle | undefined>(
+      'readonly',
+      store => store.get(key),
+      'Failed to load handle'
+    )
+    return native ? wrapDirectoryHandle(native) : null
   }
 
   async removeHandle(key: string): Promise<void> {
-    const db = await this.getDB()
-
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readwrite')
-      const store = tx.objectStore(this.STORE_NAME)
-      const request = store.delete(key)
-
-      request.onsuccess = () => resolve()
-      request.onerror = () => {
-        reject(new FileSystemError('Failed to remove handle', 'UNKNOWN', request.error ?? undefined))
-      }
-    })
+    await this.withTransaction(
+      'readwrite',
+      store => store.delete(key),
+      'Failed to remove handle'
+    )
   }
 
   async listSavedHandles(): Promise<string[]> {
-    const db = await this.getDB()
-
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readonly')
-      const store = tx.objectStore(this.STORE_NAME)
-      const request = store.getAllKeys()
-
-      request.onsuccess = () => {
-        resolve(request.result as string[])
-      }
-
-      request.onerror = () => {
-        reject(new FileSystemError('Failed to list handles', 'UNKNOWN', request.error ?? undefined))
-      }
-    })
+    return this.withTransaction<IDBValidKey[]>(
+      'readonly',
+      store => store.getAllKeys(),
+      'Failed to list handles'
+    ) as Promise<string[]>
   }
 }

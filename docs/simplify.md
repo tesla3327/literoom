@@ -19,3 +19,4 @@
 - packages/core/src/decode/decode-worker.ts (extracted createWasmAdjustments, toWasmMaskAdjustments, toWasmLinearMask, toWasmRadialMask, toWasmMaskStack, and sendImageSuccess helpers to DRY apply-adjustments, apply-rotation, apply-crop, apply-masked-adjustments, and generate-edited-thumbnail handlers)
 - packages/core/src/gpu/pipelines/rotation-pipeline.ts (removed duplicate rgbToRgba/rgbaToRgb functions, now imports from texture-utils.ts)
 - packages/core/src/gpu/pipelines/mask-pipeline.ts (DRY by importing createTextureFromPixels, createOutputTexture, readTexturePixels, calculateDispatchSize from texture-utils.ts; also updated adjustments-pipeline.ts, tone-curve-pipeline.ts, histogram-pipeline.ts to use calculateDispatchSize)
+- packages/core/src/filesystem/browser.ts (extracted withTransaction helper to DRY saveHandle, loadHandle, removeHandle, listSavedHandles IndexedDB operations)
