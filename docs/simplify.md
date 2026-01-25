@@ -9,3 +9,4 @@
 - crates/literoom-core/src/mask/radial.rs
 - crates/literoom-core/src/mask/linear.rs
 - crates/literoom-core/src/lib.rs (Histogram impl)
+- crates/literoom-core/src/decode/jpeg.rs

@@ -23,25 +23,10 @@ use super::{DecodeError, DecodedImage, Orientation};
 /// Returns `DecodeError::InvalidFormat` if the bytes are not a valid JPEG.
 /// Returns `DecodeError::CorruptedFile` if the JPEG is corrupted.
 pub fn decode_jpeg(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
-    // First, extract EXIF orientation before decoding
     let orientation = extract_orientation(bytes);
-
-    // Decode the image using the image crate
-    let cursor = Cursor::new(bytes);
-    let reader = ImageReader::new(cursor)
-        .with_guessed_format()
-        .map_err(|e| DecodeError::CorruptedFile(e.to_string()))?;
-
-    let img = reader
-        .decode()
-        .map_err(|e| DecodeError::CorruptedFile(e.to_string()))?;
-
-    // Apply orientation transformation
+    let img = decode_bytes_to_dynamic_image(bytes)?;
     let oriented_img = apply_orientation(img, orientation);
-
-    // Convert to RGB8
-    let rgb_img = oriented_img.into_rgb8();
-    Ok(DecodedImage::from_rgb_image(rgb_img))
+    Ok(DecodedImage::from_rgb_image(oriented_img.into_rgb8()))
 }
 
 /// Decode a JPEG image from bytes without applying EXIF orientation.
@@ -57,17 +42,19 @@ pub fn decode_jpeg(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
 ///
 /// A `DecodedImage` with RGB pixel data (orientation not applied).
 pub fn decode_jpeg_no_orientation(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
+    let img = decode_bytes_to_dynamic_image(bytes)?;
+    Ok(DecodedImage::from_rgb_image(img.into_rgb8()))
+}
+
+/// Decode raw bytes into a DynamicImage.
+fn decode_bytes_to_dynamic_image(bytes: &[u8]) -> Result<DynamicImage, DecodeError> {
     let cursor = Cursor::new(bytes);
     let reader = ImageReader::new(cursor)
         .with_guessed_format()
         .map_err(|e| DecodeError::CorruptedFile(e.to_string()))?;
-
-    let img = reader
+    reader
         .decode()
-        .map_err(|e| DecodeError::CorruptedFile(e.to_string()))?;
-
-    let rgb_img = img.into_rgb8();
-    Ok(DecodedImage::from_rgb_image(rgb_img))
+        .map_err(|e| DecodeError::CorruptedFile(e.to_string()))
 }
 
 /// Extract EXIF orientation from JPEG bytes.
