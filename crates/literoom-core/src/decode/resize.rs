@@ -114,19 +114,12 @@ fn calculate_fit_dimensions(width: u32, height: u32, max_edge: u32) -> (u32, u32
         return (0, 0);
     }
 
-    let ratio = width as f64 / height as f64;
+    // Scale factor based on the longer edge
+    let scale = max_edge as f64 / width.max(height) as f64;
+    let new_width = (width as f64 * scale).round() as u32;
+    let new_height = (height as f64 * scale).round() as u32;
 
-    if width >= height {
-        // Landscape or square: constrain by width
-        let new_width = max_edge;
-        let new_height = (max_edge as f64 / ratio).round() as u32;
-        (new_width, new_height.max(1))
-    } else {
-        // Portrait: constrain by height
-        let new_height = max_edge;
-        let new_width = (max_edge as f64 * ratio).round() as u32;
-        (new_width.max(1), new_height)
-    }
+    (new_width.max(1), new_height.max(1))
 }
 
 #[cfg(test)]
