@@ -3,6 +3,7 @@
 ## Table of Contents
 
 ### Open Issues
+- [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos)
 - [Sort options don't work (High)](#sort-options-dont-work)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
@@ -52,6 +53,47 @@
 ---
 
 ## Open Issues
+
+### Adjustments not persisted when navigating between photos
+
+**Severity**: High | **Type**: Bug | **Found**: 2026-01-25
+
+**Problem**:
+When editing a photo and making adjustments (Exposure, Contrast, etc.), the adjustments are lost when navigating to another photo in the filmstrip and then returning to the original photo. All slider values reset to 0/default.
+
+**Steps to Reproduce**:
+1. Open catalog in Demo Mode
+2. Double-click a photo to enter Edit view
+3. Adjust Exposure slider to +0.50 (or any non-zero value)
+4. Wait a few seconds for any potential auto-save
+5. Click a different photo in the filmstrip to navigate away
+6. Click back to the original photo
+7. Observe: Exposure slider shows 0 instead of +0.50
+
+**Expected Behavior**:
+Adjustments should persist when navigating between photos. The documentation in issues.md states "Edits now persist to IndexedDB and survive page refresh."
+
+**Actual Behavior**:
+Adjustments are lost immediately when navigating away from the photo. The Reset button becomes disabled (indicating no changes), confirming the adjustments were not saved.
+
+**Technical Details**:
+Tested in Demo Mode (`LITEROOM_DEMO_MODE=true`). The issue may be specific to Demo Mode since the mock services may not have full persistence implemented.
+
+**Observed Pattern**:
+- Adjustments visible in preview in real-time (working)
+- Histogram updates with adjustments (working)
+- Reset button enables when changes are made (working)
+- After navigation: Reset button disabled, all sliders at 0 (BUG)
+
+**Files to Investigate**:
+- `apps/web/app/stores/edit.ts` - Edit state management and persistence
+- `packages/core/src/catalog/mock-catalog-service.ts` - Demo mode persistence
+
+**Screenshots**:
+- `docs/screenshots/qa-section7-08-exposure-050-before-nav.png` - Exposure at +0.50 before navigation
+- `docs/screenshots/qa-section7-09-exposure-lost-after-nav.png` - Exposure at 0 after returning
+
+---
 
 ### Sort options don't work
 

@@ -208,41 +208,48 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 7. Basic Adjustments
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (1 bug found)
+
 ### 7.1 White Balance
-- [ ] Temperature slider: -100 to +100
-- [ ] Temperature negative = warmer (orange)
-- [ ] Temperature positive = cooler (blue)
-- [ ] Tint slider: -100 to +100
-- [ ] Tint negative = green
-- [ ] Tint positive = magenta
+- [x] Temperature slider: -100 to +100 - verified via aria-valuemin/max
+- [x] Temperature negative = warmer (orange) - visual effect observed
+- [x] Temperature positive = cooler (blue) - visual effect observed
+- [x] Tint slider: -100 to +100 - verified via aria-valuemin/max
+- [x] Tint negative = green - visual effect observed
+- [x] Tint positive = magenta - visual effect observed
 
 ### 7.2 Tone Adjustments
-- [ ] Exposure slider: -5 to +5 (0.01 step)
-- [ ] Exposure affects overall brightness
-- [ ] Contrast slider: -100 to +100
-- [ ] Highlights slider: -100 to +100
-- [ ] Shadows slider: -100 to +100
-- [ ] Whites slider: -100 to +100
-- [ ] Blacks slider: -100 to +100
+- [x] Exposure slider: -5 to +5 (0.01 step) - verified, 10 arrow presses = 0.10
+- [x] Exposure affects overall brightness - max exposure (+5) visibly brightens image
+- [x] Contrast slider: -100 to +100 - verified
+- [x] Highlights slider: -100 to +100 - verified
+- [x] Shadows slider: -100 to +100 - verified
+- [x] Whites slider: -100 to +100 - verified
+- [x] Blacks slider: -100 to +100 - verified
 
 ### 7.3 Presence Adjustments
-- [ ] Vibrance slider: -100 to +100
-- [ ] Vibrance protects skin tones
-- [ ] Saturation slider: -100 to +100
-- [ ] Saturation affects all colors equally
+- [x] Vibrance slider: -100 to +100 - verified
+- [ ] Vibrance protects skin tones - not tested (requires skin tone image analysis)
+- [x] Saturation slider: -100 to +100 - verified
+- [ ] Saturation affects all colors equally - not quantitatively tested
 
 ### 7.4 Slider Interactions
-- [ ] Values display with +/- prefix
-- [ ] Double-click label resets to 0
-- [ ] Alt+click label resets to 0
-- [ ] Preview updates in real-time
-- [ ] Decimal places based on step size
-- [ ] Values clamped to min/max
+- [x] Values display with +/- prefix - verified (shows "+10" for positive values)
+- [x] Double-click label resets to 0 - verified
+- [x] Alt+click label resets to 0 - verified
+- [x] Preview updates in real-time - verified (histogram and preview update)
+- [x] Decimal places based on step size - Exposure shows 2 decimals (+0.10), others show integers
+- [x] Values clamped to min/max - verified (Exposure cannot exceed +5.00)
 
 ### 7.5 Adjustments Persistence
-- [ ] Changes persist when navigating away
-- [ ] Changes persist after page refresh
-- [ ] Changes reflected in thumbnail
+- [ ] Changes persist when navigating away - **BUG**: Adjustments lost when navigating to another photo and back (see issues.md)
+- [ ] Changes persist after page refresh - not tested (blocked by above bug)
+- [ ] Changes reflected in thumbnail - not tested (blocked by above bug)
+
+### Additional Findings
+- [x] Reset button works - resets all adjustments to defaults
+- [x] Reset button disabled when no changes
+- [x] Reset button enabled when changes present
 
 ---
 
