@@ -70,6 +70,57 @@ export const useSelectionStore = defineStore('selection', () => {
     return first.done ? null : first.value
   }
 
+  /**
+   * Navigate by offset in the ordered list.
+   * Returns the new ID if navigation is valid, or null if at boundary or empty.
+   */
+  function getNavigatedId(orderedIds: string[], offset: number): string | null {
+    if (orderedIds.length === 0) return null
+
+    if (!currentId.value) {
+      // No current selection - go to start or end based on direction
+      const idx = offset > 0 ? 0 : orderedIds.length - 1
+      return orderedIds[idx] ?? null
+    }
+
+    const currentIndex = orderedIds.indexOf(currentId.value)
+    const newIndex = currentIndex + offset
+
+    // Check bounds
+    if (currentIndex === -1 || newIndex < 0 || newIndex >= orderedIds.length) {
+      return null
+    }
+
+    return orderedIds[newIndex] ?? null
+  }
+
+  /**
+   * Find first ID in orderedIds matching a predicate, with wrap-around search.
+   * Starts searching from the position after currentId.
+   */
+  function findWithWrapAround(
+    orderedIds: string[],
+    predicate: (id: string) => boolean,
+  ): string | null {
+    if (orderedIds.length === 0) return null
+
+    const startIndex = currentId.value ? orderedIds.indexOf(currentId.value) + 1 : 0
+
+    // Search from current position to end
+    for (let i = startIndex; i < orderedIds.length; i++) {
+      const id = orderedIds[i]
+      if (id !== undefined && predicate(id)) return id
+    }
+
+    // Wrap around and search from beginning
+    for (let i = 0; i < startIndex; i++) {
+      const id = orderedIds[i]
+      if (id !== undefined && predicate(id)) return id
+    }
+
+    return null
+  }
+
   // ============================================================================
   // Actions
   // ============================================================================
@@ -229,50 +280,16 @@ export const useSelectionStore = defineStore('selection', () => {
    * Navigate to the next asset in the ordered list.
    */
   function navigateNext(orderedIds: string[]): void {
-    if (orderedIds.length === 0) return
-
-    const firstId = orderedIds[0]
-    if (!currentId.value) {
-      if (firstId !== undefined) {
-        selectSingle(firstId)
-      }
-      return
-    }
-
-    const currentIndex = orderedIds.indexOf(currentId.value)
-    if (currentIndex === -1 || currentIndex >= orderedIds.length - 1) {
-      return
-    }
-
-    const nextId = orderedIds[currentIndex + 1]
-    if (nextId !== undefined) {
-      selectSingle(nextId)
-    }
+    const id = getNavigatedId(orderedIds, 1)
+    if (id) selectSingle(id)
   }
 
   /**
    * Navigate to the previous asset in the ordered list.
    */
   function navigatePrevious(orderedIds: string[]): void {
-    if (orderedIds.length === 0) return
-
-    const lastId = orderedIds[orderedIds.length - 1]
-    if (!currentId.value) {
-      if (lastId !== undefined) {
-        selectSingle(lastId)
-      }
-      return
-    }
-
-    const currentIndex = orderedIds.indexOf(currentId.value)
-    if (currentIndex <= 0) {
-      return
-    }
-
-    const prevId = orderedIds[currentIndex - 1]
-    if (prevId !== undefined) {
-      selectSingle(prevId)
-    }
+    const id = getNavigatedId(orderedIds, -1)
+    if (id) selectSingle(id)
   }
 
   /**
@@ -283,27 +300,8 @@ export const useSelectionStore = defineStore('selection', () => {
     orderedIds: string[],
     getFlag: (id: string) => 'none' | 'pick' | 'reject' | undefined,
   ): void {
-    if (orderedIds.length === 0) return
-
-    const startIndex = currentId.value ? orderedIds.indexOf(currentId.value) + 1 : 0
-
-    // Search from current position to end
-    for (let i = startIndex; i < orderedIds.length; i++) {
-      const id = orderedIds[i]
-      if (id !== undefined && getFlag(id) === 'none') {
-        selectSingle(id)
-        return
-      }
-    }
-
-    // Wrap around and search from beginning
-    for (let i = 0; i < startIndex; i++) {
-      const id = orderedIds[i]
-      if (id !== undefined && getFlag(id) === 'none') {
-        selectSingle(id)
-        return
-      }
-    }
+    const id = findWithWrapAround(orderedIds, id => getFlag(id) === 'none')
+    if (id) selectSingle(id)
   }
 
   /**

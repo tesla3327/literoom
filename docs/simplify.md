@@ -22,3 +22,4 @@
 - packages/core/src/filesystem/browser.ts (extracted withTransaction helper to DRY saveHandle, loadHandle, removeHandle, listSavedHandles IndexedDB operations)
 - packages/core/src/catalog/catalog-service.ts (extracted withHandleDB helper to DRY persistHandle and loadHandle IndexedDB operations)
 - apps/web/app/utils/zoomCalculations.ts (extracted Dimensions interface and helpers to DRY calculateFitScale, calculateFillScale, clampPan, calculateCenteredPan, and detectPreset)
+- apps/web/app/stores/selection.ts (extracted getNavigatedId and findWithWrapAround helpers to DRY navigateNext, navigatePrevious, and navigateToNextUnflagged)
