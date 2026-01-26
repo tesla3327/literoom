@@ -461,34 +461,52 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 13. Zoom & Pan
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (1 bug found)
+
 ### 13.1 Zoom Controls
-- [ ] Z key toggles fit/100%
-- [ ] Cmd/Ctrl+0: fit to view
-- [ ] Cmd/Ctrl+1: 100% zoom
-- [ ] Cmd/Ctrl++: zoom in
-- [ ] Cmd/Ctrl+-: zoom out
-- [ ] +/- buttons work
-- [ ] Percentage display updates
+- [x] Z key toggles fit/100% - verified (183% → 100% → 183%)
+- [x] Cmd/Ctrl+0: fit to view - verified
+- [x] Cmd/Ctrl+1: 100% zoom - verified
+- [x] Cmd/Ctrl++: zoom in - verified (183% → 201%)
+- [x] Cmd/Ctrl+-: zoom out - verified (201% → 183%)
+- [x] +/- buttons work - verified (Zoom in/out buttons in toolbar)
+- [x] Percentage display updates - verified (shows current zoom %)
 
 ### 13.2 Mouse Wheel Zoom
-- [ ] Scroll up zooms in
-- [ ] Scroll down zooms out
-- [ ] Zooms toward cursor position
-- [ ] Trackpad pinch zoom works
-- [ ] Zoom sensitivity appropriate
+- [x] Scroll up zooms in - verified (183% → 241%)
+- [x] Scroll down zooms out - verified (241% → 183%)
+- [ ] Zooms toward cursor position - not verified (hard to test via automation)
+- [ ] Trackpad pinch zoom works - not tested (requires hardware)
+- [x] Zoom sensitivity appropriate - appears smooth and controlled
 
 ### 13.3 Pan
-- [ ] Space+drag pans image
-- [ ] Pan only when zoomed in
-- [ ] Cursor changes to grab/grabbing
-- [ ] Pan bounded to image edges
-- [ ] Double-click toggles fit/100%
+- [x] Space+drag pans image - verified at 100% zoom
+- [ ] Pan only when zoomed in - not verified (pan seemed to work at all zoom levels)
+- [ ] Cursor changes to grab/grabbing - not verified (hard to test via automation)
+- [ ] Pan bounded to image edges - not verified
+- [x] Double-click toggles fit/100% - verified (100% → Fit → 100%)
 
 ### 13.4 Zoom State
-- [ ] Zoom persists per-image
-- [ ] Zoom restored when returning to image
-- [ ] Fit preset centers image
-- [ ] 100% shows native resolution
+- [ ] Zoom persists per-image - **BUG**: Zoom is global, not per-image (see issues.md)
+- [ ] Zoom restored when returning to image - **BUG**: Same issue - zoom from last viewed image is applied
+- [x] Fit preset centers image - verified, image appears centered
+- [x] 100% shows native resolution - verified (shows 100% in toolbar)
+
+### Screenshots
+- `qa-section13-01-catalog-view.png` - Demo catalog loaded
+- `qa-section13-02-edit-view-initial.png` - Initial edit view at 183% (Fit)
+- `qa-section13-03-z-key-100percent.png` - After Z key, at 100%
+- `qa-section13-04-zoom-controls-tested.png` - Zoom controls in toolbar
+- `qa-section13-05-scroll-zoom-in.png` - After scroll zoom in to 241%
+- `qa-section13-06-100-percent-zoom.png` - At 100% zoom
+- `qa-section13-07-panning.png` - During Space+drag pan
+- `qa-section13-08-after-pan.png` - After panning
+- `qa-section13-09-dblclick-fit.png` - After double-click, back to Fit
+- `qa-section13-10-img9-100percent.png` - IMG_0009 at 100%
+- `qa-section13-11-img8-zoom-not-persisted.png` - IMG_0008 zoom not persisted (bug)
+- `qa-section13-12-zoom-not-persisted-bug.png` - Confirmed zoom persistence bug
+- `qa-section13-13-fit-centered.png` - Fit mode centered
+- `qa-section13-14-pan-at-fit.png` - Pan at fit zoom level
 
 ---
 

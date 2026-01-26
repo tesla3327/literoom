@@ -5,6 +5,7 @@
 ### Open Issues
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos)
 - [Sort options don't work (High)](#sort-options-dont-work)
+- [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
@@ -136,6 +137,42 @@ Tested in Demo Mode with 50 photos. Verified by comparing first 10 photo names b
 **Screenshots**:
 - `docs/screenshots/qa-section5-05-sort-dropdown.png` - Sort dropdown showing all 6 options
 - `docs/screenshots/qa-section5-06-sort-bug.png` - Button still shows "Date (newest)" after selecting different option
+
+---
+
+### Zoom state not persisted per-image
+
+**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-25
+
+**Problem**:
+When a user sets a specific zoom level on one image and then navigates to another image, the zoom level from the second image is applied to all images. The zoom state is global rather than per-image.
+
+**Steps to Reproduce**:
+1. Open a photo in edit view (e.g., IMG_0008)
+2. Set zoom to 100% using the 1:1 button
+3. Navigate to the next image using arrow key or filmstrip
+4. Set zoom to Fit (183%) on the second image
+5. Navigate back to the first image (IMG_0008)
+6. Observe: Zoom shows 183% instead of the previously set 100%
+
+**Expected Behavior**:
+Each image should remember its own zoom level. When returning to IMG_0008, it should still show 100% zoom as originally set.
+
+**Actual Behavior**:
+The zoom level from the most recently viewed image is applied globally. All images share the same zoom state.
+
+**Technical Details**:
+Tested in Demo Mode. The zoom state appears to be stored globally in the editUI store without per-asset tracking.
+
+**Files to Investigate**:
+- `apps/web/app/stores/editUI.ts` - Zoom state management
+- `apps/web/app/composables/useZoomPan.ts` - Zoom/pan composable
+- `apps/web/app/utils/zoomCalculations.ts` - Zoom calculation utilities
+
+**Screenshots**:
+- `docs/screenshots/qa-section13-10-img9-100percent.png` - IMG_0009 at 100%
+- `docs/screenshots/qa-section13-11-img8-zoom-not-persisted.png` - IMG_0008 showing wrong zoom after navigation
+- `docs/screenshots/qa-section13-12-zoom-not-persisted-bug.png` - Confirmed bug
 
 ---
 
