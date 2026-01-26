@@ -8,6 +8,7 @@
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
+- [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
@@ -231,6 +232,38 @@ The crop overlay only shows within the already-cropped boundaries, making it imp
 - `apps/web/app/composables/useCropOverlay.ts`
 - `apps/web/app/composables/useEditPreview.ts`
 - `apps/web/app/stores/editUI.ts`
+
+---
+
+### No clipboard summary shown for copy/paste
+
+**Severity**: Low | **Type**: UX Enhancement | **Found**: 2026-01-25
+
+**Problem**:
+After copying edit settings, there is no visible feedback showing what settings are in the clipboard. Users can only tell that something is copied because the Paste button becomes enabled.
+
+**Expected Behavior**:
+A summary should be shown somewhere (tooltip, badge, or text) indicating:
+- What settings were copied (e.g., "Basic Adjustments, Tone Curve")
+- Or at minimum, a toast notification confirming the copy action
+
+**Current Behavior**:
+- Copy modal closes without any visible feedback
+- Paste button becomes enabled (only indicator)
+- No tooltip on Paste button showing clipboard contents
+- No toast notification for copy action
+
+**Suggested Implementation**:
+1. Add tooltip to Paste button showing what's in clipboard (e.g., "Paste: Basic Adjustments, Tone Curve")
+2. Or show toast notification on successful copy (e.g., "Copied: Basic Adjustments, Tone Curve")
+
+**Files to Investigate**:
+- `apps/web/app/composables/useCopyPasteSettings.ts`
+- `apps/web/app/stores/editClipboard.ts`
+- `apps/web/app/components/edit/EditControlsPanel.vue`
+
+**Screenshots**:
+- `docs/screenshots/qa-section11-07-after-copy-paste-enabled.png` - After copy, only Paste button enablement indicates success
 
 ---
 

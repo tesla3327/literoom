@@ -390,30 +390,32 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 11. Copy/Paste Settings
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (1 feature not implemented)
+
 ### 11.1 Copy Settings Modal
-- [ ] Opens with Cmd/Ctrl+Shift+C
-- [ ] "All" button selects all groups
-- [ ] "None" button deselects all
-- [ ] Basic Adjustments checkbox (default: checked)
-- [ ] Tone Curve checkbox (default: checked)
-- [ ] Crop checkbox (default: unchecked)
-- [ ] Rotation checkbox (default: unchecked)
-- [ ] Copy button disabled if nothing selected
-- [ ] Cancel button closes modal
+- [x] Opens with Cmd/Ctrl+Shift+C - verified
+- [x] "All" button selects all groups - verified
+- [x] "None" button deselects all - verified
+- [x] Basic Adjustments checkbox (default: checked) - verified
+- [x] Tone Curve checkbox (default: checked) - verified
+- [x] Crop checkbox (default: unchecked) - verified
+- [x] Rotation checkbox (default: unchecked) - verified
+- [x] Copy button disabled if nothing selected - verified
+- [x] Cancel button closes modal - verified
 
 ### 11.2 Paste Settings
-- [ ] Paste with Cmd/Ctrl+Shift+V
-- [ ] Paste button in controls header
-- [ ] Paste disabled if nothing copied
-- [ ] Summary shows what was copied
-- [ ] Settings applied to current photo
-- [ ] Preview updates after paste
+- [x] Paste with Cmd/Ctrl+Shift+V - verified
+- [x] Paste button in controls header - verified
+- [x] Paste disabled if nothing copied - verified
+- [ ] Summary shows what was copied - **NOT IMPLEMENTED** - No visible feedback about clipboard contents (see issues.md)
+- [x] Settings applied to current photo - verified (Temp +10, Exposure +0.05 applied correctly)
+- [x] Preview updates after paste - verified
 
 ### 11.3 Copy/Paste Across Photos
-- [ ] Copy from one photo
-- [ ] Navigate to another photo
-- [ ] Paste applies correctly
-- [ ] Multiple pastes work
+- [x] Copy from one photo - verified (copied from IMG_0008)
+- [x] Navigate to another photo - verified (IMG_0002, IMG_0003, IMG_0004)
+- [x] Paste applies correctly - verified on all 3 target photos
+- [x] Multiple pastes work - verified (same clipboard used on 3 different photos)
 
 ---
 
