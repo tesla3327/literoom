@@ -6,44 +6,43 @@
 
 Performance research for maximizing FPS in the GPU edit pipeline.
 
-## Current Status: Research Analysis Required
+## Current Status: Implementation Ready
 
-All four research phases are complete. **Next step**: Analyze all research findings across the synthesis documents and determine the highest-priority optimizations to implement.
+All research phases complete. **Prioritized implementation roadmap created.**
 
-### Analysis Tasks
+### Analysis Tasks - COMPLETE
 
-1. [ ] Review all synthesis documents and extract prioritized optimization list
-2. [ ] Estimate implementation effort vs. performance impact for each optimization
-3. [ ] Identify dependencies between optimizations
-4. [ ] Create implementation roadmap with quick wins first
-5. [ ] Define success metrics and benchmarking approach
+1. [x] Review all synthesis documents and extract prioritized optimization list
+2. [x] Estimate implementation effort vs. performance impact for each optimization
+3. [x] Identify dependencies between optimizations
+4. [x] Create implementation roadmap with quick wins first
+5. [x] Define success metrics and benchmarking approach
 
-### Research Documents to Analyze
+### Implementation Roadmap Summary
+
+| Phase | Optimizations | Expected FPS |
+|-------|--------------|--------------|
+| **Phase 1** (1-2 days) | Throttle 150ms→33ms, skip histogram/clipping in draft, TexturePool | ~30 FPS |
+| **Phase 2** (3-4 days) | 1/2 resolution draft, triple-buffered histogram, GPU timestamps | ~40 FPS |
+| **Phase 3** (1 week) | Single-pass uber-shader, f16 processing, subgroup histogram | ~50 FPS |
+| **Phase 4** (1-2 weeks) | GPU-direct histogram, mipmap LOD, LRU cache | ~60 FPS |
+
+### New Research Documents Created
 
 | Document | Focus Area |
 |----------|------------|
-| `2026-01-25-gpu-pipeline-optimization-synthesis.md` | Initial findings, quick wins |
-| `2026-01-25-advanced-gpu-optimization-synthesis.md` | WebGPU techniques |
-| `2026-01-25-draft-mode-implementation-research.md` | Draft mode details |
-| `2026-01-25-async-histogram-texturepool-research.md` | Async patterns, pooling |
-| `2026-01-26-shader-optimization-synthesis.md` | f16, subgroups, uber-shader |
-| `2026-01-26-phase4-advanced-research-synthesis.md` | Progressive rendering, profiling |
+| `2026-01-26-implementation-roadmap.md` | Prioritized 4-phase implementation plan |
+| `2026-01-26-benchmarking-research.md` | GPU timestamp queries, stats-gl, CI integration |
 
-### Priority Criteria
+### Benchmarking Strategy
 
-- **Impact**: How much FPS improvement?
-- **Effort**: How many days to implement?
-- **Risk**: Could it break existing functionality?
-- **Dependencies**: What else needs to be done first?
+Using **GPU timestamp queries** and **stats-gl** for accurate measurement:
+- Draft render target: <25ms
+- Full render target: <100ms
+- Histogram update target: <2ms
+- FPS during drag target: >30
 
-### Benchmarking Requirements
-
-Benchmarking must be **automated** to ensure:
-- Consistent, repeatable measurements across changes
-- CI integration for regression detection
-- Before/after comparison for each optimization
-- GPU timestamp queries for accurate GPU timing (not just CPU timing)
-- Multiple test images (various sizes, edit complexity levels)
+CI integration via GitHub Actions GPU runners ($0.07/min) or self-hosted alternatives
 
 ---
 
@@ -330,6 +329,51 @@ Benchmarking must be **automated** to ensure:
 - `docs/research/perf/2026-01-26-phase4-advanced-research-plan.md`
 - `docs/research/perf/2026-01-26-phase4-advanced-research-synthesis.md`
 
+---
+
+### 2026-01-26: Research Analysis & Implementation Roadmap
+
+**Goal**: Analyze all research findings, create prioritized implementation roadmap, establish benchmarking approach
+
+**Research Conducted** (4 parallel agents):
+1. WebGPU benchmarking frameworks and best practices
+2. CI/CD GPU performance testing approaches
+3. Image editor GPU benchmark methodologies
+4. GPU optimization priority strategies
+
+**Key Findings**:
+
+1. **Benchmarking Tools**:
+   - **stats-gl**: Ready-to-use performance monitoring with GPU timestamp support
+   - **WebGPU Inspector**: Chrome extension for frame capture and profiling
+   - **GPU Timestamps**: 100μs quantization default, use `timestampWrites` in pass descriptor
+
+2. **Statistical Best Practices**:
+   - Warmup: 500+ iterations before measurement
+   - Samples: At least 10-30 for reliability
+   - Metrics: Report median, mean, P99, and CV% (coefficient of variation)
+   - CV < 10%: Excellent reliability, CV < 20%: Good
+
+3. **CI Integration**:
+   - GitHub Actions GPU runners: $0.07/min with Tesla T4
+   - RunsOn (AWS): ~$0.009/min (85% cheaper)
+   - Playwright with Chrome GPU flags for headless testing
+   - Regression detection via 10% threshold comparison
+
+4. **Optimization Priority Order**:
+   - **Quick wins first**: Throttle reduction (4.5x), histogram skip (5-50ms), TexturePool (1.2-2.4ms)
+   - **Memory bandwidth**: Single-pass uber-shader provides 75% bandwidth reduction
+   - **Separable operations**: Industry standard for biggest gains with least effort
+
+5. **Industry Benchmarks**:
+   - PugetBench for Lightroom: Active vs passive task distinction
+   - Target latencies: <100ms instant feel, <33ms for dragging
+   - Frame time P99 should be <33ms to avoid double-drops
+
+**Documents Created**:
+- `docs/research/perf/2026-01-26-implementation-roadmap.md`
+- `docs/research/perf/2026-01-26-benchmarking-research.md`
+
 ## Next Steps
 
 ### Phase 1: Quick Wins - RESEARCH COMPLETE
@@ -354,10 +398,36 @@ Benchmarking must be **automated** to ensure:
 4. ✅ Interaction-aware rendering (33ms throttle, state machine design)
 5. ✅ Memory management (LRU cache, device tier detection)
 
-### Phase 5: Implementation - NEXT
-All research phases complete. Ready for implementation:
-1. [ ] Implement draft mode (33ms throttle + 1/2 resolution)
-2. [ ] Integrate TexturePool
-3. [ ] Add GPU timestamp profiling
-4. [ ] Implement progressive refinement state machine
-5. [ ] Add interaction-aware quality switching
+### Phase 5: Analysis - COMPLETE
+1. [x] Synthesize all research findings
+2. [x] Create prioritized implementation roadmap
+3. [x] Define benchmarking strategy with GPU timestamps
+4. [x] Research CI/CD integration options
+
+### Phase 6: Implementation - READY TO START
+
+**See `docs/research/perf/2026-01-26-implementation-roadmap.md` for detailed plan.**
+
+**Tier 1 Quick Wins** (1-2 days, ~30 FPS target):
+1. [ ] Reduce throttle 150ms → 33ms
+2. [ ] Skip histogram in draft mode
+3. [ ] Skip clipping in draft mode
+4. [ ] Integrate TexturePool
+5. [ ] Add 400ms debounce for full render
+
+**Tier 2 Core Architecture** (3-4 days, ~40 FPS target):
+1. [ ] 1/2 resolution draft mode
+2. [ ] Triple-buffered histogram
+3. [ ] GPU timestamp profiling
+4. [ ] Progressive refinement state machine
+
+**Tier 3 Shader Optimizations** (1 week, ~50 FPS target):
+1. [ ] Single-pass uber-shader (adjustments + tone curve)
+2. [ ] f16 processing with fallback
+3. [ ] Subgroup histogram optimization
+
+**Tier 4 Advanced** (1-2 weeks, ~60 FPS target):
+1. [ ] GPU-direct histogram rendering
+2. [ ] Mipmap-based LOD system
+3. [ ] LRU texture cache
+4. [ ] Device tier detection
