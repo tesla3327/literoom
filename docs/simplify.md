@@ -31,3 +31,4 @@
 - packages/core/src/gpu/gpu-tone-curve-service.ts (extracted isLinearCurve to decode/curve-utils.ts to DRY duplicate linear curve detection in gpu-tone-curve-service.ts and mock-decode-service.ts)
 - apps/web/app/composables/useHistogramDisplaySVG.ts (extracted sampleHistogramToPoints helper and removed unused histogramToStrokePath function to DRY histogram path generation)
 - packages/core/src/catalog/thumbnail-service.ts (extracted QueueProcessor helper class to DRY duplicate queue/processing logic between thumbnail and preview pipelines)
+- apps/web/app/components/catalog/CatalogGrid.vue (extracted useGridLayout composable to DRY grid layout calculations including rowCount, getGlobalIndex, columnsInRow, getRowIndex, and getItem helpers)

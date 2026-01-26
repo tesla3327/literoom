@@ -14,7 +14,8 @@
  */
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGridKeyboard, scrollIntoViewIfNeeded } from '~/composables/useGridKeyboard'
-import type { FlagStatus } from '@literoom/core/catalog'
+import { useGridLayout } from '~/composables/useGridLayout'
+import type { FlagStatus, Asset } from '@literoom/core/catalog'
 import { ThumbnailPriority } from '@literoom/core/catalog'
 
 // ============================================================================
@@ -55,7 +56,7 @@ watch(columnsCount, (cols) => {
 }, { immediate: true })
 
 // ============================================================================
-// Grid Layout Calculations
+// Grid Layout
 // ============================================================================
 
 /**
@@ -64,19 +65,27 @@ watch(columnsCount, (cols) => {
 const sortedAssetIds = computed(() => catalogUIStore.sortedAssetIds)
 
 /**
- * Number of rows needed to display all items.
+ * Grid layout calculations using shared composable.
  */
-const rowCount = computed(() =>
-  Math.ceil(sortedAssetIds.value.length / columnsCount.value),
-)
+const { rowCount, getGlobalIndex, columnsInRow, getRowIndex, getItem: getAsset } = useGridLayout<Asset>({
+  totalItems: computed(() => sortedAssetIds.value.length),
+  columnsCount,
+  getItemAtIndex: (index) => {
+    const assetId = sortedAssetIds.value[index]
+    if (!assetId) return undefined
+    const asset = catalogStore.getAsset(assetId)
+    if (!asset) {
+      console.warn(`[CatalogGrid] Asset ID "${assetId}" exists but asset data not found in store`)
+    }
+    return asset
+  },
+})
 
 /**
  * Calculate row height based on thumbnail size.
  * Includes padding (8px gap = 2 * 4px).
  */
 const rowHeight = computed(() => {
-  // Each thumbnail is aspect-square
-  // Height = (containerWidth - padding) / columns + gap
   const availableWidth = containerWidth.value - 16 // 8px padding on each side
   const gapTotal = (columnsCount.value - 1) * 8 // 8px gap between columns
   const thumbnailSize = (availableWidth - gapTotal) / columnsCount.value
@@ -84,44 +93,10 @@ const rowHeight = computed(() => {
 })
 
 /**
- * Convert row index to the starting global index.
- */
-function getGlobalIndex(rowIndex: number, colIndex: number): number {
-  return rowIndex * columnsCount.value + colIndex
-}
-
-/**
  * Get asset ID for a specific row/column position.
  */
 function getAssetId(rowIndex: number, colIndex: number): string | undefined {
-  const globalIndex = getGlobalIndex(rowIndex, colIndex)
-  return sortedAssetIds.value[globalIndex]
-}
-
-/**
- * Get the asset for a specific row/column position.
- * Returns undefined if asset ID doesn't exist or asset is not in store.
- */
-function getAsset(rowIndex: number, colIndex: number) {
-  const assetId = getAssetId(rowIndex, colIndex)
-  if (!assetId) return undefined
-
-  const asset = catalogStore.getAsset(assetId)
-  if (!asset) {
-    // Debug: Log when asset is in assetIds but not in assets Map
-    // This indicates a desync that shouldn't happen in normal operation
-    console.warn(`[CatalogGrid] Asset ID "${assetId}" exists but asset data not found in store`)
-  }
-  return asset
-}
-
-/**
- * Get number of columns in a specific row (last row may have fewer).
- */
-function columnsInRow(rowIndex: number): number {
-  const startIndex = rowIndex * columnsCount.value
-  const remaining = sortedAssetIds.value.length - startIndex
-  return Math.min(columnsCount.value, remaining)
+  return sortedAssetIds.value[getGlobalIndex(rowIndex, colIndex)]
 }
 
 // ============================================================================
@@ -217,11 +192,8 @@ const currentIndex = computed({
  * Scroll to the current item and update focus.
  */
 function scrollToCurrentItem(id: string, index: number) {
-  // Calculate which row this index is in
-  const rowIndex = Math.floor(index / columnsCount.value)
-
-  // Scroll to the row
-  virtualizer.value.scrollToIndex(rowIndex, { align: 'auto' })
+  // Scroll to the row containing this index
+  virtualizer.value.scrollToIndex(getRowIndex(index), { align: 'auto' })
 
   // After scroll, find and focus the element
   nextTick(() => {
