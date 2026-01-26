@@ -879,21 +879,54 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 21. Data Persistence
 
+**Tested**: 2026-01-26 | **Status**: FAIL (Multiple bugs found)
+
 ### 21.1 Edit State
-- [ ] Adjustments persist across navigation
-- [ ] Adjustments persist across refresh
-- [ ] Adjustments persist across sessions
-- [ ] Multiple photos save independently
+- [ ] Adjustments persist across navigation - **BUG**: Adjustments lost when navigating between photos (see issues.md)
+- [x] Adjustments persist across refresh - verified, page refresh preserves adjustments
+- [ ] Adjustments persist across sessions - not tested (Demo Mode resets)
+- [ ] Multiple photos save independently - **BUG**: Adjustments from one photo are lost when navigating away
+
+**Key Finding**: Adjustments are saved to IndexedDB and persist across page refresh, but the in-memory state is not maintained when navigating between photos within the same session. This means:
+- Photo A: Set Temp to +30
+- Photo B: Set Temp to -20
+- Return to Photo A: Temp shows 0 (lost!)
+- Refresh page: Temp shows +30 (restored from DB!)
+
+This is a critical UX bug - users expect adjustments to be preserved as they work through a batch of photos.
 
 ### 21.2 Catalog State
-- [ ] Flag status persists
-- [ ] Folder selection remembered
-- [ ] Recent folders list maintained
+- [ ] Flag status persists - **BUG (Demo Mode)**: Flags reset on page refresh (expected in Demo Mode, mock data reloads)
+- [ ] Folder selection remembered - not testable in Demo Mode (auto-loads demo catalog)
+- [ ] Recent folders list maintained - not testable in Demo Mode
+
+**Note**: In Demo Mode, catalog state resets to mock data on each page load. This is expected behavior. Real file system mode likely persists flags to IndexedDB.
 
 ### 21.3 UI State
-- [ ] Filter mode persists in session
-- [ ] Sort mode persists in session
-- [ ] Zoom states cached per-image
+- [ ] Filter mode persists in session - **BUG**: Filter resets to "All" after navigation to edit view and back
+- [ ] Sort mode persists in session - **BUG**: Sort doesn't work at all (see issues.md Section 5)
+- [ ] Zoom states cached per-image - **BUG**: Zoom is global, not per-image (already documented in Section 13)
+
+### Screenshots
+- `qa-section21-01-initial-load.png` - Demo catalog loaded
+- `qa-section21-02-edit-view.png` - Edit view for IMG_0008
+- `qa-section21-03-adjustments-made.png` - Temp +30, Exposure +0.20 set
+- `qa-section21-04-back-to-img8-lost.png` - Adjustments lost after returning
+- `qa-section21-05-before-refresh.png` - Before page refresh
+- `qa-section21-06-after-refresh.png` - After refresh, adjustments restored from DB
+- `qa-section21-07-catalog-view.png` - Catalog view
+- `qa-section21-08-flag-changed.png` - Flag changed (Reject → Unflagged)
+- `qa-section21-09-after-refresh-flags-reset.png` - Flags reset after refresh (Demo Mode)
+- `qa-section21-10-picks-filter.png` - Picks filter selected
+- `qa-section21-11-filter-persisted.png` - Filter not persisted (reset to All)
+- `qa-section21-12-sort-changed.png` - Sort dropdown
+- `qa-section21-13-filter-still-picks.png` - Picks filter active
+- `qa-section21-14-img-100percent.png` - Zoom at 100%
+- `qa-section21-15-zoom-not-persisted.png` - Zoom state check
+- `qa-section21-16-photo-a-temp30.png` - Photo A with Temp +30
+- `qa-section21-17-photo-b-temp-neg20.png` - Photo B with Temp -20
+- `qa-section21-18-photo-a-lost.png` - Photo A adjustments lost (Temp back to 0)
+- `qa-section21-19-photo-b-lost.png` - Photo B adjustments also lost
 
 ---
 
