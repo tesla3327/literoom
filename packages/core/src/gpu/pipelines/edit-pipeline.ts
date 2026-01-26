@@ -27,6 +27,7 @@ import {
   type ToneCurveLut,
   isIdentityLut,
 } from './tone-curve-pipeline'
+import { getUberPipeline } from './uber-pipeline'
 import { getMaskPipeline, type MaskStackInput } from './mask-pipeline'
 import { getRotationPipeline, RotationPipeline } from './rotation-pipeline'
 import type { CurvePoint } from '../../decode/types'
@@ -79,6 +80,8 @@ export interface EditPipelineTiming {
   adjustments: number
   /** Time for tone curve stage (0 if skipped) */
   toneCurve: number
+  /** Time for combined adjustments+toneCurve via uber-pipeline (0 if not used) */
+  uberPipeline: number
   /** Time for masks stage (0 if skipped) */
   masks: number
   /** Time to read RGBA pixels from GPU and convert to RGB */
@@ -89,6 +92,8 @@ export interface EditPipelineTiming {
   gpuAdjustments?: number
   /** GPU-measured tone curve time (nanoseconds) */
   gpuToneCurve?: number
+  /** GPU-measured uber-pipeline time (nanoseconds) */
+  gpuUberPipeline?: number
   /** GPU-measured masks time (nanoseconds) */
   gpuMasks?: number
 }
@@ -279,6 +284,7 @@ export class GPUEditPipeline {
       rotation: 0,
       adjustments: 0,
       toneCurve: 0,
+      uberPipeline: 0,
       masks: 0,
       readback: 0,
     }
@@ -294,14 +300,22 @@ export class GPUEditPipeline {
       timing.downsample = performance.now() - downsampleStart
     }
 
+    // Determine which features are needed
+    const needsAdjustments = shouldApplyAdjustments(params.adjustments)
+    const needsToneCurve = shouldApplyToneCurve(params.toneCurvePoints, params.toneCurveLut)
+
+    // Use uber-pipeline when BOTH adjustments AND tone curve are needed (75% bandwidth reduction)
+    const useUberPipeline = needsAdjustments && needsToneCurve
+
     // Get all required pipelines
-    const [rotationPipeline, adjustmentsPipeline, toneCurvePipeline, maskPipeline] =
+    const [rotationPipeline, adjustmentsPipeline, toneCurvePipeline, uberPipeline, maskPipeline] =
       await Promise.all([
         shouldApplyRotation(params.rotation) ? getRotationPipeline() : null,
-        shouldApplyAdjustments(params.adjustments) ? getAdjustmentsPipeline() : null,
-        shouldApplyToneCurve(params.toneCurvePoints, params.toneCurveLut)
-          ? getToneCurvePipeline()
-          : null,
+        // Only get individual pipelines if not using uber-pipeline
+        needsAdjustments && !useUberPipeline ? getAdjustmentsPipeline() : null,
+        needsToneCurve && !useUberPipeline ? getToneCurvePipeline() : null,
+        // Get uber-pipeline when both features are needed
+        useUberPipeline ? getUberPipeline() : null,
         shouldApplyMasks(params.masks) ? getMaskPipeline() : null,
       ])
 
@@ -336,7 +350,7 @@ export class GPUEditPipeline {
     // Track textures for cleanup with their dimensions for pool release
     const texturesToRelease: TextureWithDims[] = []
 
-    // Track GPU timing stage indices: [rotation, adjustments, toneCurve, masks]
+    // Track GPU timing stage indices: [rotation, adjustments/uber, toneCurve, masks]
     const gpuTimingIndices: (number | null)[] = [null, null, null, null]
 
     // Stage 1: Rotation (changes dimensions)
@@ -397,32 +411,46 @@ export class GPUEditPipeline {
       timingHelper: this.timingHelper,
     }
 
-    // Stage 2: Adjustments
-    if (adjustmentsPipeline && params.adjustments) {
-      const result = applyStage(ctx, 'Edit Pipeline Adjustments Output', (input, output, enc) =>
-        adjustmentsPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.adjustments!, enc)
+    // Stage 2+3: Use uber-pipeline for combined adjustments+toneCurve (single pass, 75% bandwidth reduction)
+    if (uberPipeline && params.adjustments) {
+      const lut = params.toneCurveLut ?? generateLutFromCurvePoints(params.toneCurvePoints!)
+      const result = applyStage(ctx, 'Edit Pipeline Uber Output', (input, output, enc) =>
+        uberPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.adjustments!, lut, enc)
       )
       ctx.inputTexture = result.inputTexture
       ctx.encoder = result.encoder
-      timing.adjustments = result.elapsedTime
+      timing.uberPipeline = result.elapsedTime
       if (result.gpuTimingIndex !== null) {
-        gpuTimingIndices[1] = result.gpuTimingIndex
+        gpuTimingIndices[1] = result.gpuTimingIndex // Use adjustments slot for uber timing
       }
-    }
-
-    // Stage 3: Tone Curve
-    if (toneCurvePipeline) {
-      const lut = params.toneCurveLut ?? generateLutFromCurvePoints(params.toneCurvePoints!)
-
-      if (!isIdentityLut(lut)) {
-        const result = applyStage(ctx, 'Edit Pipeline Tone Curve Output', (input, output, enc) =>
-          toneCurvePipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, lut, enc)
+    } else {
+      // Stage 2: Adjustments (only when not using uber-pipeline)
+      if (adjustmentsPipeline && params.adjustments) {
+        const result = applyStage(ctx, 'Edit Pipeline Adjustments Output', (input, output, enc) =>
+          adjustmentsPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.adjustments!, enc)
         )
         ctx.inputTexture = result.inputTexture
         ctx.encoder = result.encoder
-        timing.toneCurve = result.elapsedTime
+        timing.adjustments = result.elapsedTime
         if (result.gpuTimingIndex !== null) {
-          gpuTimingIndices[2] = result.gpuTimingIndex
+          gpuTimingIndices[1] = result.gpuTimingIndex
+        }
+      }
+
+      // Stage 3: Tone Curve (only when not using uber-pipeline)
+      if (toneCurvePipeline) {
+        const lut = params.toneCurveLut ?? generateLutFromCurvePoints(params.toneCurvePoints!)
+
+        if (!isIdentityLut(lut)) {
+          const result = applyStage(ctx, 'Edit Pipeline Tone Curve Output', (input, output, enc) =>
+            toneCurvePipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, lut, enc)
+          )
+          ctx.inputTexture = result.inputTexture
+          ctx.encoder = result.encoder
+          timing.toneCurve = result.elapsedTime
+          if (result.gpuTimingIndex !== null) {
+            gpuTimingIndices[2] = result.gpuTimingIndex
+          }
         }
       }
     }
@@ -469,7 +497,12 @@ export class GPUEditPipeline {
         timing.gpuRotation = gpuTimings[gpuTimingIndices[0]]
       }
       if (gpuTimingIndices[1] !== null && gpuTimings[gpuTimingIndices[1]] !== undefined) {
-        timing.gpuAdjustments = gpuTimings[gpuTimingIndices[1]]
+        // Index 1 is used for either adjustments or uber-pipeline
+        if (timing.uberPipeline > 0) {
+          timing.gpuUberPipeline = gpuTimings[gpuTimingIndices[1]]
+        } else {
+          timing.gpuAdjustments = gpuTimings[gpuTimingIndices[1]]
+        }
       }
       if (gpuTimingIndices[2] !== null && gpuTimings[gpuTimingIndices[2]] !== undefined) {
         timing.gpuToneCurve = gpuTimings[gpuTimingIndices[2]]

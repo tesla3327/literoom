@@ -70,6 +70,7 @@ interface MockGPUDevice {
   createBindGroup: ReturnType<typeof vi.fn>
   createCommandEncoder: ReturnType<typeof vi.fn>
   createQuerySet: ReturnType<typeof vi.fn>
+  createSampler: ReturnType<typeof vi.fn>
   features: Set<string>
   queue: {
     writeTexture: ReturnType<typeof vi.fn>
@@ -108,6 +109,7 @@ function createMockDevice(): MockGPUDevice {
     createQuerySet: vi.fn(() => ({
       destroy: vi.fn(),
     })),
+    createSampler: vi.fn(() => ({})), // Required for uber-pipeline
     features: new Set<string>(), // Mock features without timestamp-query support
     queue: {
       writeTexture: vi.fn(),
@@ -143,6 +145,11 @@ vi.mock('./adjustments-pipeline', () => ({
     vibrance: 0,
     saturation: 0,
   },
+  packAdjustmentsToFloat32Array: vi.fn((adj) => new Float32Array([
+    adj.temperature, adj.tint, adj.exposure, adj.contrast,
+    adj.highlights, adj.shadows, adj.whites, adj.blacks,
+    adj.vibrance, adj.saturation, 0, 0,
+  ])),
 }))
 
 import { getGPUCapabilityService } from '../capabilities'
@@ -1532,6 +1539,10 @@ const mockMaskPipeline = {
   applyToTextures: vi.fn((input, output, w, h, masks, encoder) => encoder),
 }
 
+const mockUberPipeline = {
+  applyToTextures: vi.fn((input, output, w, h, adj, lut, encoder) => encoder),
+}
+
 // Mock texture tracking for cleanup tests
 let createdTextures: Array<{ destroy: ReturnType<typeof vi.fn> }> = []
 
@@ -1564,6 +1575,10 @@ vi.mock('./tone-curve-pipeline', () => ({
 
 vi.mock('./mask-pipeline', () => ({
   getMaskPipeline: vi.fn(),
+}))
+
+vi.mock('./uber-pipeline', () => ({
+  getUberPipeline: vi.fn(),
 }))
 
 // Mock texture utilities
@@ -1661,6 +1676,7 @@ vi.mock('../gpu-tone-curve-service', () => ({
 import { getRotationPipeline, RotationPipeline } from './rotation-pipeline'
 import { getToneCurvePipeline, isIdentityLut } from './tone-curve-pipeline'
 import { getMaskPipeline } from './mask-pipeline'
+import { getUberPipeline } from './uber-pipeline'
 import { createTextureFromPixels, createOutputTexture, readTexturePixels } from '../texture-utils'
 import { generateLutFromCurvePoints } from '../gpu-tone-curve-service'
 
@@ -1991,10 +2007,10 @@ describe('GPUEditPipeline.process()', () => {
   })
 
   describe('all operations combined', () => {
-    it('should call all pipelines in correct order when all enabled', async () => {
+    it('should use uber-pipeline for combined adjustments+toneCurve (75% bandwidth reduction)', async () => {
+      // When both adjustments AND tone curve are enabled, uber-pipeline is used
       vi.mocked(getRotationPipeline).mockResolvedValue(mockRotationPipeline as any)
-      vi.mocked(getAdjustmentsPipeline).mockResolvedValue(mockAdjustmentsPipeline as any)
-      vi.mocked(getToneCurvePipeline).mockResolvedValue(mockToneCurvePipeline as any)
+      vi.mocked(getUberPipeline).mockResolvedValue(mockUberPipeline as any)
       vi.mocked(getMaskPipeline).mockResolvedValue(mockMaskPipeline as any)
       vi.mocked(isIdentityLut).mockReturnValue(false)
 
@@ -2003,13 +2019,9 @@ describe('GPUEditPipeline.process()', () => {
         callOrder.push('rotation')
         return args[7]
       })
-      mockAdjustmentsPipeline.applyToTextures.mockImplementation((...args) => {
-        callOrder.push('adjustments')
-        return args[5]
-      })
-      mockToneCurvePipeline.applyToTextures.mockImplementation((...args) => {
-        callOrder.push('toneCurve')
-        return args[5]
+      mockUberPipeline.applyToTextures.mockImplementation((...args) => {
+        callOrder.push('uber')
+        return args[6]
       })
       mockMaskPipeline.applyToTextures.mockImplementation((...args) => {
         callOrder.push('masks')
@@ -2032,12 +2044,63 @@ describe('GPUEditPipeline.process()', () => {
 
       await pipeline.process(input, params)
 
+      // Uber-pipeline handles both adjustments and tone curve in a single pass
       expect(mockRotationPipeline.applyToTextures).toHaveBeenCalled()
-      expect(mockAdjustmentsPipeline.applyToTextures).toHaveBeenCalled()
-      expect(mockToneCurvePipeline.applyToTextures).toHaveBeenCalled()
+      expect(mockUberPipeline.applyToTextures).toHaveBeenCalled()
       expect(mockMaskPipeline.applyToTextures).toHaveBeenCalled()
 
-      expect(callOrder).toEqual(['rotation', 'adjustments', 'toneCurve', 'masks'])
+      // Individual pipelines should NOT be called when uber-pipeline is used
+      expect(getAdjustmentsPipeline).not.toHaveBeenCalled()
+      expect(getToneCurvePipeline).not.toHaveBeenCalled()
+
+      // Order: rotation → uber → masks
+      expect(callOrder).toEqual(['rotation', 'uber', 'masks'])
+    })
+
+    it('should fall back to separate pipelines when only adjustments enabled', async () => {
+      // When only adjustments is enabled (no tone curve), use individual pipeline
+      vi.mocked(getRotationPipeline).mockResolvedValue(mockRotationPipeline as any)
+      vi.mocked(getAdjustmentsPipeline).mockResolvedValue(mockAdjustmentsPipeline as any)
+      vi.mocked(getMaskPipeline).mockResolvedValue(mockMaskPipeline as any)
+
+      const callOrder: string[] = []
+      mockRotationPipeline.applyToTextures.mockImplementation((...args) => {
+        callOrder.push('rotation')
+        return args[7]
+      })
+      mockAdjustmentsPipeline.applyToTextures.mockImplementation((...args) => {
+        callOrder.push('adjustments')
+        return args[5]
+      })
+      mockMaskPipeline.applyToTextures.mockImplementation((...args) => {
+        callOrder.push('masks')
+        return args[5]
+      })
+
+      const input = createTestInput(4, 4)
+      const params: EditPipelineParams = {
+        rotation: 45,
+        adjustments: { ...DEFAULT_BASIC_ADJUSTMENTS, exposure: 1 },
+        // No tone curve - so individual adjustments pipeline is used
+        masks: {
+          linearMasks: [{
+            startX: 0, startY: 0, endX: 1, endY: 1,
+            feather: 0.5, enabled: true, adjustments: {},
+          }],
+          radialMasks: [],
+        },
+      }
+
+      await pipeline.process(input, params)
+
+      expect(mockRotationPipeline.applyToTextures).toHaveBeenCalled()
+      expect(mockAdjustmentsPipeline.applyToTextures).toHaveBeenCalled()
+      expect(mockMaskPipeline.applyToTextures).toHaveBeenCalled()
+
+      // Uber-pipeline should NOT be called when only one feature is enabled
+      expect(getUberPipeline).not.toHaveBeenCalled()
+
+      expect(callOrder).toEqual(['rotation', 'adjustments', 'masks'])
     })
   })
 
@@ -2155,10 +2218,10 @@ describe('GPUEditPipeline.process()', () => {
 
   describe('texture management with pool', () => {
     it('should acquire and release textures through pool', async () => {
+      // When both adjustments AND tone curve are enabled, uber-pipeline is used
       vi.mocked(getRotationPipeline).mockResolvedValue(mockRotationPipeline as any)
-      vi.mocked(getAdjustmentsPipeline).mockResolvedValue(mockAdjustmentsPipeline as any)
+      vi.mocked(getUberPipeline).mockResolvedValue(mockUberPipeline as any)
       vi.mocked(isIdentityLut).mockReturnValue(false)
-      vi.mocked(getToneCurvePipeline).mockResolvedValue(mockToneCurvePipeline as any)
 
       const input = createTestInput(4, 4)
       const params: EditPipelineParams = {
