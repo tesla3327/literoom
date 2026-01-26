@@ -235,62 +235,20 @@ export class AdaptiveProcessor {
     wasmExecutor: () => Promise<T>
   ): Promise<ProcessingResult<T>> {
     const selectedBackend = this.selectBackend(operation, imageWidth, imageHeight)
-
     const startTime = performance.now()
 
     if (selectedBackend === 'webgpu') {
       try {
         const data = await gpuExecutor()
-        const timing = performance.now() - startTime
-
-        if (this._config.logPerformance) {
-          console.log(
-            `[AdaptiveProcessor] ${operation} (GPU): ${timing.toFixed(2)}ms`
-          )
-        }
-
-        // Reset error count on success
-        this._gpuErrorCount = 0
-
-        return { data, backend: 'webgpu', timing }
+        return this._buildGPUSuccessResult(data, operation, startTime)
       } catch (error) {
-        // Log error and increment count
-        console.error(`[AdaptiveProcessor] GPU ${operation} failed:`, error)
-        this._gpuErrorCount++
-
-        // Disable GPU if too many errors
-        if (this._gpuErrorCount >= AdaptiveProcessor.MAX_GPU_ERRORS) {
-          console.warn(
-            `[AdaptiveProcessor] Too many GPU errors (${this._gpuErrorCount}), disabling GPU`
-          )
-          this._gpuDisabledDueToErrors = true
-        }
-
-        // Fall back to WASM
-        console.log(`[AdaptiveProcessor] Falling back to WASM for ${operation}`)
+        this._handleGPUError(operation, error)
         const data = await wasmExecutor()
-        const timing = performance.now() - startTime
-
-        if (this._config.logPerformance) {
-          console.log(
-            `[AdaptiveProcessor] ${operation} (WASM fallback): ${timing.toFixed(2)}ms`
-          )
-        }
-
-        return { data, backend: 'wasm', timing }
+        return this._buildWASMFallbackResult(data, operation, startTime)
       }
     } else {
-      // WASM path
       const data = await wasmExecutor()
-      const timing = performance.now() - startTime
-
-      if (this._config.logPerformance) {
-        console.log(
-          `[AdaptiveProcessor] ${operation} (WASM): ${timing.toFixed(2)}ms`
-        )
-      }
-
-      return { data, backend: 'wasm', timing }
+      return this._buildWASMResult(data, operation, startTime)
     }
   }
 
@@ -305,55 +263,86 @@ export class AdaptiveProcessor {
     wasmExecutor: () => T
   ): ProcessingResult<T> {
     const selectedBackend = this.selectBackend(operation, imageWidth, imageHeight)
-
     const startTime = performance.now()
 
     if (selectedBackend === 'webgpu') {
       try {
         const data = gpuExecutor()
-        const timing = performance.now() - startTime
-
-        if (this._config.logPerformance) {
-          console.log(
-            `[AdaptiveProcessor] ${operation} (GPU): ${timing.toFixed(2)}ms`
-          )
-        }
-
-        this._gpuErrorCount = 0
-        return { data, backend: 'webgpu', timing }
+        return this._buildGPUSuccessResult(data, operation, startTime)
       } catch (error) {
-        console.error(`[AdaptiveProcessor] GPU ${operation} failed:`, error)
-        this._gpuErrorCount++
-
-        if (this._gpuErrorCount >= AdaptiveProcessor.MAX_GPU_ERRORS) {
-          console.warn(
-            `[AdaptiveProcessor] Too many GPU errors, disabling GPU`
-          )
-          this._gpuDisabledDueToErrors = true
-        }
-
+        this._handleGPUError(operation, error)
         const data = wasmExecutor()
-        const timing = performance.now() - startTime
-
-        if (this._config.logPerformance) {
-          console.log(
-            `[AdaptiveProcessor] ${operation} (WASM fallback): ${timing.toFixed(2)}ms`
-          )
-        }
-
-        return { data, backend: 'wasm', timing }
+        return this._buildWASMFallbackResult(data, operation, startTime)
       }
     } else {
       const data = wasmExecutor()
-      const timing = performance.now() - startTime
+      return this._buildWASMResult(data, operation, startTime)
+    }
+  }
 
-      if (this._config.logPerformance) {
-        console.log(
-          `[AdaptiveProcessor] ${operation} (WASM): ${timing.toFixed(2)}ms`
-        )
-      }
+  /**
+   * Build a success result for GPU execution.
+   */
+  private _buildGPUSuccessResult<T>(
+    data: T,
+    operation: GPUOperation,
+    startTime: number
+  ): ProcessingResult<T> {
+    const timing = performance.now() - startTime
+    this._logPerformance(operation, 'GPU', timing)
+    this._gpuErrorCount = 0
+    return { data, backend: 'webgpu', timing }
+  }
 
-      return { data, backend: 'wasm', timing }
+  /**
+   * Build a result for WASM fallback after GPU error.
+   */
+  private _buildWASMFallbackResult<T>(
+    data: T,
+    operation: GPUOperation,
+    startTime: number
+  ): ProcessingResult<T> {
+    const timing = performance.now() - startTime
+    this._logPerformance(operation, 'WASM fallback', timing)
+    return { data, backend: 'wasm', timing }
+  }
+
+  /**
+   * Build a result for direct WASM execution.
+   */
+  private _buildWASMResult<T>(
+    data: T,
+    operation: GPUOperation,
+    startTime: number
+  ): ProcessingResult<T> {
+    const timing = performance.now() - startTime
+    this._logPerformance(operation, 'WASM', timing)
+    return { data, backend: 'wasm', timing }
+  }
+
+  /**
+   * Handle a GPU execution error.
+   */
+  private _handleGPUError(operation: GPUOperation, error: unknown): void {
+    console.error(`[AdaptiveProcessor] GPU ${operation} failed:`, error)
+    this._gpuErrorCount++
+
+    if (this._gpuErrorCount >= AdaptiveProcessor.MAX_GPU_ERRORS) {
+      console.warn(
+        `[AdaptiveProcessor] Too many GPU errors (${this._gpuErrorCount}), disabling GPU`
+      )
+      this._gpuDisabledDueToErrors = true
+    }
+
+    console.log(`[AdaptiveProcessor] Falling back to WASM for ${operation}`)
+  }
+
+  /**
+   * Log performance timing if enabled.
+   */
+  private _logPerformance(operation: GPUOperation, backend: string, timing: number): void {
+    if (this._config.logPerformance) {
+      console.log(`[AdaptiveProcessor] ${operation} (${backend}): ${timing.toFixed(2)}ms`)
     }
   }
 

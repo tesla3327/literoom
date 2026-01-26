@@ -34,3 +34,4 @@
 - apps/web/app/components/catalog/CatalogGrid.vue (extracted useGridLayout composable to DRY grid layout calculations including rowCount, getGlobalIndex, columnsInRow, getRowIndex, and getItem helpers)
 - packages/core/src/decode/mock-decode-service.ts (extracted clamp255 and luminance helpers to DRY ~35 clamping operations and ~7 luminance calculations; consolidated applyAdjustments to use applyAllAdjustmentsToPixel which is also used by applyPixelAdjustments for masked adjustments)
 - packages/core/src/gpu/pipelines/adjustments-pipeline.ts (extracted packAdjustmentsToFloat32Array helper to DRY duplicate Float32Array construction in apply() and applyToTextures() methods)
+- packages/core/src/gpu/adaptive-processor.ts (extracted _buildGPUSuccessResult, _buildWASMFallbackResult, _buildWASMResult, _handleGPUError, and _logPerformance helpers to DRY duplicate GPU execution, timing, logging, and error handling logic between execute() and executeSync() methods)
