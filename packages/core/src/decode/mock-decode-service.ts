@@ -24,6 +24,25 @@ import type {
 import { DecodeError } from './types'
 import { isLinearCurve } from './curve-utils'
 
+// ============================================================================
+// Color Math Helpers
+// ============================================================================
+
+/**
+ * Clamp a value to the 0-255 range.
+ */
+function clamp255(value: number): number {
+  return Math.max(0, Math.min(255, value))
+}
+
+/**
+ * Calculate luminance using BT.601 coefficients.
+ * Used for saturation, vibrance, highlights, shadows, whites, and blacks adjustments.
+ */
+function luminance(r: number, g: number, b: number): number {
+  return 0.299 * r + 0.587 * g + 0.114 * b
+}
+
 /**
  * Configuration options for MockDecodeService.
  */
@@ -261,107 +280,15 @@ export class MockDecodeService implements IDecodeService {
     const outputPixels = new Uint8Array(pixels.length)
 
     for (let i = 0; i < pixels.length; i += 3) {
-      let r = pixels[i]
-      let g = pixels[i + 1]
-      let b = pixels[i + 2]
-
-      // Apply exposure (multiply by 2^exposure)
-      if (adjustments.exposure !== 0) {
-        const multiplier = Math.pow(2, adjustments.exposure)
-        r = Math.min(255, Math.max(0, r * multiplier))
-        g = Math.min(255, Math.max(0, g * multiplier))
-        b = Math.min(255, Math.max(0, b * multiplier))
-      }
-
-      // Apply contrast (S-curve around midpoint)
-      if (adjustments.contrast !== 0) {
-        const factor = (adjustments.contrast / 100) + 1 // -1 to 2
-        r = Math.min(255, Math.max(0, ((r / 255 - 0.5) * factor + 0.5) * 255))
-        g = Math.min(255, Math.max(0, ((g / 255 - 0.5) * factor + 0.5) * 255))
-        b = Math.min(255, Math.max(0, ((b / 255 - 0.5) * factor + 0.5) * 255))
-      }
-
-      // Apply temperature (warm/cool tint)
-      if (adjustments.temperature !== 0) {
-        const tempFactor = adjustments.temperature / 100
-        r = Math.min(255, Math.max(0, r + tempFactor * 30))
-        b = Math.min(255, Math.max(0, b - tempFactor * 30))
-      }
-
-      // Apply tint (green/magenta shift)
-      if (adjustments.tint !== 0) {
-        const tintFactor = adjustments.tint / 100
-        g = Math.min(255, Math.max(0, g - tintFactor * 30))
-        r = Math.min(255, Math.max(0, r + tintFactor * 15))
-        b = Math.min(255, Math.max(0, b + tintFactor * 15))
-      }
-
-      // Apply saturation
-      if (adjustments.saturation !== 0) {
-        const sat = (adjustments.saturation / 100) + 1 // 0 to 2
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b
-        r = Math.min(255, Math.max(0, gray + (r - gray) * sat))
-        g = Math.min(255, Math.max(0, gray + (g - gray) * sat))
-        b = Math.min(255, Math.max(0, gray + (b - gray) * sat))
-      }
-
-      // Apply vibrance (saturation that protects skin tones)
-      if (adjustments.vibrance !== 0) {
-        const vib = (adjustments.vibrance / 100) + 1 // 0 to 2
-        const maxChannel = Math.max(r, g, b)
-        const minChannel = Math.min(r, g, b)
-        const currentSat = maxChannel === 0 ? 0 : (maxChannel - minChannel) / maxChannel
-        // Less effect on already-saturated colors
-        const adjustedVib = 1 + (vib - 1) * (1 - currentSat)
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b
-        r = Math.min(255, Math.max(0, gray + (r - gray) * adjustedVib))
-        g = Math.min(255, Math.max(0, gray + (g - gray) * adjustedVib))
-        b = Math.min(255, Math.max(0, gray + (b - gray) * adjustedVib))
-      }
-
-      // Apply highlights (affect bright areas)
-      if (adjustments.highlights !== 0) {
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
-        const highlightMask = Math.max(0, (luminance - 128) / 127)
-        const highlightFactor = (adjustments.highlights / 100) * highlightMask * 50
-        r = Math.min(255, Math.max(0, r + highlightFactor))
-        g = Math.min(255, Math.max(0, g + highlightFactor))
-        b = Math.min(255, Math.max(0, b + highlightFactor))
-      }
-
-      // Apply shadows (affect dark areas)
-      if (adjustments.shadows !== 0) {
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
-        const shadowMask = Math.max(0, 1 - luminance / 128)
-        const shadowFactor = (adjustments.shadows / 100) * shadowMask * 50
-        r = Math.min(255, Math.max(0, r + shadowFactor))
-        g = Math.min(255, Math.max(0, g + shadowFactor))
-        b = Math.min(255, Math.max(0, b + shadowFactor))
-      }
-
-      // Apply whites (adjust white point)
-      if (adjustments.whites !== 0) {
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
-        const whiteMask = Math.pow(Math.max(0, luminance / 255), 2)
-        const whiteFactor = (adjustments.whites / 100) * whiteMask * 40
-        r = Math.min(255, Math.max(0, r + whiteFactor))
-        g = Math.min(255, Math.max(0, g + whiteFactor))
-        b = Math.min(255, Math.max(0, b + whiteFactor))
-      }
-
-      // Apply blacks (adjust black point)
-      if (adjustments.blacks !== 0) {
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b
-        const blackMask = Math.pow(Math.max(0, 1 - luminance / 255), 2)
-        const blackFactor = (adjustments.blacks / 100) * blackMask * 40
-        r = Math.min(255, Math.max(0, r + blackFactor))
-        g = Math.min(255, Math.max(0, g + blackFactor))
-        b = Math.min(255, Math.max(0, b + blackFactor))
-      }
-
-      outputPixels[i] = Math.round(r)
-      outputPixels[i + 1] = Math.round(g)
-      outputPixels[i + 2] = Math.round(b)
+      const [r, g, b] = this.applyAllAdjustmentsToPixel(
+        pixels[i],
+        pixels[i + 1],
+        pixels[i + 2],
+        adjustments
+      )
+      outputPixels[i] = r
+      outputPixels[i + 1] = g
+      outputPixels[i + 2] = b
     }
 
     return { width, height, pixels: outputPixels }
@@ -677,9 +604,9 @@ export class MockDecodeService implements IDecodeService {
           b = Math.round(b * (1 - maskVal) + ab * maskVal)
         }
 
-        outputPixels[idx] = Math.max(0, Math.min(255, r))
-        outputPixels[idx + 1] = Math.max(0, Math.min(255, g))
-        outputPixels[idx + 2] = Math.max(0, Math.min(255, b))
+        outputPixels[idx] = clamp255(r)
+        outputPixels[idx + 1] = clamp255(g)
+        outputPixels[idx + 2] = clamp255(b)
       }
     }
 
@@ -770,9 +697,10 @@ export class MockDecodeService implements IDecodeService {
   }
 
   /**
-   * Apply adjustments to a single pixel (simplified for demo).
+   * Apply all adjustments to a single pixel.
+   * Core implementation used by both applyAdjustments and applyPixelAdjustments.
    */
-  private applyPixelAdjustments(
+  private applyAllAdjustmentsToPixel(
     r: number,
     g: number,
     b: number,
@@ -782,44 +710,114 @@ export class MockDecodeService implements IDecodeService {
     let outG = g
     let outB = b
 
-    // Apply exposure
+    // Apply exposure (multiply by 2^exposure)
     if (adjustments.exposure && adjustments.exposure !== 0) {
       const multiplier = Math.pow(2, adjustments.exposure)
-      outR = outR * multiplier
-      outG = outG * multiplier
-      outB = outB * multiplier
+      outR = clamp255(outR * multiplier)
+      outG = clamp255(outG * multiplier)
+      outB = clamp255(outB * multiplier)
     }
 
-    // Apply contrast
+    // Apply contrast (S-curve around midpoint)
     if (adjustments.contrast && adjustments.contrast !== 0) {
       const factor = (adjustments.contrast / 100) + 1
-      outR = ((outR / 255 - 0.5) * factor + 0.5) * 255
-      outG = ((outG / 255 - 0.5) * factor + 0.5) * 255
-      outB = ((outB / 255 - 0.5) * factor + 0.5) * 255
+      outR = clamp255(((outR / 255 - 0.5) * factor + 0.5) * 255)
+      outG = clamp255(((outG / 255 - 0.5) * factor + 0.5) * 255)
+      outB = clamp255(((outB / 255 - 0.5) * factor + 0.5) * 255)
     }
 
-    // Apply temperature
+    // Apply temperature (warm/cool tint)
     if (adjustments.temperature && adjustments.temperature !== 0) {
       const tempFactor = adjustments.temperature / 100
-      outR = outR + tempFactor * 30
-      outB = outB - tempFactor * 30
+      outR = clamp255(outR + tempFactor * 30)
+      outB = clamp255(outB - tempFactor * 30)
+    }
+
+    // Apply tint (green/magenta shift)
+    if (adjustments.tint && adjustments.tint !== 0) {
+      const tintFactor = adjustments.tint / 100
+      outG = clamp255(outG - tintFactor * 30)
+      outR = clamp255(outR + tintFactor * 15)
+      outB = clamp255(outB + tintFactor * 15)
     }
 
     // Apply saturation
     if (adjustments.saturation && adjustments.saturation !== 0) {
       const sat = (adjustments.saturation / 100) + 1
-      const gray = 0.299 * outR + 0.587 * outG + 0.114 * outB
-      outR = gray + (outR - gray) * sat
-      outG = gray + (outG - gray) * sat
-      outB = gray + (outB - gray) * sat
+      const gray = luminance(outR, outG, outB)
+      outR = clamp255(gray + (outR - gray) * sat)
+      outG = clamp255(gray + (outG - gray) * sat)
+      outB = clamp255(gray + (outB - gray) * sat)
     }
 
-    // Clamp values
-    return [
-      Math.max(0, Math.min(255, outR)),
-      Math.max(0, Math.min(255, outG)),
-      Math.max(0, Math.min(255, outB)),
-    ]
+    // Apply vibrance (saturation that protects skin tones)
+    if (adjustments.vibrance && adjustments.vibrance !== 0) {
+      const vib = (adjustments.vibrance / 100) + 1
+      const maxChannel = Math.max(outR, outG, outB)
+      const minChannel = Math.min(outR, outG, outB)
+      const currentSat = maxChannel === 0 ? 0 : (maxChannel - minChannel) / maxChannel
+      // Less effect on already-saturated colors
+      const adjustedVib = 1 + (vib - 1) * (1 - currentSat)
+      const gray = luminance(outR, outG, outB)
+      outR = clamp255(gray + (outR - gray) * adjustedVib)
+      outG = clamp255(gray + (outG - gray) * adjustedVib)
+      outB = clamp255(gray + (outB - gray) * adjustedVib)
+    }
+
+    // Apply highlights (affect bright areas)
+    if (adjustments.highlights && adjustments.highlights !== 0) {
+      const lum = luminance(outR, outG, outB)
+      const highlightMask = Math.max(0, (lum - 128) / 127)
+      const highlightFactor = (adjustments.highlights / 100) * highlightMask * 50
+      outR = clamp255(outR + highlightFactor)
+      outG = clamp255(outG + highlightFactor)
+      outB = clamp255(outB + highlightFactor)
+    }
+
+    // Apply shadows (affect dark areas)
+    if (adjustments.shadows && adjustments.shadows !== 0) {
+      const lum = luminance(outR, outG, outB)
+      const shadowMask = Math.max(0, 1 - lum / 128)
+      const shadowFactor = (adjustments.shadows / 100) * shadowMask * 50
+      outR = clamp255(outR + shadowFactor)
+      outG = clamp255(outG + shadowFactor)
+      outB = clamp255(outB + shadowFactor)
+    }
+
+    // Apply whites (adjust white point)
+    if (adjustments.whites && adjustments.whites !== 0) {
+      const lum = luminance(outR, outG, outB)
+      const whiteMask = Math.pow(Math.max(0, lum / 255), 2)
+      const whiteFactor = (adjustments.whites / 100) * whiteMask * 40
+      outR = clamp255(outR + whiteFactor)
+      outG = clamp255(outG + whiteFactor)
+      outB = clamp255(outB + whiteFactor)
+    }
+
+    // Apply blacks (adjust black point)
+    if (adjustments.blacks && adjustments.blacks !== 0) {
+      const lum = luminance(outR, outG, outB)
+      const blackMask = Math.pow(Math.max(0, 1 - lum / 255), 2)
+      const blackFactor = (adjustments.blacks / 100) * blackMask * 40
+      outR = clamp255(outR + blackFactor)
+      outG = clamp255(outG + blackFactor)
+      outB = clamp255(outB + blackFactor)
+    }
+
+    return [Math.round(outR), Math.round(outG), Math.round(outB)]
+  }
+
+  /**
+   * Apply adjustments to a single pixel (for masked adjustments).
+   * Delegates to applyAllAdjustmentsToPixel.
+   */
+  private applyPixelAdjustments(
+    r: number,
+    g: number,
+    b: number,
+    adjustments: Partial<Adjustments>
+  ): [number, number, number] {
+    return this.applyAllAdjustmentsToPixel(r, g, b, adjustments)
   }
 
   /**
