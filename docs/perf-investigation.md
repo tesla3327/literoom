@@ -74,6 +74,45 @@ Performance research for maximizing FPS in the GPU edit pipeline.
 - `docs/research/perf/2026-01-25-advanced-gpu-optimization-synthesis.md`
 - `docs/research/perf/2026-01-25-implementation-research-plan.md`
 
+---
+
+### 2026-01-25: Draft Mode Implementation Research
+
+**Goal**: Complete implementation research for Research Area 1 (Draft Mode)
+
+**Research Conducted** (8 parallel agents):
+1. useEditPreview render flow analysis
+2. edit-pipeline GPU code exploration
+3. Histogram/clipping detection code analysis
+4. Online research on draft mode best practices
+5. Progressive rendering and mipmap techniques
+6. Debounce/throttle timing optimization
+7. Slider component flow analysis
+8. TexturePool integration potential
+
+**Key Findings**:
+
+1. **Draft mode trigger point**: `useEditPreview.ts` lines 975-977 already sets 'draft' quality but it's UI-only - doesn't affect rendering
+
+2. **Optimal resolution**: 1/2 (50%) is industry standard, provides ~75% performance gain with acceptable quality
+
+3. **Operations to skip in draft**:
+   - Histogram computation: 5-50ms savings
+   - Clipping detection: 2-5ms readback stall eliminated
+   - Both controllable via `AdaptiveProcessor.enabledOperations`
+
+4. **Timing recommendations**:
+   - Reduce throttle from 150ms to 33ms for draft renders
+   - Add 400ms debounce for full-quality render after interaction ends
+   - Touch requires <25ms latency, mouse tolerates up to 60ms
+
+5. **Progressive refinement**: State machine designed with 4 states (idle → interacting → refining → complete)
+
+6. **Expected gains**: Draft render time reduced from 40-147ms to 8-23ms (~85% improvement, enabling 30-60 FPS)
+
+**Documents Created**:
+- `docs/research/perf/2026-01-25-draft-mode-implementation-research.md`
+
 ## Next Steps
 
 ### Phase 1: Quick Wins (1-2 days)

@@ -11,24 +11,25 @@ Based on the advanced GPU optimization synthesis, this plan focuses on researchi
 
 ---
 
-## Research Area 1: Draft Mode Implementation
+## Research Area 1: Draft Mode Implementation ✅ COMPLETE
 
 **Priority**: HIGH
 **Expected Impact**: 4-16x faster draft renders
+**Status**: Research complete - see `2026-01-25-draft-mode-implementation-research.md`
 
-### Questions to Answer
+### Questions Answered
 
-1. Where exactly in `useEditPreview.ts` should draft mode be triggered?
-2. What is the optimal downsampling factor (1/2, 1/4, 1/8)?
-3. How to implement progressive refinement after drag ends?
-4. Should draft mode affect only GPU pipeline or also WASM fallback?
+1. **Where to trigger draft mode?** → `useEditPreview.ts` lines 975-977 (throttledRender already sets 'draft')
+2. **Optimal downsampling factor?** → **1/2 resolution** (industry standard, 75% perf gain)
+3. **Progressive refinement?** → **400ms debounce** after interaction ends, state machine designed
+4. **GPU vs WASM?** → Both - GPU gets resolution reduction, WASM gets skip flags via AdaptiveProcessor
 
 ### Tasks
 
-- [ ] Analyze current render flow in useEditPreview.ts
-- [ ] Identify all operations that can be skipped in draft mode
-- [ ] Research optimal debounce/throttle timing
-- [ ] Design progressive refinement state machine
+- [x] Analyze current render flow in useEditPreview.ts
+- [x] Identify all operations that can be skipped in draft mode
+- [x] Research optimal debounce/throttle timing
+- [x] Design progressive refinement state machine
 
 ---
 
@@ -181,10 +182,10 @@ Based on the advanced GPU optimization synthesis, this plan focuses on researchi
 
 ## Next Steps
 
-1. **Immediate**: Begin Research Area 1 (Draft Mode) - highest impact, lowest effort
-2. **Short-term**: Research Areas 2-4 (Async patterns, pooling)
-3. **Medium-term**: Research Areas 5-7 (Shader optimizations)
-4. **Long-term**: Research Area 8 (Progressive rendering)
+1. ~~**Immediate**: Begin Research Area 1 (Draft Mode)~~ ✅ COMPLETE
+2. **Immediate**: Research Areas 2-4 (Async patterns, pooling) - Triple-buffered histogram, GPU-direct histogram, TexturePool integration
+3. **Short-term**: Research Areas 5-7 (Shader optimizations)
+4. **Medium-term**: Research Area 8 (Progressive rendering)
 
 ---
 
