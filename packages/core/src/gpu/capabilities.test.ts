@@ -176,6 +176,7 @@ describe('detectGPUCapabilities', () => {
 
     expect(caps.features.float32Filtering).toBe(true)
     expect(caps.features.textureCompressionBC).toBe(false)
+    expect(caps.features.shaderF16).toBe(false)
   })
 
   it('returns WASM fallback when forceDisabled is true', async () => {
@@ -514,5 +515,26 @@ describe('edge cases', () => {
 
     expect(caps.features.float32Filtering).toBe(false)
     expect(caps.features.textureCompressionBC).toBe(false)
+    expect(caps.features.shaderF16).toBe(false)
+  })
+
+  it('detects and requests shader-f16 feature when available', async () => {
+    mockAdapter = createMockAdapter({
+      features: new Set(['float32-filterable', 'shader-f16']),
+    })
+    mockDevice = {
+      ...createMockDevice(),
+      features: new Set(['float32-filterable', 'shader-f16']),
+    }
+    mockAdapter.requestDevice = vi.fn().mockResolvedValue(mockDevice)
+    mockNavigator.gpu!.requestAdapter = vi.fn().mockResolvedValue(mockAdapter)
+
+    const caps = await detectGPUCapabilities()
+
+    expect(caps.features.shaderF16).toBe(true)
+    expect(mockAdapter.requestDevice).toHaveBeenCalledWith({
+      requiredFeatures: ['shader-f16'],
+      requiredLimits: {},
+    })
   })
 })

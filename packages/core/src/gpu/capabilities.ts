@@ -74,6 +74,7 @@ function buildCapabilities(
     features: {
       float32Filtering: features.has('float32-filterable'),
       textureCompressionBC: features.has('texture-compression-bc'),
+      shaderF16: features.has('shader-f16'),
     },
   }
 }
@@ -147,9 +148,15 @@ export async function detectGPUCapabilities(
 
     const adapterInfo = await getAdapterInfo(adapter)
 
+    // Determine which features to request
+    const requiredFeatures: GPUFeatureName[] = []
+    if (adapter.features.has('shader-f16')) {
+      requiredFeatures.push('shader-f16')
+    }
+
     // Request device to get accurate limits (temporary - just for querying)
     const device = await adapter.requestDevice({
-      requiredFeatures: [],
+      requiredFeatures,
       requiredLimits: {},
     })
 
@@ -315,9 +322,15 @@ export class GPUCapabilityService {
 
       const adapterInfo = await getAdapterInfo(extAdapter)
 
+      // Determine which features to request
+      const requiredFeatures: GPUFeatureName[] = []
+      if (this._adapter.features.has('shader-f16')) {
+        requiredFeatures.push('shader-f16')
+      }
+
       // Request device
       this._device = await this._adapter.requestDevice({
-        requiredFeatures: [],
+        requiredFeatures,
         requiredLimits: {},
       })
 

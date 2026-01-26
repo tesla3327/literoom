@@ -12,7 +12,7 @@
  */
 
 import { getGPUCapabilityService } from '../capabilities'
-import { UBER_SHADER_SOURCE } from '../shaders'
+import { UBER_SHADER_SOURCE, UBER_SHADER_F16_SOURCE } from '../shaders'
 import { alignTo256, removeRowPadding, calculateDispatchSize } from '../texture-utils'
 import type { BasicAdjustments } from './adjustments-pipeline'
 import { packAdjustmentsToFloat32Array, DEFAULT_BASIC_ADJUSTMENTS } from './adjustments-pipeline'
@@ -39,6 +39,7 @@ export class UberPipeline {
   private device: GPUDevice
   private shaderModule: GPUShaderModule | null = null
   private bindGroupLayout: GPUBindGroupLayout | null = null
+  private f16Supported: boolean = false
 
   // Pipeline cache for different configurations
   private pipelineCache: Map<string, GPUComputePipeline> = new Map()
@@ -63,7 +64,7 @@ export class UberPipeline {
    * Get cache key for a pipeline configuration.
    */
   private getCacheKey(params: UberPipelineParams): string {
-    return `adj=${params.enableAdjustments}_tc=${params.enableToneCurve}`
+    return `adj=${params.enableAdjustments}_tc=${params.enableToneCurve}_f16=${this.f16Supported}`
   }
 
   /**
@@ -74,10 +75,14 @@ export class UberPipeline {
       return // Already initialized
     }
 
-    // Create shader module
+    // Check if f16 is supported
+    const gpuService = getGPUCapabilityService()
+    this.f16Supported = gpuService.capabilities?.features?.shaderF16 ?? false
+
+    // Create shader module with appropriate source
     this.shaderModule = this.device.createShaderModule({
-      label: 'Uber Shader',
-      code: UBER_SHADER_SOURCE,
+      label: this.f16Supported ? 'Uber Shader (f16)' : 'Uber Shader',
+      code: this.f16Supported ? UBER_SHADER_F16_SOURCE : UBER_SHADER_SOURCE,
     })
 
     // Create bind group layout that supports all features
@@ -493,6 +498,14 @@ export class UberPipeline {
   }
 
   /**
+   * Check if half-precision (f16) processing is enabled.
+   * @returns true if f16 shader is being used
+   */
+  isF16Enabled(): boolean {
+    return this.f16Supported
+  }
+
+  /**
    * Destroy the pipeline and release resources.
    */
   destroy(): void {
@@ -507,6 +520,7 @@ export class UberPipeline {
     this.bindGroupLayout = null
     this.pipelineCache.clear()
     this.cachedLut = null
+    this.f16Supported = false
   }
 }
 

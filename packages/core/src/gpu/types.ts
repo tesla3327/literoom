@@ -47,6 +47,8 @@ export interface GPUCapabilities {
     float32Filtering: boolean
     /** Whether BC texture compression is supported */
     textureCompressionBC: boolean
+    /** Whether f16 (half-precision) shader support is available */
+    shaderF16: boolean
   }
 }
 
@@ -66,6 +68,7 @@ export const DEFAULT_GPU_CAPABILITIES: GPUCapabilities = {
   features: {
     float32Filtering: false,
     textureCompressionBC: false,
+    shaderF16: false,
   },
 }
 

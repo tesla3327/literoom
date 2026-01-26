@@ -504,7 +504,7 @@ Track regressions with threshold-based detection (>10% regression = failure).
 
 ### Phase 3 Complete When:
 - [x] Single-pass uber-shader benchmarks faster than multi-pass
-- [ ] f16 path working on supported devices
+- [x] f16 path working on supported devices
 - [ ] Subgroup histogram path working on Chrome 134+
 
 **Phase 3.1 Implementation Details** (2026-01-26):
@@ -523,6 +523,38 @@ Track regressions with threshold-based detection (>10% regression = failure).
 - `packages/core/src/gpu/__tests__/uber-shader-benchmark.test.ts` - Benchmark comparisons
 
 **Test Coverage:** 45+ new tests for uber-pipeline, edit-pipeline tests updated for uber integration
+
+**Phase 3.2 Implementation Details** (2026-01-26):
+- **3.2**: f16 (half-precision) shader path with automatic fallback
+  - Added `shader-f16` feature detection to GPU capabilities
+  - Created `uber-adjustments-f16.wgsl` with half-precision color operations
+  - Hybrid precision strategy: f16 for simple ops, f32 for precision-critical calculations
+  - Automatic fallback to f32 when `shader-f16` feature is unavailable
+  - UberPipeline automatically selects best available precision
+  - Pipeline caching separates f16 and f32 variants
+
+**f16 Precision Strategy:**
+- **Safe for f16**: Exposure, contrast, temperature, tint, whites, blacks, saturation
+- **Requires f32**: Highlights/shadows (smoothstep accumulation), vibrance, luminance, LUT coordinates
+
+**Expected Performance Impact:**
+- 25-50% faster ALU operations on supported hardware
+- 50% memory bandwidth reduction for color data
+- No quality degradation (differences below visible threshold)
+
+**New Files Created:**
+- `packages/core/src/gpu/shaders/uber-adjustments-f16.wgsl` - Half-precision uber-shader
+- `packages/core/src/gpu/__tests__/f16-pipeline.test.ts` - 30 unit tests
+- `packages/core/src/gpu/__tests__/f16-benchmark.test.ts` - 33 benchmark tests
+
+**Modified Files:**
+- `packages/core/src/gpu/types.ts` - Added `shaderF16` to features interface
+- `packages/core/src/gpu/capabilities.ts` - Added f16 feature detection and device request
+- `packages/core/src/gpu/shaders/index.ts` - Exported f16 shader source
+- `packages/core/src/gpu/pipelines/uber-pipeline.ts` - Added f16 support and `isF16Enabled()` method
+- `packages/core/src/gpu/capabilities.test.ts` - Added f16 detection tests
+
+**Test Coverage:** 63+ new tests for f16 support (30 unit tests + 33 benchmark tests)
 
 ### Phase 4 Complete When:
 - [ ] GPU-direct histogram rendering at 60fps
