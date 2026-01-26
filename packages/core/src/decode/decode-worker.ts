@@ -207,6 +207,14 @@ function sendImageSuccess(id: string, outputImage: JsDecodedImage): void {
 }
 
 /**
+ * Decode an image from bytes, automatically detecting RAW vs JPEG format.
+ * Caller is responsible for calling .free() on the returned image.
+ */
+function decodeImage(bytes: Uint8Array): JsDecodedImage {
+  return is_raw_file(bytes) ? decode_raw_thumbnail(bytes) : decode_jpeg(bytes)
+}
+
+/**
  * Determine error code from error message.
  */
 function classifyError(error: unknown): ErrorCode {
@@ -255,16 +263,7 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
       }
 
       case 'generate-thumbnail': {
-        // First decode the image, then generate thumbnail
-        // Try RAW first, fall back to JPEG
-        let sourceImage: JsDecodedImage
-
-        if (is_raw_file(request.bytes)) {
-          sourceImage = decode_raw_thumbnail(request.bytes)
-        } else {
-          sourceImage = decode_jpeg(request.bytes)
-        }
-
+        const sourceImage = decodeImage(request.bytes)
         const thumb = generate_thumbnail(sourceImage, request.size)
         sourceImage.free()
         sendSuccess(id, thumb)
@@ -272,15 +271,7 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
       }
 
       case 'generate-preview': {
-        // First decode the image, then resize for preview
-        let sourceImage: JsDecodedImage
-
-        if (is_raw_file(request.bytes)) {
-          sourceImage = decode_raw_thumbnail(request.bytes)
-        } else {
-          sourceImage = decode_jpeg(request.bytes)
-        }
-
+        const sourceImage = decodeImage(request.bytes)
         const preview = resize_to_fit(sourceImage, request.maxEdge, request.filter)
         sourceImage.free()
         sendSuccess(id, preview)
@@ -433,9 +424,7 @@ self.onmessage = async (event: MessageEvent<DecodeRequest>) => {
         const { bytes, size, editState } = request
 
         // Decode source image
-        let currentImage: JsDecodedImage = is_raw_file(bytes)
-          ? decode_raw_thumbnail(bytes)
-          : decode_jpeg(bytes)
+        let currentImage: JsDecodedImage = decodeImage(bytes)
 
         // Apply rotation (if any)
         if (editState.rotation) {
