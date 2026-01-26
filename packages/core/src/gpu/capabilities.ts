@@ -75,6 +75,7 @@ function buildCapabilities(
       float32Filtering: features.has('float32-filterable'),
       textureCompressionBC: features.has('texture-compression-bc'),
       shaderF16: features.has('shader-f16'),
+      subgroups: features.has('subgroups'),
     },
   }
 }
@@ -152,6 +153,9 @@ export async function detectGPUCapabilities(
     const requiredFeatures: GPUFeatureName[] = []
     if (adapter.features.has('shader-f16')) {
       requiredFeatures.push('shader-f16')
+    }
+    if (adapter.features.has('subgroups')) {
+      requiredFeatures.push('subgroups')
     }
 
     // Request device to get accurate limits (temporary - just for querying)
@@ -326,6 +330,9 @@ export class GPUCapabilityService {
       const requiredFeatures: GPUFeatureName[] = []
       if (this._adapter.features.has('shader-f16')) {
         requiredFeatures.push('shader-f16')
+      }
+      if (this._adapter.features.has('subgroups')) {
+        requiredFeatures.push('subgroups')
       }
 
       // Request device

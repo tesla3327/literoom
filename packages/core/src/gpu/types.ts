@@ -49,6 +49,8 @@ export interface GPUCapabilities {
     textureCompressionBC: boolean
     /** Whether f16 (half-precision) shader support is available */
     shaderF16: boolean
+    /** Whether subgroups support is available */
+    subgroups: boolean
   }
 }
 
@@ -69,6 +71,7 @@ export const DEFAULT_GPU_CAPABILITIES: GPUCapabilities = {
     float32Filtering: false,
     textureCompressionBC: false,
     shaderF16: false,
+    subgroups: false,
   },
 }
 

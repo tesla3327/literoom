@@ -51,14 +51,18 @@ let mockAdapter: MockGPUAdapter | null = null
 let mockDevice: MockGPUDevice | null = null
 let mockNavigator: { gpu?: { requestAdapter: () => Promise<MockGPUAdapter | null> } }
 
-function createMockDevice(): MockGPUDevice {
+function createMockDevice(options: { subgroups?: boolean; shaderF16?: boolean } = {}): MockGPUDevice {
   let lostResolve: (info: { reason: string; message: string }) => void
   const lostPromise = new Promise<{ reason: string; message: string }>((resolve) => {
     lostResolve = resolve
   })
 
+  const features = new Set<string>(['float32-filterable'])
+  if (options.subgroups) features.add('subgroups')
+  if (options.shaderF16) features.add('shader-f16')
+
   return {
-    features: new Set(['float32-filterable']),
+    features,
     limits: {
       maxTextureDimension2D: 8192,
       maxStorageBufferBindingSize: 128 * 1024 * 1024,
@@ -523,7 +527,7 @@ describe('edge cases', () => {
       features: new Set(['float32-filterable', 'shader-f16']),
     })
     mockDevice = {
-      ...createMockDevice(),
+      ...createMockDevice({ shaderF16: true }),
       features: new Set(['float32-filterable', 'shader-f16']),
     }
     mockAdapter.requestDevice = vi.fn().mockResolvedValue(mockDevice)
@@ -536,5 +540,58 @@ describe('edge cases', () => {
       requiredFeatures: ['shader-f16'],
       requiredLimits: {},
     })
+  })
+})
+
+// ============================================================================
+// Subgroups Detection Tests
+// ============================================================================
+
+describe('Subgroups Detection', () => {
+  it('should detect subgroups feature when available', async () => {
+    // Mock adapter with subgroups support
+    mockAdapter = createMockAdapter({
+      features: new Set(['subgroups']),
+    })
+    mockDevice = createMockDevice({ subgroups: true })
+    mockAdapter.requestDevice = vi.fn().mockResolvedValue(mockDevice)
+    mockNavigator.gpu!.requestAdapter = vi.fn().mockResolvedValue(mockAdapter)
+
+    const service = new GPUCapabilityService()
+    const caps = await service.initialize()
+
+    expect(caps.features.subgroups).toBe(true)
+  })
+
+  it('should not detect subgroups when unavailable', async () => {
+    mockAdapter = createMockAdapter({
+      features: new Set<string>(),
+    })
+    mockDevice = createMockDevice({ subgroups: false })
+    mockAdapter.requestDevice = vi.fn().mockResolvedValue(mockDevice)
+    mockNavigator.gpu!.requestAdapter = vi.fn().mockResolvedValue(mockAdapter)
+
+    const service = new GPUCapabilityService()
+    const caps = await service.initialize()
+
+    expect(caps.features.subgroups).toBe(false)
+  })
+
+  it('should request subgroups feature when available', async () => {
+    mockDevice = createMockDevice({ subgroups: true })
+    mockAdapter = createMockAdapter({
+      features: new Set(['subgroups']),
+    })
+    mockAdapter.requestDevice = vi.fn().mockResolvedValue(mockDevice)
+    mockNavigator.gpu!.requestAdapter = vi.fn().mockResolvedValue(mockAdapter)
+
+    const service = new GPUCapabilityService()
+    await service.initialize()
+
+    expect(mockAdapter.requestDevice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requiredFeatures: expect.arrayContaining(['subgroups']),
+      })
+    )
   })
 })

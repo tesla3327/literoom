@@ -7,7 +7,7 @@
  */
 
 import { getGPUCapabilityService } from '../capabilities'
-import { HISTOGRAM_SHADER_SOURCE } from '../shaders'
+import { HISTOGRAM_SHADER_SOURCE, HISTOGRAM_SUBGROUP_SHADER_SOURCE } from '../shaders'
 import { calculateDispatchSize } from '../texture-utils'
 import { StagingBufferPool } from '../utils/staging-buffer-pool'
 
@@ -32,6 +32,7 @@ export class HistogramPipeline {
   private device: GPUDevice
   private pipeline: GPUComputePipeline | null = null
   private bindGroupLayout: GPUBindGroupLayout | null = null
+  private subgroupsSupported: boolean = false
 
   // Reusable buffers
   private histogramBuffer: GPUBuffer | null = null // 4KB storage (4 channels × 256 bins × 4 bytes)
@@ -42,7 +43,9 @@ export class HistogramPipeline {
   private lastHistogramData: HistogramResult | null = null
 
   // Workgroup size (must match shader)
-  private static readonly WORKGROUP_SIZE = 16
+  // Standard: 16x16 = 256, Subgroup-optimized: 256x1
+  private static readonly WORKGROUP_SIZE = 16  // Keep for standard
+  private static readonly WORKGROUP_SIZE_SUBGROUP = 256  // Linear for subgroup
 
   // Buffer sizes
   private static readonly HISTOGRAM_BUFFER_SIZE = 256 * 4 * 4 // 4 channels × 256 bins × 4 bytes = 4096 bytes
@@ -60,10 +63,18 @@ export class HistogramPipeline {
       return // Already initialized
     }
 
-    // Create shader module
+    // Detect subgroup support
+    const gpuService = getGPUCapabilityService()
+    this.subgroupsSupported = gpuService.capabilities?.features?.subgroups ?? false
+
+    // Create shader module - use subgroup shader if supported
+    const shaderSource = this.subgroupsSupported
+      ? HISTOGRAM_SUBGROUP_SHADER_SOURCE
+      : HISTOGRAM_SHADER_SOURCE
+
     const shaderModule = this.device.createShaderModule({
-      label: 'Histogram Shader',
-      code: HISTOGRAM_SHADER_SOURCE,
+      label: this.subgroupsSupported ? 'Histogram Subgroup Shader' : 'Histogram Shader',
+      code: shaderSource,
     })
 
     // Create bind group layout
@@ -181,7 +192,16 @@ export class HistogramPipeline {
     })
 
     // Calculate dispatch sizes
-    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, HistogramPipeline.WORKGROUP_SIZE)
+    let workgroupsX: number, workgroupsY: number
+    if (this.subgroupsSupported) {
+      // Linear dispatch for subgroup shader
+      const totalPixels = width * height
+      workgroupsX = Math.ceil(totalPixels / HistogramPipeline.WORKGROUP_SIZE_SUBGROUP)
+      workgroupsY = 1
+    } else {
+      // 2D dispatch for standard shader
+      [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, HistogramPipeline.WORKGROUP_SIZE)
+    }
 
     // Create command encoder
     const encoder = this.device.createCommandEncoder({
@@ -332,11 +352,20 @@ export class HistogramPipeline {
     })
 
     // Calculate dispatch sizes
-    const [workgroupsX, workgroupsY] = calculateDispatchSize(
-      width,
-      height,
-      HistogramPipeline.WORKGROUP_SIZE
-    )
+    let workgroupsX: number, workgroupsY: number
+    if (this.subgroupsSupported) {
+      // Linear dispatch for subgroup shader
+      const totalPixels = width * height
+      workgroupsX = Math.ceil(totalPixels / HistogramPipeline.WORKGROUP_SIZE_SUBGROUP)
+      workgroupsY = 1
+    } else {
+      // 2D dispatch for standard shader
+      [workgroupsX, workgroupsY] = calculateDispatchSize(
+        width,
+        height,
+        HistogramPipeline.WORKGROUP_SIZE
+      )
+    }
 
     // Create command encoder
     const encoder = this.device.createCommandEncoder({
@@ -388,6 +417,13 @@ export class HistogramPipeline {
    */
   getLastHistogram(): HistogramResult | null {
     return this.lastHistogramData
+  }
+
+  /**
+   * Check if the pipeline is using subgroup optimization.
+   */
+  isSubgroupsEnabled(): boolean {
+    return this.subgroupsSupported
   }
 
   /**

@@ -505,7 +505,7 @@ Track regressions with threshold-based detection (>10% regression = failure).
 ### Phase 3 Complete When:
 - [x] Single-pass uber-shader benchmarks faster than multi-pass
 - [x] f16 path working on supported devices
-- [ ] Subgroup histogram path working on Chrome 134+
+- [x] Subgroup histogram path working on Chrome 134+
 
 **Phase 3.1 Implementation Details** (2026-01-26):
 - **3.1**: Single-pass uber-shader combining adjustments + tone curve
@@ -555,6 +555,42 @@ Track regressions with threshold-based detection (>10% regression = failure).
 - `packages/core/src/gpu/capabilities.test.ts` - Added f16 detection tests
 
 **Test Coverage:** 63+ new tests for f16 support (30 unit tests + 33 benchmark tests)
+
+**Phase 3.3 Implementation Details** (2026-01-26):
+- **3.3**: Subgroup histogram optimization for Chrome 134+
+  - Added `subgroups` feature detection to GPU capabilities
+  - Created `HISTOGRAM_SUBGROUP_SHADER_SOURCE` with subgroup operations
+  - Uses linear 256x1 workgroup instead of 16x16 for better subgroup utilization
+  - Uses `subgroupAdd()` for hardware-accelerated reduction within subgroups
+  - Only first thread per subgroup (`subgroup_id == 0u`) writes to global memory
+  - Automatic fallback to standard shader when `subgroups` feature unavailable
+  - HistogramPipeline automatically selects best available shader
+
+**Subgroup Optimization Strategy:**
+- **Phase 1**: Initialize shared memory (same as standard)
+- **Phase 2**: Each thread processes one pixel, determines bin indices
+- **Phase 3**: Accumulate to local histogram with workgroup atomics
+- **Phase 4**: Use `subgroupAdd()` to reduce counts before global atomics
+- Only first thread in each subgroup writes to global histogram (32x fewer global atomics)
+
+**Expected Performance Impact:**
+- 2-4x faster histogram computation
+- 32x fewer global atomic operations (with typical subgroup_size=32)
+- Same output as standard shader (drop-in replacement)
+
+**New Files Created:**
+- `packages/core/src/gpu/shaders/histogram-subgroup.wgsl` - Subgroup-optimized histogram shader
+- `packages/core/src/gpu/__tests__/histogram-subgroup.test.ts` - 17 unit tests
+- `packages/core/src/gpu/__tests__/histogram-subgroup-benchmark.test.ts` - 16 benchmark tests
+
+**Modified Files:**
+- `packages/core/src/gpu/types.ts` - Added `subgroups` to features interface
+- `packages/core/src/gpu/capabilities.ts` - Added subgroups feature detection and device request
+- `packages/core/src/gpu/shaders/index.ts` - Exported subgroup shader source
+- `packages/core/src/gpu/pipelines/histogram-pipeline.ts` - Added subgroup support and `isSubgroupsEnabled()` method
+- `packages/core/src/gpu/capabilities.test.ts` - Added subgroups detection tests
+
+**Test Coverage:** 33+ new tests for subgroup support (17 unit tests + 16 benchmark tests)
 
 ### Phase 4 Complete When:
 - [ ] GPU-direct histogram rendering at 60fps
