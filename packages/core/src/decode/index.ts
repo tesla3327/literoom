@@ -64,4 +64,4 @@ export {
 } from './mock-decode-service'
 
 // Curve utilities
-export { isLinearCurve, CURVE_POINT_TOLERANCE } from './curve-utils'
+export { isLinearCurve, linearInterpolateCurve, CURVE_POINT_TOLERANCE } from './curve-utils'

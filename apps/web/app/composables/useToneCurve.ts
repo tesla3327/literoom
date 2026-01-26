@@ -11,6 +11,7 @@
 
 import type { Ref } from 'vue'
 import type { ToneCurve, CurvePoint, HistogramData } from '@literoom/core/decode'
+import { linearInterpolateCurve } from '@literoom/core/decode'
 
 // ============================================================================
 // Constants
@@ -171,25 +172,7 @@ export function useToneCurve(options: UseToneCurveOptions = {}): UseToneCurveRet
    * The WASM module uses the full monotonic spline for actual processing.
    */
   function evaluateCurve(x: number): number {
-    const points = localCurve.value.points
-    if (points.length < 2) return x
-
-    // Handle endpoints
-    if (x <= points[0]!.x) return points[0]!.y
-    if (x >= points[points.length - 1]!.x) return points[points.length - 1]!.y
-
-    // Find segment
-    let i = 0
-    while (i < points.length - 1 && points[i + 1]!.x < x) i++
-
-    const p0 = points[i]!
-    const p1 = points[i + 1] || points[i]!
-
-    if (p1.x === p0.x) return p0.y
-
-    // Linear interpolation (good enough for 256 samples)
-    const t = (x - p0.x) / (p1.x - p0.x)
-    return p0.y + t * (p1.y - p0.y)
+    return linearInterpolateCurve(localCurve.value.points, x)
   }
 
   // ============================================================================

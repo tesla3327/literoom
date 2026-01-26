@@ -22,7 +22,7 @@ import type {
   HistogramData
 } from './types'
 import { DecodeError } from './types'
-import { isLinearCurve } from './curve-utils'
+import { isLinearCurve, linearInterpolateCurve } from './curve-utils'
 
 // ============================================================================
 // Color Math Helpers
@@ -379,24 +379,14 @@ export class MockDecodeService implements IDecodeService {
     // Build simple LUT via linear interpolation for mock
     const lut = new Uint8Array(256)
     for (let i = 0; i < 256; i++) {
-      const x = i / 255
-      // Find segment
-      let segIndex = 0
-      while (segIndex < points.length - 1 && points[segIndex + 1].x < x) {
-        segIndex++
-      }
-      const p0 = points[segIndex]
-      const p1 = points[segIndex + 1] || points[segIndex]
-      // Linear interpolation
-      const t = p1.x === p0.x ? 0 : (x - p0.x) / (p1.x - p0.x)
-      const y = p0.y + t * (p1.y - p0.y)
-      lut[i] = Math.max(0, Math.min(255, Math.round(y * 255)))
+      const y = linearInterpolateCurve(points, i / 255)
+      lut[i] = clamp255(Math.round(y * 255))
     }
 
     // Apply LUT to pixels
     const outputPixels = new Uint8Array(pixels.length)
     for (let i = 0; i < pixels.length; i++) {
-      outputPixels[i] = lut[pixels[i]]
+      outputPixels[i] = lut[pixels[i]!]!
     }
 
     return { width, height, pixels: outputPixels }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { isLinearCurve, CURVE_POINT_TOLERANCE } from './curve-utils'
+import { isLinearCurve, linearInterpolateCurve, CURVE_POINT_TOLERANCE } from './curve-utils'
 
 describe('isLinearCurve', () => {
   it('returns true for exact identity curve [(0,0), (1,1)]', () => {
@@ -105,5 +105,104 @@ describe('isLinearCurve', () => {
 describe('CURVE_POINT_TOLERANCE', () => {
   it('has expected value of 0.001', () => {
     expect(CURVE_POINT_TOLERANCE).toBe(0.001)
+  })
+})
+
+describe('linearInterpolateCurve', () => {
+  describe('basic interpolation', () => {
+    it('returns x for empty or single point curve', () => {
+      expect(linearInterpolateCurve([], 0.5)).toBe(0.5)
+      expect(linearInterpolateCurve([{ x: 0.5, y: 0.8 }], 0.5)).toBe(0.5)
+    })
+
+    it('interpolates linearly between two points', () => {
+      const points = [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ]
+      expect(linearInterpolateCurve(points, 0)).toBe(0)
+      expect(linearInterpolateCurve(points, 0.5)).toBe(0.5)
+      expect(linearInterpolateCurve(points, 1)).toBe(1)
+    })
+
+    it('handles non-linear two-point curves', () => {
+      const points = [
+        { x: 0, y: 0 },
+        { x: 1, y: 0.5 },
+      ]
+      expect(linearInterpolateCurve(points, 0)).toBe(0)
+      expect(linearInterpolateCurve(points, 0.5)).toBe(0.25)
+      expect(linearInterpolateCurve(points, 1)).toBe(0.5)
+    })
+
+    it('interpolates across multiple segments', () => {
+      const points = [
+        { x: 0, y: 0 },
+        { x: 0.5, y: 0.8 },
+        { x: 1, y: 1 },
+      ]
+      expect(linearInterpolateCurve(points, 0)).toBe(0)
+      expect(linearInterpolateCurve(points, 0.25)).toBe(0.4)
+      expect(linearInterpolateCurve(points, 0.5)).toBe(0.8)
+      expect(linearInterpolateCurve(points, 0.75)).toBeCloseTo(0.9)
+      expect(linearInterpolateCurve(points, 1)).toBe(1)
+    })
+  })
+
+  describe('edge cases', () => {
+    it('clamps x below first point to first point y', () => {
+      const points = [
+        { x: 0.2, y: 0.3 },
+        { x: 0.8, y: 0.7 },
+      ]
+      expect(linearInterpolateCurve(points, 0)).toBe(0.3)
+      expect(linearInterpolateCurve(points, 0.1)).toBe(0.3)
+      expect(linearInterpolateCurve(points, 0.2)).toBe(0.3)
+    })
+
+    it('clamps x above last point to last point y', () => {
+      const points = [
+        { x: 0.2, y: 0.3 },
+        { x: 0.8, y: 0.7 },
+      ]
+      expect(linearInterpolateCurve(points, 0.8)).toBe(0.7)
+      expect(linearInterpolateCurve(points, 0.9)).toBe(0.7)
+      expect(linearInterpolateCurve(points, 1)).toBe(0.7)
+    })
+
+    it('handles vertical segments (same x values)', () => {
+      const points = [
+        { x: 0, y: 0 },
+        { x: 0.5, y: 0.3 },
+        { x: 0.5, y: 0.7 },
+        { x: 1, y: 1 },
+      ]
+      // Should return the first point's y when x values match
+      expect(linearInterpolateCurve(points, 0.5)).toBe(0.3)
+    })
+
+    it('handles S-curve with multiple control points', () => {
+      const points = [
+        { x: 0, y: 0 },
+        { x: 0.25, y: 0.15 },
+        { x: 0.75, y: 0.85 },
+        { x: 1, y: 1 },
+      ]
+      expect(linearInterpolateCurve(points, 0)).toBe(0)
+      expect(linearInterpolateCurve(points, 0.25)).toBe(0.15)
+      expect(linearInterpolateCurve(points, 0.5)).toBeCloseTo(0.5)
+      expect(linearInterpolateCurve(points, 0.75)).toBe(0.85)
+      expect(linearInterpolateCurve(points, 1)).toBe(1)
+    })
+  })
+
+  describe('readonly array support', () => {
+    it('works with readonly arrays', () => {
+      const points: readonly { x: number; y: number }[] = [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ]
+      expect(linearInterpolateCurve(points, 0.5)).toBe(0.5)
+    })
   })
 })
