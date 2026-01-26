@@ -1,6 +1,6 @@
 # GPU Pipeline Performance Investigation
 
-**Last Updated**: 2026-01-25
+**Last Updated**: 2026-01-26
 
 ## Summary
 
@@ -159,6 +159,63 @@ Performance research for maximizing FPS in the GPU edit pipeline.
 **Documents Created**:
 - `docs/research/perf/2026-01-25-async-histogram-texturepool-research.md`
 
+---
+
+### 2026-01-26: Phase 3 Shader Optimizations Research
+
+**Goal**: Complete research for f16 processing, subgroup operations, and single-pass uber-shader
+
+**Research Conducted** (16 parallel agents):
+1. adjustments.wgsl f16 compatibility analysis
+2. tone-curve.wgsl precision requirements
+3. histogram.wgsl subgroup optimization opportunities
+4. masks.wgsl f16 and single-pass potential
+5. rotation.wgsl precision analysis
+6. Edit pipeline multi-pass flow analysis
+7. WebGPU f16 extension browser support
+8. f16 color processing accuracy research
+9. Chrome subgroups implementation status
+10. Subgroup histogram algorithms
+11. Uber-shader design patterns
+12. GPU register pressure optimization
+13. Figma/Canva/Photopea architecture research
+14. GPU texture cache optimization
+15. WGSL override constants for shader variants
+16. Single-pass vs multi-pass tradeoffs
+
+**Key Findings**:
+
+1. **f16 Processing**:
+   - Chrome 120+, Safari 26+, Firefox 141+ support `shader-f16`
+   - **NOT supported on Qualcomm/Adreno** (hardware limitation)
+   - Safe for: exposure, contrast, temperature, tint, saturation (0-1 range)
+   - Unsafe for: histogram accumulation, tone curve LUT sampling, feathering smoothstep
+   - Expected gains: 25-50% faster, 50% memory bandwidth reduction
+
+2. **Subgroup Operations**:
+   - Chrome 134+ stable with `"subgroups"` feature
+   - Subgroup sizes: Intel 32, AMD 32/64, NVIDIA 32, Apple 32
+   - `subgroupAdd()` enables 2-4x faster histogram reduction
+   - Must maintain atomics fallback for older browsers
+   - Histogram compute: 2.3ms → 0.8-1.1ms expected
+
+3. **Single-Pass Uber-Shader**:
+   - Current: 4 passes, 128 MB bandwidth, 78.8 MB intermediate textures
+   - Single-pass: 1 pass, 32 MB bandwidth (75% reduction)
+   - Register pressure: ~30-35 VGPRs combined (safe, under 64 limit)
+   - Use `@override` constants for compile-time feature flags
+   - Rotation MUST remain separate (changes dimensions)
+   - Adjustments + Tone Curve + Masks CAN be combined
+
+4. **Professional Editor Patterns**:
+   - Figma: Uniform buffer batching, bind group caching, compute shaders
+   - Photopea: 15x speedup with WebGL (850ms → 55ms for 10 layers)
+   - Common: 300-500MB VRAM budget, LRU texture eviction, separable filters
+
+**Documents Created**:
+- `docs/research/perf/2026-01-26-shader-optimization-research-plan.md`
+- `docs/research/perf/2026-01-26-shader-optimization-synthesis.md`
+
 ## Next Steps
 
 ### Phase 1: Quick Wins - RESEARCH COMPLETE
@@ -171,12 +228,12 @@ Performance research for maximizing FPS in the GPU edit pipeline.
 2. ✅ GPU-direct histogram rendering (WGSL shaders designed)
 3. ✅ Fire-and-forget pattern documented
 
-### Phase 3: Shader Optimizations - NEXT
-1. [ ] f16 processing research (Research Area 5)
-2. [ ] Subgroup operations research (Research Area 6) - preliminary findings included
-3. [ ] Single-pass adjustment uber-shader (Research Area 7)
+### Phase 3: Shader Optimizations - RESEARCH COMPLETE
+1. ✅ f16 processing research (25-50% faster, fallback needed for Qualcomm)
+2. ✅ Subgroup operations research (2-4x faster histogram, Chrome 134+)
+3. ✅ Single-pass uber-shader (75% bandwidth reduction, 30-35 VGPRs)
 
-### Phase 4: Advanced
+### Phase 4: Advanced - NEXT
 1. [ ] Progressive rendering research (Research Area 8)
 2. [ ] Mipmap-based refinement
 3. [ ] GPU timestamp profiling infrastructure
