@@ -3,6 +3,7 @@
 ## Table of Contents
 
 ### Open Issues
+- [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos)
 - [Sort options don't work (High)](#sort-options-dont-work)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
@@ -59,6 +60,45 @@
 ---
 
 ## Open Issues
+
+### debouncedFullRender.cancel is not a function
+
+**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-26
+
+**Problem**:
+When making adjustments in the edit view (e.g., dragging sliders), the console repeatedly logs the error `debouncedFullRender.cancel is not a function`. The error occurs many times during slider adjustments.
+
+**Steps to Reproduce**:
+1. Start app in Demo Mode (`LITEROOM_DEMO_MODE=true`)
+2. Open any photo in edit view
+3. Adjust any slider (e.g., Exposure, Temperature)
+4. Observe browser console - error appears repeatedly
+
+**Expected Behavior**:
+No console errors during normal slider adjustment operations.
+
+**Actual Behavior**:
+Error `debouncedFullRender.cancel is not a function` is logged repeatedly (37+ times observed during a single adjustment session).
+
+**Impact**:
+- Does not crash the application
+- Adjustments and preview updates still work
+- May indicate a debounce/throttle implementation issue that could affect performance
+
+**Technical Details**:
+The error suggests that `debouncedFullRender` is expected to be a debounced function with a `.cancel()` method (like lodash's debounce or useDebounceFn from VueUse), but the actual value doesn't have this method.
+
+**Files to Investigate**:
+- `apps/web/app/composables/useEditPreview.ts` - Preview rendering logic
+- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Preview canvas component
+- Search for `debouncedFullRender` across the codebase
+
+**Console Output**:
+```
+debouncedFullRender.cancel is not a function (x37)
+```
+
+---
 
 ### Adjustments not persisted when navigating between photos
 

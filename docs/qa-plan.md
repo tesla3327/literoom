@@ -793,10 +793,22 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 19. Browser Compatibility
 
+**Tested**: 2026-01-26 | **Status**: PARTIAL PASS (Chrome tested, 1 bug found)
+
 ### 19.1 Chrome/Edge (Primary)
-- [ ] WebGPU acceleration works
-- [ ] File System Access API works
-- [ ] All features functional
+- [x] WebGPU acceleration works - verified via console: `[GPUCapabilityService] Initialized successfully: {vendor: apple, architecture: metal-3}`, `[AdaptiveProcessor] Initialized with backend: webgpu`
+- [ ] File System Access API works - not testable in Demo Mode (requires real folder selection)
+- [x] All features functional:
+  - [x] Thumbnail grid displays correctly with 50 demo images
+  - [x] Edit view loads with preview and histogram
+  - [x] Adjustments work (Temperature, Exposure sliders tested)
+  - [x] Histogram updates in real-time during adjustments
+  - [x] Crop tool displays with aspect ratio options and action bar
+  - [x] Copy Settings modal opens (Cmd+Shift+C)
+  - [x] Export modal opens with all options (scope, quality, resize, filename template)
+  - [x] Clipping overlay toggles with J key
+
+**Bug Found**: `debouncedFullRender.cancel is not a function` - Error occurs repeatedly during slider adjustments (see issues.md)
 
 ### 19.2 Firefox
 - [ ] WASM fallback used
@@ -807,6 +819,17 @@ This document provides a complete manual testing checklist for the Literoom phot
 - [ ] WASM fallback used
 - [ ] File System Access limited
 - [ ] Core features work
+
+### Screenshots
+- `qa-section19-01-initial-load.png` - App initial load with demo catalog
+- `qa-section19-02-grid-view.png` - Catalog grid with thumbnails
+- `qa-section19-03-edit-view.png` - Edit view with preview and controls
+- `qa-section19-04-adjustment-test.png` - After Temperature adjustment
+- `qa-section19-05-histogram.png` - Histogram responding to Exposure adjustment
+- `qa-section19-06-crop-tool.png` - Crop tool active with aspect ratios
+- `qa-section19-07-copy-modal.png` - Copy Settings modal
+- `qa-section19-08-export-modal.png` - Export modal with all options
+- `qa-section19-09-clipping-overlay.png` - Clipping overlay active (high exposure)
 
 ---
 
