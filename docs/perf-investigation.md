@@ -216,6 +216,79 @@ Performance research for maximizing FPS in the GPU edit pipeline.
 - `docs/research/perf/2026-01-26-shader-optimization-research-plan.md`
 - `docs/research/perf/2026-01-26-shader-optimization-synthesis.md`
 
+---
+
+### 2026-01-26: Phase 4 Advanced Research
+
+**Goal**: Complete research for progressive rendering, mipmap refinement, and GPU profiling
+
+**Research Conducted** (18 parallel agents):
+1. Lightroom progressive rendering techniques
+2. Capture One rendering architecture
+3. DaVinci Resolve proxy/progressive quality
+4. WebGPU mipmap generation best practices
+5. requestIdleCallback and idle detection patterns
+6. Progressive image loading (LQIP, BlurHash, ThumbHash)
+7. Texture streaming from game development
+8. WebGPU timestamp queries API
+9. Chrome DevTools GPU profiling
+10. WebGPU profiling libraries (stats-gl, webgpu-utils)
+11. Image editor interaction patterns and latency
+12. Smooth quality transition techniques
+13. GPU memory management and LRU caching
+14. Visible region prioritization (quadtree, R-tree)
+15. Codebase: preview generation flow analysis
+16. Codebase: interaction handling analysis
+17. Figma/Canva WebGPU architecture
+18. scheduler.postTask() API for priority scheduling
+
+**Key Findings**:
+
+1. **Professional Editor Approaches**:
+   - Lightroom: Tiered previews (Minimal → Standard → 1:1), Smart Previews at 2540px
+   - Capture One: Draft rendering during drag (temporary 0.5s blur)
+   - DaVinci Resolve: Timeline Proxy Mode (on-the-fly 1/2, 1/4, 1/8 res)
+   - Figma: Tile-based rendering, batched GPU ops, local edit prioritization
+
+2. **Mipmap Generation**:
+   - WebGPU has NO built-in generateMipmap() - must implement manually
+   - Memory overhead: exactly 33% extra
+   - Compute shader 29-50% faster than render pipeline for 4K+ textures
+   - Use explicit LOD selection based on zoom level
+
+3. **GPU Timestamp Profiling**:
+   - Use timestampWrites in pass descriptor (writeTimestamp deprecated)
+   - Results in nanoseconds via BigUint64Array
+   - Default 100μs quantization for security
+   - Tools: stats-gl, WebGPU Inspector, PIX (Windows)
+
+4. **Interaction-Aware Rendering**:
+   - Current throttle (150ms) = ~6-7 FPS - too slow
+   - Research recommends: 33ms for mouse, <25ms for touch
+   - Draft mode is UI-only - no actual quality reduction
+   - State machine: idle → interacting → refining → complete
+
+5. **Latency Requirements**:
+   - Dragging: <33ms perceivable
+   - Tapping: <82ms perceivable
+   - Touch: <25ms required for responsiveness
+   - Animation: <16ms (60fps target)
+
+6. **Memory Management**:
+   - WebGPU doesn't expose memory queries directly
+   - Use error scopes for OOM detection
+   - LRU cache with explicit texture.destroy()
+   - Device tier detection via @pmndrs/detect-gpu
+
+7. **Idle Detection**:
+   - requestIdleCallback: 50ms max deadline, no Safari support
+   - scheduler.postTask(): 3 priority levels, ~82% browser support
+   - Dynamic priority via TaskController.setPriority()
+
+**Documents Created**:
+- `docs/research/perf/2026-01-26-phase4-advanced-research-plan.md`
+- `docs/research/perf/2026-01-26-phase4-advanced-research-synthesis.md`
+
 ## Next Steps
 
 ### Phase 1: Quick Wins - RESEARCH COMPLETE
@@ -233,7 +306,17 @@ Performance research for maximizing FPS in the GPU edit pipeline.
 2. ✅ Subgroup operations research (2-4x faster histogram, Chrome 134+)
 3. ✅ Single-pass uber-shader (75% bandwidth reduction, 30-35 VGPRs)
 
-### Phase 4: Advanced - NEXT
-1. [ ] Progressive rendering research (Research Area 8)
-2. [ ] Mipmap-based refinement
-3. [ ] GPU timestamp profiling infrastructure
+### Phase 4: Advanced - RESEARCH COMPLETE
+1. ✅ Progressive rendering (Lightroom/Resolve/Figma patterns documented)
+2. ✅ Mipmap-based refinement (compute shader generation, LOD selection)
+3. ✅ GPU timestamp profiling (timestampWrites API, stats-gl library)
+4. ✅ Interaction-aware rendering (33ms throttle, state machine design)
+5. ✅ Memory management (LRU cache, device tier detection)
+
+### Phase 5: Implementation - NEXT
+All research phases complete. Ready for implementation:
+1. [ ] Implement draft mode (33ms throttle + 1/2 resolution)
+2. [ ] Integrate TexturePool
+3. [ ] Add GPU timestamp profiling
+4. [ ] Implement progressive refinement state machine
+5. [ ] Add interaction-aware quality switching
