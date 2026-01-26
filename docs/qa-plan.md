@@ -742,23 +742,52 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 18. Error Handling
 
+**Tested**: 2026-01-26 | **Status**: PARTIAL PASS (Demo Mode limitations)
+
 ### 18.1 File System Errors
-- [ ] Permission denied shows message
-- [ ] Folder not found handled
-- [ ] Disk full during export handled
-- [ ] Network errors handled gracefully
+- [ ] Permission denied shows message - **NOT TESTABLE** (Demo Mode bypasses file system)
+- [ ] Folder not found handled - **NOT TESTABLE** (Demo Mode)
+- [ ] Disk full during export handled - **NOT TESTABLE** (Demo Mode)
+- [ ] Network errors handled gracefully - **NOT TESTABLE** (Demo Mode)
+
+**Note**: File system error handling code exists in `PermissionRecovery.vue` component but cannot be triggered in Demo Mode. The component handles permission recovery, folder re-authorization, and displays appropriate error messages. Testing requires non-demo mode with real file system access.
 
 ### 18.2 GPU Errors
-- [ ] GPU failure falls back to WASM
-- [ ] Error count tracked
-- [ ] Recovery after 3 errors
-- [ ] User notified of fallback
+- [x] GPU failure falls back to WASM - verified, console shows "[AdaptiveProcessor] Initialized with backend: wasm"
+- [ ] Error count tracked - not visible in UI, may be tracked internally
+- [ ] Recovery after 3 errors - not testable (would require GPU to be available first)
+- [x] User notified of fallback - "GPU Unavailable" button shown in filter bar header
+
+**Console Output Observed**:
+```
+[warning] No available adapters.
+[warning] [GPUCapabilityService] Initialization failed: No suitable GPU adapter found
+[log] [AdaptiveProcessor] Initialized with backend: wasm
+[log] [catalog.client] GPU initialized: backend=wasm, available=false
+```
+
+**Verification**: Made adjustments in edit view, confirmed WASM backend processes images correctly:
+- Adjustments computed in ~6-8ms via WASM
+- Histogram updates correctly via WASM (1.8-11ms)
+- All edit features functional with WASM fallback
 
 ### 18.3 Decode Errors
-- [ ] Invalid format shows error
-- [ ] Corrupted file shows error
-- [ ] Timeout after 30 seconds
-- [ ] Error thumbnail displayed
+- [ ] Invalid format shows error - **NOT TESTABLE** (Demo Mode uses synthetic images)
+- [ ] Corrupted file shows error - **NOT TESTABLE** (Demo Mode)
+- [ ] Timeout after 30 seconds - **NOT TESTABLE** (Demo Mode)
+- [ ] Error thumbnail displayed - **NOT TESTABLE** (Demo Mode)
+
+**Note**: Error handling UI exists in the codebase:
+- `EditPreviewCanvas.vue`: Error state with message display (`data-testid="error-state"`)
+- `CatalogThumbnail.vue`: Thumbnail error state with "Failed" label
+- Testing decode errors requires real file system with corrupted/invalid files
+
+### Screenshots
+- `qa-section18-01-catalog-with-gpu-status.png` - Catalog view showing "GPU Unavailable" button
+- `qa-section18-02-gpu-status-hover.png` - GPU status button hover state
+- `qa-section18-03-edit-view-with-wasm.png` - Edit view functioning with WASM backend
+- `qa-section18-04-wasm-adjustment-working.png` - Adjustments working with WASM fallback
+- `qa-section18-05-final-catalog-view.png` - Final catalog view with WASM backend
 
 ---
 
