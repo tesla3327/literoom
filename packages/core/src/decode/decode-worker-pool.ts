@@ -12,12 +12,12 @@ import type {
   ThumbnailOptions,
   PreviewOptions,
   FileType,
-  ErrorCode,
   Adjustments,
   HistogramData
 } from './types'
 import { DecodeError, filterToNumber } from './types'
 import type { IDecodeService } from './decode-service'
+import { parseDecodeResponse, type ResponseValue } from './response-parser'
 
 const DEFAULT_TIMEOUT = 30_000
 const MAX_WORKERS = 8
@@ -36,7 +36,7 @@ export interface PoolOptions {
  */
 interface PendingPoolRequest {
   workerId: number
-  resolve: (value: DecodedImage | FileType | HistogramData | Uint8Array) => void
+  resolve: (value: ResponseValue) => void
   reject: (error: Error) => void
   timeoutId: ReturnType<typeof setTimeout>
 }
@@ -187,43 +187,11 @@ export class DecodeWorkerPool implements IDecodeService {
     this.pending.delete(response.id)
     this.workerLoad[workerId]--
 
-    switch (response.type) {
-      case 'error':
-        pending.reject(
-          new DecodeError(response.message, response.code as ErrorCode)
-        )
-        break
-      case 'file-type':
-        pending.resolve(response.fileType)
-        break
-      case 'success':
-        pending.resolve({
-          width: response.width,
-          height: response.height,
-          pixels: response.pixels
-        })
-        break
-      case 'histogram':
-        pending.resolve({
-          red: response.red,
-          green: response.green,
-          blue: response.blue,
-          luminance: response.luminance,
-          maxValue: response.maxValue,
-          hasHighlightClipping: response.hasHighlightClipping,
-          hasShadowClipping: response.hasShadowClipping
-        })
-        break
-      case 'tone-curve-result':
-        pending.resolve({
-          width: response.width,
-          height: response.height,
-          pixels: response.pixels
-        })
-        break
-      case 'encode-jpeg-result':
-        (pending.resolve as (value: Uint8Array) => void)(response.bytes)
-        break
+    const parsed = parseDecodeResponse(response)
+    if (parsed.type === 'error') {
+      pending.reject(parsed.error)
+    } else {
+      pending.resolve(parsed.value)
     }
   }
 
@@ -231,10 +199,7 @@ export class DecodeWorkerPool implements IDecodeService {
    * Send a request to the least busy worker and wait for a response.
    * The request must already have an id assigned that encodes the target workerId.
    */
-  private sendRequest<T extends DecodedImage | FileType | HistogramData | Uint8Array>(
-    request: DecodeRequest,
-    workerId: number
-  ): Promise<T> {
+  private sendRequest<T extends ResponseValue>(request: DecodeRequest, workerId: number): Promise<T> {
     return new Promise((resolve, reject) => {
       if (this.workers.length === 0 || this._state.status !== 'ready') {
         reject(new DecodeError('Decode service not ready', 'WORKER_ERROR'))
@@ -252,7 +217,7 @@ export class DecodeWorkerPool implements IDecodeService {
       this.workerLoad[workerId]++
       this.pending.set(request.id, {
         workerId,
-        resolve: resolve as (value: DecodedImage | FileType | HistogramData | Uint8Array) => void,
+        resolve: resolve as (value: ResponseValue) => void,
         reject,
         timeoutId
       })
@@ -265,9 +230,7 @@ export class DecodeWorkerPool implements IDecodeService {
    * Create a request with the given fields and route it to the least busy worker.
    * DRYs up the common pattern: getLeastBusyWorker() + generateId() + sendRequest().
    */
-  private routeRequest<T extends DecodedImage | FileType | HistogramData | Uint8Array>(
-    requestFields: Omit<DecodeRequest, 'id'>
-  ): Promise<T> {
+  private routeRequest<T extends ResponseValue>(requestFields: Omit<DecodeRequest, 'id'>): Promise<T> {
     const workerId = this.getLeastBusyWorker()
     const request = { ...requestFields, id: this.generateId(workerId) } as DecodeRequest
     return this.sendRequest(request, workerId)

@@ -13,12 +13,12 @@ import type {
   ThumbnailOptions,
   PreviewOptions,
   FileType,
-  ErrorCode,
   Adjustments,
   HistogramData
 } from './types'
 import { DecodeError, filterToNumber } from './types'
 import { DecodeWorkerPool, type PoolOptions } from './decode-worker-pool'
+import { parseDecodeResponse, type ResponseValue } from './response-parser'
 
 const DEFAULT_TIMEOUT = 30_000
 
@@ -111,7 +111,7 @@ export interface IDecodeService {
  * Pending request waiting for a response from the worker.
  */
 interface PendingRequest {
-  resolve: (value: DecodedImage | FileType | HistogramData | Uint8Array) => void
+  resolve: (value: ResponseValue) => void
   reject: (error: Error) => void
   timeoutId: ReturnType<typeof setTimeout>
 }
@@ -228,58 +228,18 @@ export class DecodeService implements IDecodeService {
     clearTimeout(pending.timeoutId)
     this.pending.delete(response.id)
 
-    switch (response.type) {
-      case 'error':
-        pending.reject(
-          new DecodeError(response.message, response.code as ErrorCode)
-        )
-        break
-      case 'file-type':
-        pending.resolve(response.fileType)
-        break
-      case 'success':
-        pending.resolve({
-          width: response.width,
-          height: response.height,
-          pixels: response.pixels
-        })
-        break
-      case 'histogram':
-        pending.resolve({
-          red: response.red,
-          green: response.green,
-          blue: response.blue,
-          luminance: response.luminance,
-          maxValue: response.maxValue,
-          hasHighlightClipping: response.hasHighlightClipping,
-          hasShadowClipping: response.hasShadowClipping
-        })
-        break
-      case 'tone-curve-result':
-        pending.resolve({
-          width: response.width,
-          height: response.height,
-          pixels: response.pixels
-        })
-        break
-      case 'encode-jpeg-result':
-        // For encode-jpeg, we return the raw JPEG bytes directly
-        // The resolve type is DecodedImage | FileType | HistogramData | Uint8Array
-        (pending.resolve as (value: Uint8Array) => void)(response.bytes)
-        break
-      case 'generate-edited-thumbnail-result':
-        // For edited thumbnail, we return the JPEG bytes
-        (pending.resolve as (value: Uint8Array) => void)(response.bytes)
-        break
+    const parsed = parseDecodeResponse(response)
+    if (parsed.type === 'error') {
+      pending.reject(parsed.error)
+    } else {
+      pending.resolve(parsed.value)
     }
   }
 
   /**
    * Send a request to the worker and wait for a response.
    */
-  private sendRequest<T extends DecodedImage | FileType | HistogramData | Uint8Array>(
-    request: DecodeRequest
-  ): Promise<T> {
+  private sendRequest<T extends ResponseValue>(request: DecodeRequest): Promise<T> {
     return new Promise((resolve, reject) => {
       if (!this.worker || this._state.status !== 'ready') {
         reject(new DecodeError('Decode service not ready', 'WORKER_ERROR'))
@@ -292,7 +252,7 @@ export class DecodeService implements IDecodeService {
       }, DEFAULT_TIMEOUT)
 
       this.pending.set(request.id, {
-        resolve: resolve as (value: DecodedImage | FileType | HistogramData | Uint8Array) => void,
+        resolve: resolve as (value: ResponseValue) => void,
         reject,
         timeoutId
       })
@@ -302,53 +262,32 @@ export class DecodeService implements IDecodeService {
   }
 
   /**
-   * Decode a JPEG file to raw RGB pixels.
+   * Create a request with the given fields and send it.
+   * DRYs up the common pattern: generateId() + sendRequest().
    */
-  async decodeJpeg(bytes: Uint8Array): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'decode-jpeg',
-      bytes
-    })
+  private routeRequest<T extends ResponseValue>(requestFields: Omit<DecodeRequest, 'id'>): Promise<T> {
+    const request = { ...requestFields, id: this.generateId() } as DecodeRequest
+    return this.sendRequest(request)
   }
 
-  /**
-   * Extract and decode the embedded thumbnail from a RAW file.
-   */
-  async decodeRawThumbnail(bytes: Uint8Array): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'decode-raw-thumbnail',
-      bytes
-    })
+  // ===========================================================================
+  // IDecodeService Implementation
+  // ===========================================================================
+
+  decodeJpeg(bytes: Uint8Array): Promise<DecodedImage> {
+    return this.routeRequest({ type: 'decode-jpeg', bytes })
   }
 
-  /**
-   * Generate a thumbnail from image bytes.
-   * Automatically detects file type (JPEG or RAW).
-   */
-  async generateThumbnail(
-    bytes: Uint8Array,
-    options: ThumbnailOptions = {}
-  ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'generate-thumbnail',
-      bytes,
-      size: options.size ?? 256
-    })
+  decodeRawThumbnail(bytes: Uint8Array): Promise<DecodedImage> {
+    return this.routeRequest({ type: 'decode-raw-thumbnail', bytes })
   }
 
-  /**
-   * Generate a preview from image bytes.
-   * Automatically detects file type (JPEG or RAW).
-   */
-  async generatePreview(
-    bytes: Uint8Array,
-    options: PreviewOptions
-  ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
+  generateThumbnail(bytes: Uint8Array, options: ThumbnailOptions = {}): Promise<DecodedImage> {
+    return this.routeRequest({ type: 'generate-thumbnail', bytes, size: options.size ?? 256 })
+  }
+
+  generatePreview(bytes: Uint8Array, options: PreviewOptions): Promise<DecodedImage> {
+    return this.routeRequest({
       type: 'generate-preview',
       bytes,
       maxEdge: options.maxEdge,
@@ -356,120 +295,49 @@ export class DecodeService implements IDecodeService {
     })
   }
 
-  /**
-   * Detect the file type from magic bytes.
-   */
-  async detectFileType(bytes: Uint8Array): Promise<FileType> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'detect-file-type',
-      bytes
-    })
+  detectFileType(bytes: Uint8Array): Promise<FileType> {
+    return this.routeRequest({ type: 'detect-file-type', bytes })
   }
 
-  /**
-   * Apply adjustments to image pixel data.
-   * Returns a new image with adjustments applied.
-   */
-  async applyAdjustments(
+  applyAdjustments(
     pixels: Uint8Array,
     width: number,
     height: number,
     adjustments: Adjustments
   ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'apply-adjustments',
-      pixels,
-      width,
-      height,
-      adjustments
-    })
+    return this.routeRequest({ type: 'apply-adjustments', pixels, width, height, adjustments })
   }
 
-  /**
-   * Compute histogram from image pixel data.
-   * Returns histogram data for all channels.
-   */
-  async computeHistogram(
-    pixels: Uint8Array,
-    width: number,
-    height: number
-  ): Promise<HistogramData> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'compute-histogram',
-      pixels,
-      width,
-      height
-    })
+  computeHistogram(pixels: Uint8Array, width: number, height: number): Promise<HistogramData> {
+    return this.routeRequest({ type: 'compute-histogram', pixels, width, height })
   }
 
-  /**
-   * Apply tone curve to image pixel data.
-   * Returns a new image with the tone curve applied.
-   */
-  async applyToneCurve(
+  applyToneCurve(
     pixels: Uint8Array,
     width: number,
     height: number,
     points: Array<{ x: number; y: number }>
   ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'apply-tone-curve',
-      pixels,
-      width,
-      height,
-      points
-    })
+    return this.routeRequest({ type: 'apply-tone-curve', pixels, width, height, points })
   }
 
-  /**
-   * Apply rotation to image pixel data.
-   * Returns a new image with the rotation applied.
-   *
-   * @param pixels - RGB pixel data (3 bytes per pixel)
-   * @param width - Image width
-   * @param height - Image height
-   * @param angleDegrees - Rotation angle (positive = counter-clockwise)
-   * @param useLanczos - Use high-quality Lanczos3 filter (default: false for bilinear)
-   */
-  async applyRotation(
+  applyRotation(
     pixels: Uint8Array,
     width: number,
     height: number,
     angleDegrees: number,
     useLanczos = false
   ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'apply-rotation',
-      pixels,
-      width,
-      height,
-      angleDegrees,
-      useLanczos
-    })
+    return this.routeRequest({ type: 'apply-rotation', pixels, width, height, angleDegrees, useLanczos })
   }
 
-  /**
-   * Apply crop to image pixel data using normalized coordinates.
-   * Returns a new image with the crop applied.
-   *
-   * @param pixels - RGB pixel data (3 bytes per pixel)
-   * @param width - Image width
-   * @param height - Image height
-   * @param crop - Crop rectangle in normalized coordinates (0-1)
-   */
-  async applyCrop(
+  applyCrop(
     pixels: Uint8Array,
     width: number,
     height: number,
     crop: { left: number; top: number; width: number; height: number }
   ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
+    return this.routeRequest({
       type: 'apply-crop',
       pixels,
       width,
@@ -481,78 +349,25 @@ export class DecodeService implements IDecodeService {
     })
   }
 
-  /**
-   * Encode image pixel data to JPEG bytes.
-   *
-   * @param pixels - RGB pixel data (3 bytes per pixel)
-   * @param width - Image width
-   * @param height - Image height
-   * @param quality - JPEG quality 1-100 (default: 90)
-   * @returns JPEG-encoded bytes
-   */
-  async encodeJpeg(
-    pixels: Uint8Array,
-    width: number,
-    height: number,
-    quality = 90
-  ): Promise<Uint8Array> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'encode-jpeg',
-      pixels,
-      width,
-      height,
-      quality
-    })
+  encodeJpeg(pixels: Uint8Array, width: number, height: number, quality = 90): Promise<Uint8Array> {
+    return this.routeRequest({ type: 'encode-jpeg', pixels, width, height, quality })
   }
 
-  /**
-   * Apply masked adjustments (local adjustments) to image pixel data.
-   * This applies linear and radial gradient masks with per-mask adjustments.
-   *
-   * @param pixels - RGB pixel data (3 bytes per pixel)
-   * @param width - Image width
-   * @param height - Image height
-   * @param maskStack - Mask stack containing linear and radial gradient masks
-   * @returns New image with masked adjustments applied
-   */
-  async applyMaskedAdjustments(
+  applyMaskedAdjustments(
     pixels: Uint8Array,
     width: number,
     height: number,
     maskStack: MaskStackData
   ): Promise<DecodedImage> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'apply-masked-adjustments',
-      pixels,
-      width,
-      height,
-      maskStack
-    })
+    return this.routeRequest({ type: 'apply-masked-adjustments', pixels, width, height, maskStack })
   }
 
-  /**
-   * Generate a thumbnail with edits applied.
-   * Full pipeline: decode -> rotate -> crop -> adjust -> tone curve -> masks -> resize -> encode
-   *
-   * @param bytes - Raw image bytes (JPEG or RAW)
-   * @param size - Target thumbnail size (longest edge, typically 512)
-   * @param editState - Edit parameters to apply
-   * @returns JPEG-encoded thumbnail bytes with edits applied
-   */
-  async generateEditedThumbnail(
+  generateEditedThumbnail(
     bytes: Uint8Array,
     size: number,
     editState: EditedThumbnailEditState
   ): Promise<Uint8Array> {
-    return this.sendRequest({
-      id: this.generateId(),
-      type: 'generate-edited-thumbnail',
-      bytes,
-      size,
-      editState
-    })
+    return this.routeRequest({ type: 'generate-edited-thumbnail', bytes, size, editState })
   }
 
   /**

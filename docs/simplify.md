@@ -40,3 +40,4 @@
 - packages/core/src/gpu/pipelines/edit-pipeline.ts (extracted applyStage helper to DRY duplicate output texture creation, stage application, and cleanup tracking pattern across adjustments, tone curve, and masks stages)
 - packages/core/src/gpu/pipelines/rotation-pipeline.ts (extracted buildRotationParams helper to DRY duplicate rotation parameter calculation in apply() and applyToTextures() methods)
 - packages/core/src/gpu/pipelines/tone-curve-pipeline.ts (extracted executeComputePass helper to DRY duplicate LUT update, dimensions buffer update, bind group creation, and compute pass execution between apply() and applyToTextures() methods)
+- packages/core/src/decode/decode-service.ts (extracted parseDecodeResponse to new response-parser.ts to DRY duplicate handleResponse switch statements in decode-service.ts and decode-worker-pool.ts; added routeRequest helper to DRY generateId() + sendRequest() pattern across 14 methods)
