@@ -113,24 +113,70 @@ Performance research for maximizing FPS in the GPU edit pipeline.
 **Documents Created**:
 - `docs/research/perf/2026-01-25-draft-mode-implementation-research.md`
 
+---
+
+### 2026-01-25: Async Histogram & TexturePool Research
+
+**Goal**: Complete implementation research for Research Areas 2-4 (HIGH priority)
+
+**Research Conducted** (10 parallel agents):
+1. Triple-buffered staging buffer patterns (online research)
+2. GPU-direct histogram rendering techniques (online research)
+3. Histogram-pipeline.ts current implementation analysis
+4. TexturePool implementation analysis
+5. Edit-pipeline.ts texture allocation audit
+6. Buffer pooling best practices (online research)
+7. Figma/Photopea histogram approaches (online research)
+8. Clipping detection implementation analysis
+9. WebGPU subgroup operations for histogram (online research)
+10. WASM histogram implementation analysis
+
+**Key Findings**:
+
+1. **Triple-Buffered Histogram**:
+   - Current: Blocking `mapAsync()` creates 2-5ms stalls per frame
+   - Solution: `StagingBufferPool` class with 3 buffers (optimal per Metal/Vulkan best practices)
+   - Fire-and-forget pattern: Skip readback when pool exhausted, use previous frame data
+
+2. **GPU-Direct Histogram Rendering**:
+   - Fragment shader reads directly from storage buffer (zero CPU readback)
+   - Double-buffer interpolation with `smoothstep()` for smooth transitions
+   - Enables real-time 60fps histogram updates
+
+3. **TexturePool Integration**:
+   - Pool exists but is unused in production (lines 214-308 in texture-utils.ts)
+   - Current: 240MB GPU memory allocated per frame (5 textures × 48MB)
+   - Solution: Integrate pool in edit-pipeline.ts, reduce to ~48MB with reuse
+
+4. **Clipping Detection**:
+   - Currently reads full 4KB histogram to detect 8 bytes of data (512:1 overhead)
+   - Could create lightweight clipping-only shader for draft mode
+
+5. **Subgroup Operations**:
+   - Chrome 134+ supports `subgroupAdd()` for 2-4x faster histogram reduction
+   - Fallback to atomics for older browsers
+
+**Documents Created**:
+- `docs/research/perf/2026-01-25-async-histogram-texturepool-research.md`
+
 ## Next Steps
 
-### Phase 1: Quick Wins (1-2 days)
-1. Implement draft mode (skip histogram/clipping during drag)
-2. Integrate existing TexturePool in edit-pipeline.ts
-3. Add throttle/debounce to slider interactions
+### Phase 1: Quick Wins - RESEARCH COMPLETE
+1. ✅ Draft mode research complete (skip histogram/clipping during drag)
+2. ✅ TexturePool integration strategy documented
+3. ✅ Throttle/debounce timing researched (33ms draft, 400ms full)
 
-### Phase 2: Async Architecture (3-5 days)
-1. Triple-buffered histogram readback
-2. GPU-direct histogram rendering
-3. Fire-and-forget pattern for non-critical readbacks
+### Phase 2: Async Architecture - RESEARCH COMPLETE
+1. ✅ Triple-buffered histogram design complete (StagingBufferPool class)
+2. ✅ GPU-direct histogram rendering (WGSL shaders designed)
+3. ✅ Fire-and-forget pattern documented
 
-### Phase 3: Shader Optimizations (1 week)
-1. f16 processing with fallback
-2. Subgroup operations with fallback
-3. Single-pass adjustment uber-shader
+### Phase 3: Shader Optimizations - NEXT
+1. [ ] f16 processing research (Research Area 5)
+2. [ ] Subgroup operations research (Research Area 6) - preliminary findings included
+3. [ ] Single-pass adjustment uber-shader (Research Area 7)
 
-### Phase 4: Advanced (2 weeks)
-1. Mipmap-based progressive refinement
-2. Tile-based rendering with priority
-3. GPU timestamp profiling infrastructure
+### Phase 4: Advanced
+1. [ ] Progressive rendering research (Research Area 8)
+2. [ ] Mipmap-based refinement
+3. [ ] GPU timestamp profiling infrastructure

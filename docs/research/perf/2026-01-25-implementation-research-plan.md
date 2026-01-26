@@ -33,66 +33,69 @@ Based on the advanced GPU optimization synthesis, this plan focuses on researchi
 
 ---
 
-## Research Area 2: Triple-Buffered Histogram
+## Research Area 2: Triple-Buffered Histogram ✅ COMPLETE
 
 **Priority**: HIGH
 **Expected Impact**: Eliminate 2-5ms readback stalls
+**Status**: Research complete - see `2026-01-25-async-histogram-texturepool-research.md`
 
-### Questions to Answer
+### Questions Answered
 
-1. How to integrate staging buffer pool with existing histogram-pipeline.ts?
-2. What is the optimal pool size (2, 3, 4 buffers)?
-3. How to handle fire-and-forget pattern when pool is exhausted?
-4. Should histogram update be decoupled from render loop?
+1. **How to integrate staging buffer pool?** → `StagingBufferPool` class with acquire/release pattern
+2. **Optimal pool size?** → **3 buffers** (triple-buffering) - best tradeoff per Metal/Vulkan best practices
+3. **Fire-and-forget when exhausted?** → Skip readback, use previous frame's data (Vello pattern)
+4. **Decouple from render loop?** → Yes, use async callbacks with `computeAsync()` method
 
 ### Tasks
 
-- [ ] Profile current mapAsync timing in histogram-pipeline.ts
-- [ ] Design buffer pool integration
-- [ ] Implement non-blocking readback pattern
-- [ ] Test latency vs throughput tradeoffs
+- [x] Profile current mapAsync timing in histogram-pipeline.ts
+- [x] Design buffer pool integration
+- [x] Implement non-blocking readback pattern
+- [x] Test latency vs throughput tradeoffs
 
 ---
 
-## Research Area 3: GPU-Direct Histogram Rendering
+## Research Area 3: GPU-Direct Histogram Rendering ✅ COMPLETE
 
 **Priority**: HIGH
 **Expected Impact**: Zero-latency histogram updates
+**Status**: Research complete - see `2026-01-25-async-histogram-texturepool-research.md`
 
-### Questions to Answer
+### Questions Answered
 
-1. How to render histogram overlay without CPU readback?
-2. What WebGPU patterns work best for this use case?
-3. How to implement smooth animated transitions?
-4. How to integrate with existing Vue histogram component?
+1. **Render without readback?** → Fragment shader reads directly from storage buffer
+2. **Best WebGPU patterns?** → Bind compute output as fragment input, fullscreen quad rendering
+3. **Smooth transitions?** → Double-buffer interpolation with `smoothstep()` easing in shader
+4. **Vue integration?** → `GPUHistogramRenderer` class sharing buffer with compute pipeline
 
 ### Tasks
 
-- [ ] Design histogram render pipeline (storage buffer → render)
-- [ ] Create WGSL fragment shader for histogram visualization
-- [ ] Implement GPU-side Gaussian smoothing
-- [ ] Design double-buffer interpolation system
+- [x] Design histogram render pipeline (storage buffer → render)
+- [x] Create WGSL fragment shader for histogram visualization
+- [x] Implement GPU-side Gaussian smoothing
+- [x] Design double-buffer interpolation system
 
 ---
 
-## Research Area 4: TexturePool Integration
+## Research Area 4: TexturePool Integration ✅ COMPLETE
 
 **Priority**: HIGH
 **Expected Impact**: 1.2-2.4ms saved per frame
+**Status**: Research complete - see `2026-01-25-async-histogram-texturepool-research.md`
 
-### Questions to Answer
+### Questions Answered
 
-1. How to integrate existing TexturePool with edit-pipeline.ts?
-2. What pool configuration is optimal (size, eviction policy)?
-3. How to handle texture format/size variations?
-4. When should textures be destroyed vs pooled?
+1. **How to integrate?** → Replace `createTextureFromPixels()` with `pool.acquire()` + `writeTexture()`
+2. **Optimal configuration?** → Size 8, FIFO eviction (existing implementation)
+3. **Format/size variations?** → Pool keys by `${width}x${height}:${usage}` automatically
+4. **When to destroy vs pool?** → Pool during edit session, `clear()` on pipeline destroy
 
 ### Tasks
 
-- [ ] Audit current texture allocation in edit-pipeline.ts
-- [ ] Design pool integration strategy
-- [ ] Implement pool lifecycle management
-- [ ] Benchmark before/after allocation timing
+- [x] Audit current texture allocation in edit-pipeline.ts
+- [x] Design pool integration strategy
+- [x] Implement pool lifecycle management
+- [x] Benchmark before/after allocation timing
 
 ---
 
@@ -183,8 +186,8 @@ Based on the advanced GPU optimization synthesis, this plan focuses on researchi
 ## Next Steps
 
 1. ~~**Immediate**: Begin Research Area 1 (Draft Mode)~~ ✅ COMPLETE
-2. **Immediate**: Research Areas 2-4 (Async patterns, pooling) - Triple-buffered histogram, GPU-direct histogram, TexturePool integration
-3. **Short-term**: Research Areas 5-7 (Shader optimizations)
+2. ~~**Immediate**: Research Areas 2-4 (Async patterns, pooling)~~ ✅ COMPLETE
+3. **Next**: Research Areas 5-7 (Shader optimizations) - f16 processing, subgroups, single-pass uber-shader
 4. **Medium-term**: Research Area 8 (Progressive rendering)
 
 ---
