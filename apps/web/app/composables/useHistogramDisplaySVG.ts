@@ -246,6 +246,7 @@ export function useHistogramDisplaySVG(
   assetId: Ref<string>,
   adjustedPixelsRef?: Ref<Uint8Array | null | undefined>,
   adjustedDimensionsRef?: Ref<{ width: number; height: number } | null | undefined>,
+  renderQualityRef?: Ref<'draft' | 'full'>,
 ): UseHistogramDisplaySVGReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
@@ -536,6 +537,11 @@ export function useHistogramDisplaySVG(
     watch(
       [adjustedPixelsRef, adjustedDimensionsRef],
       ([pixels, dims]) => {
+        // Skip histogram computation during draft mode
+        // This saves computation entirely during rapid slider dragging
+        if (renderQualityRef?.value === 'draft') {
+          return // Use cached histogram during interaction
+        }
         if (pixels && dims) {
           scheduleComputeFromPixels(pixels, dims.width, dims.height)
         }

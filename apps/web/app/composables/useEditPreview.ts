@@ -103,7 +103,7 @@ export interface UseEditPreviewReturn {
 }
 
 // ============================================================================
-// Throttle Utility
+// Throttle & Debounce Utilities
 // ============================================================================
 
 /**
@@ -157,6 +157,40 @@ function throttle<T extends (...args: unknown[]) => void>(
   }
 
   return throttled as T & { cancel: () => void }
+}
+
+/**
+ * Debounce function that delays execution until after a period of inactivity.
+ * - Each call resets the timer
+ * - Function only executes after no calls for the specified delay
+ */
+function debounce<T extends (...args: unknown[]) => void>(
+  fn: T,
+  delay: number,
+): T & { cancel: () => void } {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  const debounced = (...args: Parameters<T>) => {
+    // Cancel any pending execution
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId)
+    }
+
+    // Schedule new execution
+    timeoutId = setTimeout(() => {
+      timeoutId = null
+      fn(...args)
+    }, delay)
+  }
+
+  debounced.cancel = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  }
+
+  return debounced as T & { cancel: () => void }
 }
 
 // ============================================================================
@@ -924,7 +958,11 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         }
 
         // ===== STEP 6: Detect clipping for overlay =====
-        clippingMap.value = detectClippedPixels(currentPixels, currentWidth, currentHeight)
+        // Only compute clipping in full quality mode
+        if (quality === 'full') {
+          clippingMap.value = detectClippedPixels(currentPixels, currentWidth, currentHeight)
+        }
+        // In draft mode, keep existing clippingMap (stale data is acceptable during drag)
         previewDimensions.value = { width: currentWidth, height: currentHeight }
 
         // ===== STEP 7: Store adjusted pixels for histogram =====
@@ -969,12 +1007,23 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   }
 
   /**
+   * Debounced full-quality render for when interaction ends.
+   * Fires 400ms after the last call, providing high-quality output after the user stops dragging.
+   */
+  const debouncedFullRender = debounce(() => {
+    renderPreview('full')
+  }, 400)
+
+  /**
    * Throttled render for use during slider drag.
-   * First update is immediate, subsequent updates throttled to 150ms.
+   * First update is immediate, subsequent updates throttled to 33ms (~30 FPS).
+   * After each draft render, schedules a debounced full-quality render.
    */
   const throttledRender = throttle(() => {
     renderPreview('draft')
-  }, 150)
+    // Schedule full-quality render for when interaction ends
+    debouncedFullRender()
+  }, 33)
 
   // ============================================================================
   // Watchers
@@ -1037,8 +1086,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       renderGeneration.value++
       const currentGen = renderGeneration.value
 
-      // Cancel any pending throttled renders
+      // Cancel any pending throttled and debounced renders
       throttledRender.cancel()
+      debouncedFullRender.cancel()
 
       // Reset state
       error.value = null
@@ -1276,6 +1326,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   onUnmounted(() => {
     throttledRender.cancel()
+    debouncedFullRender.cancel()
     // Only revoke blob URL if we created it (owned), not if it's borrowed from the store
     if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
       URL.revokeObjectURL(previewUrl.value)

@@ -10,10 +10,12 @@ const props = defineProps<{
   assetId: string
   adjustedPixels?: Uint8Array | null
   adjustedDimensions?: { width: number; height: number } | null
+  renderQuality?: 'draft' | 'full'
 }>()
 
 const adjustedPixelsRef = toRef(props, 'adjustedPixels')
 const adjustedDimensionsRef = toRef(props, 'adjustedDimensions')
+const renderQualityRef = toRef(props, 'renderQuality')
 
 const {
   canvasRef,
@@ -24,6 +26,7 @@ const {
   toRef(props, 'assetId'),
   adjustedPixelsRef,
   adjustedDimensionsRef,
+  renderQualityRef as Ref<'draft' | 'full'>,
 )
 
 // Use shared UI store for clipping overlay state

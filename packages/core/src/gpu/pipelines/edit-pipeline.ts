@@ -10,12 +10,11 @@
 
 import { getGPUCapabilityService } from '../capabilities'
 import {
-  createTextureFromPixels,
-  createOutputTexture,
   readTexturePixels,
   TextureUsage,
   rgbToRgba,
   rgbaToRgb,
+  TexturePool,
 } from '../texture-utils'
 import {
   getAdjustmentsPipeline,
@@ -104,6 +103,7 @@ export interface EditPipelineResult {
 export class GPUEditPipeline {
   private device: GPUDevice | null = null
   private _initialized = false
+  private texturePool: TexturePool | null = null
 
   /**
    * Whether the pipeline is ready to process images.
@@ -131,6 +131,11 @@ export class GPUEditPipeline {
     }
 
     this.device = gpuService.device
+
+    // Initialize texture pool for efficient memory reuse
+    // Pool size of 8 allows for all pipeline stages plus some headroom
+    this.texturePool = new TexturePool(this.device, 8)
+
     this._initialized = true
     return true
   }
@@ -187,13 +192,18 @@ export class GPUEditPipeline {
     // Convert RGB to RGBA and upload to GPU
     const uploadStart = performance.now()
     const rgba = rgbToRgba(input.pixels, input.width, input.height)
-    let inputTexture = createTextureFromPixels(
-      this.device,
-      rgba,
+    let inputTexture = this.texturePool!.acquire(
       input.width,
       input.height,
       TextureUsage.PINGPONG,
       'Edit Pipeline Input'
+    )
+    // Upload pixels to acquired texture
+    this.device.queue.writeTexture(
+      { texture: inputTexture },
+      rgba.buffer,
+      { bytesPerRow: input.width * 4, rowsPerImage: input.height, offset: rgba.byteOffset },
+      { width: input.width, height: input.height, depthOrArrayLayers: 1 }
     )
     timing.upload = performance.now() - uploadStart
 
@@ -202,8 +212,8 @@ export class GPUEditPipeline {
       label: 'Edit Pipeline Command Encoder',
     })
 
-    // Track textures for cleanup
-    const texturesToDestroy: GPUTexture[] = []
+    // Track textures for cleanup with their dimensions for pool release
+    const texturesToRelease: TextureWithDims[] = []
 
     // Stage 1: Rotation (changes dimensions)
     if (rotationPipeline && params.rotation && Math.abs(params.rotation) > 0.001) {
@@ -216,9 +226,8 @@ export class GPUEditPipeline {
         params.rotation
       )
 
-      // Create output texture with new dimensions
-      const outputTexture = createOutputTexture(
-        this.device,
+      // Create output texture with new dimensions from pool
+      const outputTexture = this.texturePool!.acquire(
         rotDims.width,
         rotDims.height,
         TextureUsage.PINGPONG,
@@ -237,8 +246,8 @@ export class GPUEditPipeline {
         encoder
       )
 
-      // Update current state
-      texturesToDestroy.push(inputTexture)
+      // Update current state - track old texture with its dimensions
+      texturesToRelease.push({ texture: inputTexture, width: currentWidth, height: currentHeight })
       inputTexture = outputTexture
       currentWidth = rotDims.width
       currentHeight = rotDims.height
@@ -253,7 +262,8 @@ export class GPUEditPipeline {
       currentWidth,
       currentHeight,
       encoder,
-      texturesToDestroy,
+      texturesToRelease,
+      texturePool: this.texturePool!,
     }
 
     // Stage 2: Adjustments
@@ -307,10 +317,10 @@ export class GPUEditPipeline {
     )
     timing.readback = performance.now() - readStart
 
-    // Cleanup all textures
-    inputTexture.destroy()
-    for (const texture of texturesToDestroy) {
-      texture.destroy()
+    // Release textures back to pool instead of destroying
+    this.texturePool!.release(inputTexture, currentWidth, currentHeight, TextureUsage.PINGPONG)
+    for (const item of texturesToRelease) {
+      this.texturePool!.release(item.texture, item.width, item.height, TextureUsage.PINGPONG)
     }
 
     // Convert RGBA back to RGB
@@ -330,6 +340,8 @@ export class GPUEditPipeline {
    * Destroy the pipeline and release resources.
    */
   destroy(): void {
+    this.texturePool?.clear()
+    this.texturePool = null
     this.device = null
     this._initialized = false
   }
@@ -340,6 +352,15 @@ export class GPUEditPipeline {
 // ============================================================================
 
 /**
+ * Texture with its dimensions for proper pool release.
+ */
+interface TextureWithDims {
+  texture: GPUTexture
+  width: number
+  height: number
+}
+
+/**
  * Context for applying a pipeline stage.
  */
 interface StageContext {
@@ -348,7 +369,8 @@ interface StageContext {
   currentWidth: number
   currentHeight: number
   encoder: GPUCommandEncoder
-  texturesToDestroy: GPUTexture[]
+  texturesToRelease: TextureWithDims[]
+  texturePool: TexturePool
 }
 
 /**
@@ -375,8 +397,7 @@ function applyStage(
 ): StageResult {
   const start = performance.now()
 
-  const outputTexture = createOutputTexture(
-    ctx.device,
+  const outputTexture = ctx.texturePool.acquire(
     ctx.currentWidth,
     ctx.currentHeight,
     TextureUsage.PINGPONG,
@@ -385,7 +406,8 @@ function applyStage(
 
   const encoder = applyFn(ctx.inputTexture, outputTexture, ctx.encoder)
 
-  ctx.texturesToDestroy.push(ctx.inputTexture)
+  // Track old texture with its dimensions for pool release
+  ctx.texturesToRelease.push({ texture: ctx.inputTexture, width: ctx.currentWidth, height: ctx.currentHeight })
 
   return {
     inputTexture: outputTexture,

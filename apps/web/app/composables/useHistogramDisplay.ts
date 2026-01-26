@@ -203,12 +203,14 @@ async function loadImagePixels(
  * @param assetId - Reactive ref to the current asset ID
  * @param adjustedPixelsRef - Optional ref to adjusted pixel data from preview
  * @param adjustedDimensionsRef - Optional ref to adjusted pixel dimensions
+ * @param renderQualityRef - Optional ref to render quality ('draft' | 'full') - skips computation in draft mode
  * @returns Histogram state and controls
  */
 export function useHistogramDisplay(
   assetId: Ref<string>,
   adjustedPixelsRef?: Ref<Uint8Array | null | undefined>,
   adjustedDimensionsRef?: Ref<{ width: number; height: number } | null | undefined>,
+  renderQualityRef?: Ref<'draft' | 'full'>,
 ): UseHistogramDisplayReturn {
   const editStore = useEditStore()
   const catalogStore = useCatalogStore()
@@ -642,6 +644,11 @@ export function useHistogramDisplay(
     watch(
       [adjustedPixelsRef, adjustedDimensionsRef],
       ([pixels, dims]) => {
+        // Skip histogram computation during draft mode (it has a 500ms debounce anyway,
+        // but this saves the computation entirely during rapid slider dragging)
+        if (renderQualityRef?.value === 'draft') {
+          return // Use cached histogram during interaction
+        }
         if (pixels && dims) {
           // Use debounced computation to avoid jank during rapid updates
           scheduleComputeFromPixels(pixels, dims.width, dims.height)

@@ -91,6 +91,7 @@ const {
 defineExpose({
   adjustedPixels,
   adjustedDimensions,
+  renderQuality,
   zoomIn,
   zoomOut,
   toggleZoom,

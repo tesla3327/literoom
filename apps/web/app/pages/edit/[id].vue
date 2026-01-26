@@ -47,6 +47,7 @@ const previewCanvasRef = ref<InstanceType<typeof EditPreviewCanvas> | null>(null
 // Reactive computed refs that extract adjusted pixels from the preview component
 const adjustedPixels = computed(() => previewCanvasRef.value?.adjustedPixels ?? null)
 const adjustedDimensions = computed(() => previewCanvasRef.value?.adjustedDimensions ?? null)
+const renderQuality = computed(() => previewCanvasRef.value?.renderQuality ?? 'full')
 
 // ============================================================================
 // Histogram Mode Toggle
@@ -318,12 +319,14 @@ onUnmounted(() => {
             :asset-id="assetId"
             :adjusted-pixels="adjustedPixels"
             :adjusted-dimensions="adjustedDimensions"
+            :render-quality="renderQuality"
           />
           <EditHistogramDisplaySVG
             v-else
             :asset-id="assetId"
             :adjusted-pixels="adjustedPixels"
             :adjusted-dimensions="adjustedDimensions"
+            :render-quality="renderQuality"
           />
 
           <!-- Quick info -->
