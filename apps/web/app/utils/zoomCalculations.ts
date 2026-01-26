@@ -63,7 +63,7 @@ export const ZOOM_CACHE_DEBOUNCE = 300
 // ============================================================================
 
 /** Check if dimensions are valid (non-zero) */
-function hasValidDimensions(d: Dimensions): boolean {
+export function hasValidDimensions(d: Dimensions): boolean {
   return d.imageWidth > 0 && d.imageHeight > 0 && d.viewportWidth > 0 && d.viewportHeight > 0
 }
 

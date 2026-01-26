@@ -8,19 +8,22 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { CropRectangle } from '@literoom/core/catalog'
-import type { Camera, ZoomPreset } from '~/utils/zoomCalculations'
+import type { Camera, Dimensions, ZoomPreset } from '~/utils/zoomCalculations'
 import {
-  calculateCenteredPan,
   calculateFitScale,
   clampPan,
   clampScale,
   createCameraForPreset,
   detectPreset,
   getZoomPercentage,
+  hasValidDimensions,
   zoomIn as zoomInCalc,
   zoomOut as zoomOutCalc,
   zoomToPoint,
 } from '~/utils/zoomCalculations'
+
+/** Standard presets that should recalculate camera on initializeZoom */
+const STANDARD_PRESETS: ReadonlySet<ZoomPreset> = new Set(['fit', 'fill', '100%', '200%'])
 
 /** Per-image cached zoom state */
 interface CachedZoomState {
@@ -55,6 +58,20 @@ export const useEditUIStore = defineStore('editUI', () => {
   const viewportDimensions = ref({ width: 0, height: 0 })
 
   // ============================================================================
+  // Dimension Helpers
+  // ============================================================================
+
+  /** Get current dimensions as a Dimensions object for calculation functions */
+  function getDimensions(): Dimensions {
+    return {
+      imageWidth: imageDimensions.value.width,
+      imageHeight: imageDimensions.value.height,
+      viewportWidth: viewportDimensions.value.width,
+      viewportHeight: viewportDimensions.value.height,
+    }
+  }
+
+  // ============================================================================
   // Zoom/Pan Computed
   // ============================================================================
 
@@ -62,14 +79,10 @@ export const useEditUIStore = defineStore('editUI', () => {
   const zoomPercentage = computed(() => getZoomPercentage(camera.value.scale))
 
   /** Fit scale for current image/viewport */
-  const fitScale = computed(() =>
-    calculateFitScale(
-      imageDimensions.value.width,
-      imageDimensions.value.height,
-      viewportDimensions.value.width,
-      viewportDimensions.value.height,
-    ),
-  )
+  const fitScale = computed(() => {
+    const d = getDimensions()
+    return calculateFitScale(d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
+  })
 
   /** Whether panning is currently allowed (zoomed in) */
   const canPanImage = computed(() => {
@@ -103,24 +116,19 @@ export const useEditUIStore = defineStore('editUI', () => {
    * Set camera state directly.
    */
   function setCamera(newCamera: Camera): void {
+    const d = getDimensions()
     // Clamp the pan to valid bounds
     const clamped = clampPan(
       { ...newCamera, scale: clampScale(newCamera.scale, fitScale.value) },
-      imageDimensions.value.width,
-      imageDimensions.value.height,
-      viewportDimensions.value.width,
-      viewportDimensions.value.height,
+      d.imageWidth,
+      d.imageHeight,
+      d.viewportWidth,
+      d.viewportHeight,
     )
     camera.value = clamped
 
     // Update preset based on new state
-    zoomPreset.value = detectPreset(
-      clamped,
-      imageDimensions.value.width,
-      imageDimensions.value.height,
-      viewportDimensions.value.width,
-      viewportDimensions.value.height,
-    )
+    zoomPreset.value = detectPreset(clamped, d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
   }
 
   /**
@@ -139,21 +147,9 @@ export const useEditUIStore = defineStore('editUI', () => {
 
     // Only calculate camera if we have valid dimensions
     // This prevents incorrect calculations during asset transitions
-    const hasValidDimensions
-      = imageDimensions.value.width > 0
-      && imageDimensions.value.height > 0
-      && viewportDimensions.value.width > 0
-      && viewportDimensions.value.height > 0
-
-    if (hasValidDimensions) {
-      const newCamera = createCameraForPreset(
-        preset,
-        imageDimensions.value.width,
-        imageDimensions.value.height,
-        viewportDimensions.value.width,
-        viewportDimensions.value.height,
-      )
-      camera.value = newCamera
+    const d = getDimensions()
+    if (hasValidDimensions(d)) {
+      camera.value = createCameraForPreset(preset, d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
     }
     // If dimensions aren't ready, initializeZoom() will calculate when they are
   }
@@ -277,30 +273,17 @@ export const useEditUIStore = defineStore('editUI', () => {
    * 2. Initial calculation when setZoomPreset() was called before dimensions were ready
    */
   function initializeZoom(): void {
+    const d = getDimensions()
     const preset = zoomPreset.value
 
-    // For standard presets (fit, fill, 100%, 200%), always recalculate
+    // For standard presets, always recalculate camera
     // This handles both viewport resize and deferred preset calculations
-    if (preset === 'fit' || preset === 'fill' || preset === '100%' || preset === '200%') {
-      const newCamera = createCameraForPreset(
-        preset,
-        imageDimensions.value.width,
-        imageDimensions.value.height,
-        viewportDimensions.value.width,
-        viewportDimensions.value.height,
-      )
-      camera.value = newCamera
+    if (STANDARD_PRESETS.has(preset)) {
+      camera.value = createCameraForPreset(preset, d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
     }
     else {
       // For custom zoom, just clamp pan to keep image properly positioned
-      const clamped = clampPan(
-        camera.value,
-        imageDimensions.value.width,
-        imageDimensions.value.height,
-        viewportDimensions.value.width,
-        viewportDimensions.value.height,
-      )
-      camera.value = clamped
+      camera.value = clampPan(camera.value, d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
     }
   }
 
