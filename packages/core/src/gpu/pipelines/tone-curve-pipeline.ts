@@ -200,6 +200,58 @@ export class ToneCurvePipeline {
   }
 
   /**
+   * Prepare resources for compute pass and execute it.
+   * Shared logic between apply() and applyToTextures().
+   */
+  private executeComputePass(
+    inputTexture: GPUTexture,
+    outputTexture: GPUTexture,
+    width: number,
+    height: number,
+    lut: ToneCurveLut,
+    encoder?: GPUCommandEncoder
+  ): GPUCommandEncoder {
+    // Update LUT texture
+    this.updateLut(lut)
+
+    // Update dimensions uniform buffer
+    const dimensionsData = new Uint32Array([width, height, 0, 0])
+    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, dimensionsData.buffer)
+
+    // Create bind group
+    const bindGroup = this.device.createBindGroup({
+      label: 'Tone Curve Bind Group',
+      layout: this.bindGroupLayout!,
+      entries: [
+        { binding: 0, resource: inputTexture.createView() },
+        { binding: 1, resource: outputTexture.createView() },
+        { binding: 2, resource: this.lutTexture!.createView() },
+        { binding: 3, resource: this.lutSampler! },
+        { binding: 4, resource: { buffer: this.dimensionsBuffer! } },
+      ],
+    })
+
+    // Create encoder if not provided
+    const commandEncoder =
+      encoder ||
+      this.device.createCommandEncoder({
+        label: 'Tone Curve Command Encoder',
+      })
+
+    // Calculate dispatch sizes and execute
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, ToneCurvePipeline.WORKGROUP_SIZE)
+    const pass = commandEncoder.beginComputePass({
+      label: 'Tone Curve Compute Pass',
+    })
+    pass.setPipeline(this.pipeline!)
+    pass.setBindGroup(0, bindGroup)
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
+    pass.end()
+
+    return commandEncoder
+  }
+
+  /**
    * Apply tone curve LUT to an image.
    *
    * @param inputPixels - Input RGBA pixel data (Uint8Array)
@@ -222,9 +274,6 @@ export class ToneCurvePipeline {
     if (isIdentityLut(lut)) {
       return inputPixels.slice() // Return copy
     }
-
-    // Update LUT texture
-    this.updateLut(lut)
 
     // Create input texture
     const inputTexture = this.device.createTexture({
@@ -253,39 +302,8 @@ export class ToneCurvePipeline {
         GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    // Update dimensions uniform buffer
-    const dimensionsData = new Uint32Array([width, height, 0, 0])
-    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, dimensionsData.buffer)
-
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'Tone Curve Bind Group',
-      layout: this.bindGroupLayout,
-      entries: [
-        { binding: 0, resource: inputTexture.createView() },
-        { binding: 1, resource: outputTexture.createView() },
-        { binding: 2, resource: this.lutTexture!.createView() },
-        { binding: 3, resource: this.lutSampler! },
-        { binding: 4, resource: { buffer: this.dimensionsBuffer! } },
-      ],
-    })
-
-    // Calculate dispatch sizes
-    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, ToneCurvePipeline.WORKGROUP_SIZE)
-
-    // Create command encoder
-    const encoder = this.device.createCommandEncoder({
-      label: 'Tone Curve Command Encoder',
-    })
-
-    // Begin compute pass
-    const pass = encoder.beginComputePass({
-      label: 'Tone Curve Compute Pass',
-    })
-    pass.setPipeline(this.pipeline)
-    pass.setBindGroup(0, bindGroup)
-    pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
-    pass.end()
+    // Execute compute pass
+    const encoder = this.executeComputePass(inputTexture, outputTexture, width, height, lut)
 
     // Create staging buffer for readback with aligned bytesPerRow
     const actualBytesPerRow = width * 4
@@ -348,46 +366,7 @@ export class ToneCurvePipeline {
       throw new Error('Pipeline not initialized. Call initialize() first.')
     }
 
-    // Update LUT texture
-    this.updateLut(lut)
-
-    // Update dimensions uniform buffer
-    const dimensionsData = new Uint32Array([width, height, 0, 0])
-    this.device.queue.writeBuffer(this.dimensionsBuffer!, 0, dimensionsData.buffer)
-
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'Tone Curve Bind Group',
-      layout: this.bindGroupLayout,
-      entries: [
-        { binding: 0, resource: inputTexture.createView() },
-        { binding: 1, resource: outputTexture.createView() },
-        { binding: 2, resource: this.lutTexture!.createView() },
-        { binding: 3, resource: this.lutSampler! },
-        { binding: 4, resource: { buffer: this.dimensionsBuffer! } },
-      ],
-    })
-
-    // Create encoder if not provided
-    const commandEncoder =
-      encoder ||
-      this.device.createCommandEncoder({
-        label: 'Tone Curve Command Encoder',
-      })
-
-    // Calculate dispatch sizes
-    const [workgroupsX, workgroupsY] = calculateDispatchSize(width, height, ToneCurvePipeline.WORKGROUP_SIZE)
-
-    // Begin compute pass
-    const pass = commandEncoder.beginComputePass({
-      label: 'Tone Curve Compute Pass',
-    })
-    pass.setPipeline(this.pipeline)
-    pass.setBindGroup(0, bindGroup)
-    pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
-    pass.end()
-
-    return commandEncoder
+    return this.executeComputePass(inputTexture, outputTexture, width, height, lut, encoder)
   }
 
   /**
