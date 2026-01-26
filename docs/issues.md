@@ -9,6 +9,8 @@
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
+- [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
+- [No help modal exists (Low)](#no-help-modal-exists)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
@@ -332,6 +334,71 @@ Users may want to export rejected photos for backup purposes or to share them fo
 **Files to Investigate**:
 - `apps/web/app/components/export/ExportModal.vue` - Export modal UI
 - `apps/web/app/composables/useExport.ts` - Export logic
+
+---
+
+### Delete key doesn't delete photos from grid
+
+**Severity**: Low | **Type**: Missing Feature | **Found**: 2026-01-25
+
+**Problem**:
+Pressing the Delete key when a photo is selected in the grid view has no effect. The QA plan specifies that Delete should delete the selected photo (with confirmation dialog).
+
+**Steps to Reproduce**:
+1. Open catalog grid view
+2. Click on a photo to select it
+3. Press the Delete key
+4. Observe: Nothing happens
+
+**Expected Behavior**:
+A confirmation dialog should appear asking if the user wants to delete the selected photo(s).
+
+**Actual Behavior**:
+The Delete key has no effect. The photo remains in the grid.
+
+**Technical Details**:
+Tested in Demo Mode. The Delete key works correctly in the Edit view for deleting selected masks, but has no handler in the Grid view.
+
+**Files to Investigate**:
+- `apps/web/app/components/catalog/CatalogGrid.vue` - Grid keyboard handler
+- `apps/web/app/composables/useCatalogKeyboard.ts` - Keyboard shortcut handling
+
+**Screenshots**:
+- `docs/screenshots/qa-section15-29-delete-key-no-action.png` - Delete key has no effect
+
+---
+
+### No help modal exists
+
+**Severity**: Low | **Type**: Missing Feature | **Found**: 2026-01-25
+
+**Problem**:
+The QA plan specifies that pressing the ? key (or Cmd/Ctrl+/) should open a help modal showing all keyboard shortcuts. This feature does not exist.
+
+**Steps to Reproduce**:
+1. Open the app (grid or edit view)
+2. Press the ? key (Shift+/)
+3. Observe: Nothing happens
+
+**Expected Behavior**:
+A help modal should appear listing all keyboard shortcuts with platform-specific modifiers (Cmd on Mac, Ctrl on Windows).
+
+**Actual Behavior**:
+Pressing ? has no effect. There is no help modal or shortcut reference in the app.
+
+**Suggested Implementation**:
+1. Create a `HelpModal.vue` component listing all shortcuts
+2. Organize shortcuts by context (Grid, Edit, Crop, Masks)
+3. Show platform-specific modifier keys
+4. Add keyboard handler for ? and Cmd/Ctrl+/ to open the modal
+5. Add a help icon button in the header as alternative access
+
+**Files to Create**:
+- `apps/web/app/components/HelpModal.vue`
+
+**Files to Modify**:
+- `apps/web/app/pages/index.vue` - Add keyboard handler
+- `apps/web/app/pages/edit/[id].vue` - Add keyboard handler
 
 ---
 

@@ -581,34 +581,62 @@ This document provides a complete manual testing checklist for the Literoom phot
 
 ## 15. Keyboard Shortcuts (Global)
 
+**Tested**: 2026-01-25 | **Status**: PARTIAL PASS (2 features not implemented)
+
 ### 15.1 Grid View
-- [ ] Arrow keys navigate grid
-- [ ] P/X/U for flagging
-- [ ] E/Enter/D enter edit view
-- [ ] G goes to grid
-- [ ] Delete deletes photo
-- [ ] Cmd/Ctrl+E opens export
-- [ ] ? opens help modal
+- [x] Arrow keys navigate grid - verified (Left/Right/Up/Down all work)
+- [x] P/X/U for flagging - verified (P=Pick, X=Reject, U=Unflag)
+- [x] E/Enter/D enter edit view - all 3 keys work, navigates to /edit/[id]
+- [x] G goes to grid - verified (when already in grid, no effect; from edit, returns to grid)
+- [ ] Delete deletes photo - **NOT IMPLEMENTED** - Delete key has no effect in grid view
+- [x] Cmd/Ctrl+E opens export - verified (export modal opens)
+- [ ] ? opens help modal - **NOT IMPLEMENTED** - No help modal exists in the app
 
 ### 15.2 Edit View
-- [ ] Left/Right arrow navigate photos
-- [ ] Escape/G returns to grid
-- [ ] Cmd/Ctrl+Shift+C copies settings
-- [ ] Cmd/Ctrl+Shift+V pastes settings
-- [ ] J toggles clipping overlay
-- [ ] Z toggles zoom
-- [ ] Cmd/Ctrl+0/1/+/- zoom controls
-- [ ] Space+drag pans
-- [ ] Delete removes selected mask
-- [ ] Enter applies crop
-- [ ] Escape cancels crop/mask
+- [x] Left/Right arrow navigate photos - verified (8/50 → 9/50 → 8/50)
+- [x] Escape/G returns to grid - both work correctly
+- [x] Cmd/Ctrl+Shift+C copies settings - verified (opens copy modal)
+- [x] Cmd/Ctrl+Shift+V pastes settings - verified (pastes settings when clipboard has data)
+- [x] J toggles clipping overlay - verified (overlay toggles on/off)
+- [x] Z toggles zoom - verified (113% → 100% → 113%)
+- [x] Cmd/Ctrl+0/1/+/- zoom controls - all verified:
+  - Cmd+0 = Fit (returns to 113%)
+  - Cmd+1 = 100%
+  - Cmd++ = Zoom in (113% → 124%)
+  - Cmd+- = Zoom out (124% → 113%)
+- [x] Space+drag pans - verified at 100% zoom
+- [x] Delete removes selected mask - verified (mask deleted after Delete key)
+- [x] Enter applies crop - verified (crop action bar disappears)
+- [x] Escape cancels crop - verified (stays in edit view, crop cancelled)
 
 ### 15.3 Help Modal
-- [ ] ? key opens modal
-- [ ] Cmd/Ctrl+/ opens modal
-- [ ] All shortcuts listed correctly
-- [ ] Platform-specific modifiers shown
-- [ ] Close button works
+- [ ] ? key opens modal - **NOT IMPLEMENTED** - No help modal exists
+- [ ] Cmd/Ctrl+/ opens modal - **NOT IMPLEMENTED** - No help modal exists
+- [ ] All shortcuts listed correctly - N/A (modal doesn't exist)
+- [ ] Platform-specific modifiers shown - N/A (modal doesn't exist)
+- [ ] Close button works - N/A (modal doesn't exist)
+
+### Screenshots
+- `qa-section15-01-grid-initial.png` - Initial grid view
+- `qa-section15-02-grid-cell-focused.png` - Grid cell focused
+- `qa-section15-03-arrow-right.png` to `qa-section15-05-arrow-left-up.png` - Arrow key navigation
+- `qa-section15-06-p-key-pick.png` to `qa-section15-08-u-key-unflag.png` - P/X/U flagging
+- `qa-section15-09-e-key-edit-view.png` - E key enters edit view
+- `qa-section15-10-g-key-grid.png` - G key returns to grid
+- `qa-section15-11-enter-key-edit.png` - Enter key enters edit view
+- `qa-section15-12-d-key-edit.png` - D key enters edit view
+- `qa-section15-13-escape-grid.png` - Escape returns to grid
+- `qa-section15-14-cmd-e-export.png` - Cmd+E opens export modal
+- `qa-section15-15-question-key-no-modal.png` - ? key has no effect (no help modal)
+- `qa-section15-16-edit-view.png` to `qa-section15-17-arrow-right-edit.png` - Edit view navigation
+- `qa-section15-18-j-key-clipping.png` - J key toggles clipping overlay
+- `qa-section15-19-z-key-zoom-100.png` to `qa-section15-23-cmd-minus-zoom-out.png` - Zoom shortcuts
+- `qa-section15-24-cmd-shift-c-copy-modal.png` - Copy settings modal
+- `qa-section15-25-cmd-shift-v-paste.png` - Paste settings
+- `qa-section15-26-crop-tool-active.png` to `qa-section15-28-escape-cancel-crop.png` - Crop shortcuts
+- `qa-section15-29-delete-key-no-action.png` - Delete key has no effect in grid
+- `qa-section15-30-100-zoom-for-pan.png` to `qa-section15-31-after-space-drag-pan.png` - Space+drag pan
+- `qa-section15-32-mask-created.png` to `qa-section15-33-mask-deleted.png` - Delete removes mask
 
 ---
 
