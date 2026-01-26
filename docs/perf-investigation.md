@@ -6,6 +6,38 @@
 
 Performance research for maximizing FPS in the GPU edit pipeline.
 
+## Current Status: Research Analysis Required
+
+All four research phases are complete. **Next step**: Analyze all research findings across the synthesis documents and determine the highest-priority optimizations to implement.
+
+### Analysis Tasks
+
+1. [ ] Review all synthesis documents and extract prioritized optimization list
+2. [ ] Estimate implementation effort vs. performance impact for each optimization
+3. [ ] Identify dependencies between optimizations
+4. [ ] Create implementation roadmap with quick wins first
+5. [ ] Define success metrics and benchmarking approach
+
+### Research Documents to Analyze
+
+| Document | Focus Area |
+|----------|------------|
+| `2026-01-25-gpu-pipeline-optimization-synthesis.md` | Initial findings, quick wins |
+| `2026-01-25-advanced-gpu-optimization-synthesis.md` | WebGPU techniques |
+| `2026-01-25-draft-mode-implementation-research.md` | Draft mode details |
+| `2026-01-25-async-histogram-texturepool-research.md` | Async patterns, pooling |
+| `2026-01-26-shader-optimization-synthesis.md` | f16, subgroups, uber-shader |
+| `2026-01-26-phase4-advanced-research-synthesis.md` | Progressive rendering, profiling |
+
+### Priority Criteria
+
+- **Impact**: How much FPS improvement?
+- **Effort**: How many days to implement?
+- **Risk**: Could it break existing functionality?
+- **Dependencies**: What else needs to be done first?
+
+---
+
 ## Research Completed
 
 ### 2026-01-25: Initial Investigation
