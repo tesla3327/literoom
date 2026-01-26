@@ -44,6 +44,27 @@ export const DEFAULT_BASIC_ADJUSTMENTS: BasicAdjustments = {
 }
 
 /**
+ * Pack adjustments into a Float32Array for GPU uniform buffer.
+ * Includes 2 padding values for 16-byte alignment (48 bytes total).
+ */
+export function packAdjustmentsToFloat32Array(adjustments: BasicAdjustments): Float32Array {
+  return new Float32Array([
+    adjustments.temperature,
+    adjustments.tint,
+    adjustments.exposure,
+    adjustments.contrast,
+    adjustments.highlights,
+    adjustments.shadows,
+    adjustments.whites,
+    adjustments.blacks,
+    adjustments.vibrance,
+    adjustments.saturation,
+    0, // padding
+    0, // padding
+  ])
+}
+
+/**
  * GPU pipeline for applying basic adjustments.
  */
 export class AdjustmentsPipeline {
@@ -197,25 +218,8 @@ export class AdjustmentsPipeline {
     })
 
     // Update adjustments uniform buffer
-    const adjustmentsData = new Float32Array([
-      adjustments.temperature,
-      adjustments.tint,
-      adjustments.exposure,
-      adjustments.contrast,
-      adjustments.highlights,
-      adjustments.shadows,
-      adjustments.whites,
-      adjustments.blacks,
-      adjustments.vibrance,
-      adjustments.saturation,
-      0, // padding
-      0, // padding
-    ])
-    this.device.queue.writeBuffer(
-      this.adjustmentsBuffer!,
-      0,
-      adjustmentsData.buffer
-    )
+    const adjustmentsData = packAdjustmentsToFloat32Array(adjustments)
+    this.device.queue.writeBuffer(this.adjustmentsBuffer!, 0, adjustmentsData.buffer)
 
     // Update dimensions uniform buffer
     const dimensionsData = new Uint32Array([width, height, 0, 0])
@@ -316,25 +320,8 @@ export class AdjustmentsPipeline {
     }
 
     // Update uniform buffers
-    const adjustmentsData = new Float32Array([
-      adjustments.temperature,
-      adjustments.tint,
-      adjustments.exposure,
-      adjustments.contrast,
-      adjustments.highlights,
-      adjustments.shadows,
-      adjustments.whites,
-      adjustments.blacks,
-      adjustments.vibrance,
-      adjustments.saturation,
-      0,
-      0,
-    ])
-    this.device.queue.writeBuffer(
-      this.adjustmentsBuffer!,
-      0,
-      adjustmentsData.buffer
-    )
+    const adjustmentsData = packAdjustmentsToFloat32Array(adjustments)
+    this.device.queue.writeBuffer(this.adjustmentsBuffer!, 0, adjustmentsData.buffer)
 
     const dimensionsData = new Uint32Array([width, height, 0, 0])
     this.device.queue.writeBuffer(

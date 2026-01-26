@@ -33,3 +33,4 @@
 - packages/core/src/catalog/thumbnail-service.ts (extracted QueueProcessor helper class to DRY duplicate queue/processing logic between thumbnail and preview pipelines)
 - apps/web/app/components/catalog/CatalogGrid.vue (extracted useGridLayout composable to DRY grid layout calculations including rowCount, getGlobalIndex, columnsInRow, getRowIndex, and getItem helpers)
 - packages/core/src/decode/mock-decode-service.ts (extracted clamp255 and luminance helpers to DRY ~35 clamping operations and ~7 luminance calculations; consolidated applyAdjustments to use applyAllAdjustmentsToPixel which is also used by applyPixelAdjustments for masked adjustments)
+- packages/core/src/gpu/pipelines/adjustments-pipeline.ts (extracted packAdjustmentsToFloat32Array helper to DRY duplicate Float32Array construction in apply() and applyToTextures() methods)
