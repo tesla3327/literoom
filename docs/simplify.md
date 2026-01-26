@@ -36,3 +36,4 @@
 - packages/core/src/gpu/pipelines/adjustments-pipeline.ts (extracted packAdjustmentsToFloat32Array helper to DRY duplicate Float32Array construction in apply() and applyToTextures() methods)
 - packages/core/src/gpu/adaptive-processor.ts (extracted _buildGPUSuccessResult, _buildWASMFallbackResult, _buildWASMResult, _handleGPUError, and _logPerformance helpers to DRY duplicate GPU execution, timing, logging, and error handling logic between execute() and executeSync() methods)
 - packages/core/src/decode/curve-utils.ts (extracted linearInterpolateCurve helper to DRY duplicate linear interpolation logic in useToneCurve.ts and mock-decode-service.ts)
+- packages/core/src/decode/decode-worker-pool.ts (extracted routeRequest helper to DRY duplicate getLeastBusyWorker() + generateId() + sendRequest() pattern across 14 IDecodeService methods)

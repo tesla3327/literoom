@@ -261,171 +261,86 @@ export class DecodeWorkerPool implements IDecodeService {
     })
   }
 
+  /**
+   * Create a request with the given fields and route it to the least busy worker.
+   * DRYs up the common pattern: getLeastBusyWorker() + generateId() + sendRequest().
+   */
+  private routeRequest<T extends DecodedImage | FileType | HistogramData | Uint8Array>(
+    requestFields: Omit<DecodeRequest, 'id'>
+  ): Promise<T> {
+    const workerId = this.getLeastBusyWorker()
+    const request = { ...requestFields, id: this.generateId(workerId) } as DecodeRequest
+    return this.sendRequest(request, workerId)
+  }
+
   // ===========================================================================
   // IDecodeService Implementation
   // ===========================================================================
 
-  /**
-   * Decode a JPEG file to raw RGB pixels.
-   */
-  async decodeJpeg(bytes: Uint8Array): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'decode-jpeg',
-      bytes
-    }, workerId)
+  decodeJpeg(bytes: Uint8Array): Promise<DecodedImage> {
+    return this.routeRequest({ type: 'decode-jpeg', bytes })
   }
 
-  /**
-   * Extract and decode the embedded thumbnail from a RAW file.
-   */
-  async decodeRawThumbnail(bytes: Uint8Array): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'decode-raw-thumbnail',
-      bytes
-    }, workerId)
+  decodeRawThumbnail(bytes: Uint8Array): Promise<DecodedImage> {
+    return this.routeRequest({ type: 'decode-raw-thumbnail', bytes })
   }
 
-  /**
-   * Generate a thumbnail from image bytes.
-   */
-  async generateThumbnail(
-    bytes: Uint8Array,
-    options: ThumbnailOptions = {}
-  ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'generate-thumbnail',
-      bytes,
-      size: options.size ?? 256
-    }, workerId)
+  generateThumbnail(bytes: Uint8Array, options: ThumbnailOptions = {}): Promise<DecodedImage> {
+    return this.routeRequest({ type: 'generate-thumbnail', bytes, size: options.size ?? 256 })
   }
 
-  /**
-   * Generate a preview from image bytes.
-   */
-  async generatePreview(
-    bytes: Uint8Array,
-    options: PreviewOptions
-  ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
+  generatePreview(bytes: Uint8Array, options: PreviewOptions): Promise<DecodedImage> {
+    return this.routeRequest({
       type: 'generate-preview',
       bytes,
       maxEdge: options.maxEdge,
       filter: filterToNumber(options.filter)
-    }, workerId)
+    })
   }
 
-  /**
-   * Detect the file type from magic bytes.
-   */
-  async detectFileType(bytes: Uint8Array): Promise<FileType> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'detect-file-type',
-      bytes
-    }, workerId)
+  detectFileType(bytes: Uint8Array): Promise<FileType> {
+    return this.routeRequest({ type: 'detect-file-type', bytes })
   }
 
-  /**
-   * Apply adjustments to image pixel data.
-   */
-  async applyAdjustments(
+  applyAdjustments(
     pixels: Uint8Array,
     width: number,
     height: number,
     adjustments: Adjustments
   ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'apply-adjustments',
-      pixels,
-      width,
-      height,
-      adjustments
-    }, workerId)
+    return this.routeRequest({ type: 'apply-adjustments', pixels, width, height, adjustments })
   }
 
-  /**
-   * Compute histogram from image pixel data.
-   */
-  async computeHistogram(
-    pixels: Uint8Array,
-    width: number,
-    height: number
-  ): Promise<HistogramData> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'compute-histogram',
-      pixels,
-      width,
-      height
-    }, workerId)
+  computeHistogram(pixels: Uint8Array, width: number, height: number): Promise<HistogramData> {
+    return this.routeRequest({ type: 'compute-histogram', pixels, width, height })
   }
 
-  /**
-   * Apply tone curve to image pixel data.
-   */
-  async applyToneCurve(
+  applyToneCurve(
     pixels: Uint8Array,
     width: number,
     height: number,
     points: Array<{ x: number; y: number }>
   ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'apply-tone-curve',
-      pixels,
-      width,
-      height,
-      points
-    }, workerId)
+    return this.routeRequest({ type: 'apply-tone-curve', pixels, width, height, points })
   }
 
-  /**
-   * Apply rotation to image pixel data.
-   */
-  async applyRotation(
+  applyRotation(
     pixels: Uint8Array,
     width: number,
     height: number,
     angleDegrees: number,
     useLanczos = false
   ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'apply-rotation',
-      pixels,
-      width,
-      height,
-      angleDegrees,
-      useLanczos
-    }, workerId)
+    return this.routeRequest({ type: 'apply-rotation', pixels, width, height, angleDegrees, useLanczos })
   }
 
-  /**
-   * Apply crop to image pixel data.
-   */
-  async applyCrop(
+  applyCrop(
     pixels: Uint8Array,
     width: number,
     height: number,
     crop: { left: number; top: number; width: number; height: number }
   ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
+    return this.routeRequest({
       type: 'apply-crop',
       pixels,
       width,
@@ -434,66 +349,28 @@ export class DecodeWorkerPool implements IDecodeService {
       top: crop.top,
       cropWidth: crop.width,
       cropHeight: crop.height
-    }, workerId)
+    })
   }
 
-  /**
-   * Encode image pixel data to JPEG bytes.
-   */
-  async encodeJpeg(
-    pixels: Uint8Array,
-    width: number,
-    height: number,
-    quality = 90
-  ): Promise<Uint8Array> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'encode-jpeg',
-      pixels,
-      width,
-      height,
-      quality
-    }, workerId)
+  encodeJpeg(pixels: Uint8Array, width: number, height: number, quality = 90): Promise<Uint8Array> {
+    return this.routeRequest({ type: 'encode-jpeg', pixels, width, height, quality })
   }
 
-  /**
-   * Apply masked adjustments (local adjustments) to image pixel data.
-   */
-  async applyMaskedAdjustments(
+  applyMaskedAdjustments(
     pixels: Uint8Array,
     width: number,
     height: number,
     maskStack: MaskStackData
   ): Promise<DecodedImage> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'apply-masked-adjustments',
-      pixels,
-      width,
-      height,
-      maskStack
-    }, workerId)
+    return this.routeRequest({ type: 'apply-masked-adjustments', pixels, width, height, maskStack })
   }
 
-  /**
-   * Generate a thumbnail with edits applied.
-   * Full pipeline: decode -> rotate -> crop -> adjust -> tone curve -> masks -> resize -> encode
-   */
-  async generateEditedThumbnail(
+  generateEditedThumbnail(
     bytes: Uint8Array,
     size: number,
     editState: EditedThumbnailEditState
   ): Promise<Uint8Array> {
-    const workerId = this.getLeastBusyWorker()
-    return this.sendRequest({
-      id: this.generateId(workerId),
-      type: 'generate-edited-thumbnail',
-      bytes,
-      size,
-      editState
-    }, workerId)
+    return this.routeRequest({ type: 'generate-edited-thumbnail', bytes, size, editState })
   }
 
   /**
