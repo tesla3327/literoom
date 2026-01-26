@@ -36,6 +36,15 @@ All four research phases are complete. **Next step**: Analyze all research findi
 - **Risk**: Could it break existing functionality?
 - **Dependencies**: What else needs to be done first?
 
+### Benchmarking Requirements
+
+Benchmarking must be **automated** to ensure:
+- Consistent, repeatable measurements across changes
+- CI integration for regression detection
+- Before/after comparison for each optimization
+- GPU timestamp queries for accurate GPU timing (not just CPU timing)
+- Multiple test images (various sizes, edit complexity levels)
+
 ---
 
 ## Research Completed
