@@ -69,6 +69,8 @@ interface MockGPUDevice {
   createBuffer: ReturnType<typeof vi.fn>
   createBindGroup: ReturnType<typeof vi.fn>
   createCommandEncoder: ReturnType<typeof vi.fn>
+  createQuerySet: ReturnType<typeof vi.fn>
+  features: Set<string>
   queue: {
     writeTexture: ReturnType<typeof vi.fn>
     writeBuffer: ReturnType<typeof vi.fn>
@@ -103,6 +105,10 @@ function createMockDevice(): MockGPUDevice {
       copyTextureToBuffer: vi.fn(),
       finish: vi.fn(() => ({})),
     })),
+    createQuerySet: vi.fn(() => ({
+      destroy: vi.fn(),
+    })),
+    features: new Set<string>(), // Mock features without timestamp-query support
     queue: {
       writeTexture: vi.fn(),
       writeBuffer: vi.fn(),
@@ -488,6 +494,7 @@ describe('EditPipelineTiming', () => {
   it('should have all timing fields', () => {
     const timing = {
       total: 0,
+      downsample: 0,
       upload: 0,
       rotation: 0,
       adjustments: 0,
@@ -497,6 +504,7 @@ describe('EditPipelineTiming', () => {
     }
 
     expect(timing).toHaveProperty('total')
+    expect(timing).toHaveProperty('downsample')
     expect(timing).toHaveProperty('upload')
     expect(timing).toHaveProperty('rotation')
     expect(timing).toHaveProperty('adjustments')
@@ -507,7 +515,8 @@ describe('EditPipelineTiming', () => {
 
   it('should have total >= sum of parts', () => {
     const timing = {
-      total: 100,
+      total: 110,
+      downsample: 5,
       upload: 10,
       rotation: 20,
       adjustments: 30,
@@ -517,6 +526,7 @@ describe('EditPipelineTiming', () => {
     }
 
     const sumOfParts =
+      timing.downsample +
       timing.upload +
       timing.rotation +
       timing.adjustments +
@@ -2070,6 +2080,7 @@ describe('GPUEditPipeline.process()', () => {
       const result = await pipeline.process(input, params)
 
       expect(result.timing).toHaveProperty('total')
+      expect(result.timing).toHaveProperty('downsample')
       expect(result.timing).toHaveProperty('upload')
       expect(result.timing).toHaveProperty('rotation')
       expect(result.timing).toHaveProperty('adjustments')
@@ -2085,6 +2096,7 @@ describe('GPUEditPipeline.process()', () => {
       const result = await pipeline.process(input, params)
 
       expect(result.timing.total).toBeGreaterThanOrEqual(0)
+      expect(result.timing.downsample).toBeGreaterThanOrEqual(0)
       expect(result.timing.upload).toBeGreaterThanOrEqual(0)
       expect(result.timing.rotation).toBeGreaterThanOrEqual(0)
       expect(result.timing.adjustments).toBeGreaterThanOrEqual(0)
@@ -2111,6 +2123,33 @@ describe('GPUEditPipeline.process()', () => {
       const result = await pipeline.process(input, params)
 
       expect(result.timing.rotation).toBe(0)
+    })
+
+    it('should have zero downsample timing when targetResolution is 1.0', async () => {
+      const input = createTestInput(4, 4)
+      const params: EditPipelineParams = { targetResolution: 1.0 }
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.timing.downsample).toBe(0)
+    })
+
+    it('should have zero downsample timing when targetResolution is undefined', async () => {
+      const input = createTestInput(4, 4)
+      const params: EditPipelineParams = {}
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.timing.downsample).toBe(0)
+    })
+
+    it('should have non-zero downsample timing when targetResolution is 0.5', async () => {
+      const input = createTestInput(8, 8)
+      const params: EditPipelineParams = { targetResolution: 0.5 }
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.timing.downsample).toBeGreaterThanOrEqual(0)
     })
   })
 
@@ -2143,6 +2182,95 @@ describe('GPUEditPipeline.process()', () => {
 
       // At minimum, one texture is acquired for input
       expect(createdTextures.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('half-resolution draft mode (targetResolution)', () => {
+    it('should process at half resolution when targetResolution is 0.5', async () => {
+      vi.mocked(readTexturePixels).mockResolvedValue(new Uint8Array(4 * 4 * 4).fill(128))
+
+      const input = createTestInput(8, 8)
+      const params: EditPipelineParams = { targetResolution: 0.5 }
+
+      const result = await pipeline.process(input, params)
+
+      // Output should be at half resolution (4x4 instead of 8x8)
+      expect(result.width).toBe(4)
+      expect(result.height).toBe(4)
+      expect(result.pixels.length).toBe(4 * 4 * 3) // RGB output
+    })
+
+    it('should process at full resolution when targetResolution is 1.0', async () => {
+      vi.mocked(readTexturePixels).mockResolvedValue(new Uint8Array(8 * 8 * 4).fill(128))
+
+      const input = createTestInput(8, 8)
+      const params: EditPipelineParams = { targetResolution: 1.0 }
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.width).toBe(8)
+      expect(result.height).toBe(8)
+      expect(result.pixels.length).toBe(8 * 8 * 3)
+    })
+
+    it('should process at full resolution when targetResolution is undefined', async () => {
+      vi.mocked(readTexturePixels).mockResolvedValue(new Uint8Array(8 * 8 * 4).fill(128))
+
+      const input = createTestInput(8, 8)
+      const params: EditPipelineParams = {}
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.width).toBe(8)
+      expect(result.height).toBe(8)
+    })
+
+    it('should not modify input when targetResolution >= 1.0', async () => {
+      vi.mocked(readTexturePixels).mockResolvedValue(new Uint8Array(10 * 10 * 4).fill(128))
+
+      const input = createTestInput(10, 10)
+      const params: EditPipelineParams = { targetResolution: 1.5 }
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.width).toBe(10)
+      expect(result.height).toBe(10)
+    })
+
+    it('should handle odd dimensions gracefully', async () => {
+      // 7x5 at 0.5 scale should give floor(7*0.5)=3 x floor(5*0.5)=2
+      vi.mocked(readTexturePixels).mockResolvedValue(new Uint8Array(3 * 2 * 4).fill(128))
+
+      const input: EditPipelineInput = {
+        pixels: new Uint8Array(7 * 5 * 3).fill(100),
+        width: 7,
+        height: 5,
+      }
+      const params: EditPipelineParams = { targetResolution: 0.5 }
+
+      const result = await pipeline.process(input, params)
+
+      expect(result.width).toBe(3)
+      expect(result.height).toBe(2)
+    })
+
+    it('should combine downsampling with other operations', async () => {
+      vi.mocked(getAdjustmentsPipeline).mockResolvedValue(mockAdjustmentsPipeline as any)
+      vi.mocked(readTexturePixels).mockResolvedValue(new Uint8Array(4 * 4 * 4).fill(128))
+
+      const input = createTestInput(8, 8)
+      const params: EditPipelineParams = {
+        targetResolution: 0.5,
+        adjustments: { ...DEFAULT_BASIC_ADJUSTMENTS, exposure: 1 },
+      }
+
+      const result = await pipeline.process(input, params)
+
+      // Should be at half resolution
+      expect(result.width).toBe(4)
+      expect(result.height).toBe(4)
+      // Adjustments should still be applied
+      expect(mockAdjustmentsPipeline.applyToTextures).toHaveBeenCalled()
     })
   })
 

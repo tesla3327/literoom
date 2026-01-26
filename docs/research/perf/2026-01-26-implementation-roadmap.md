@@ -406,10 +406,41 @@ Track regressions with threshold-based detection (>10% regression = failure).
 - **1.5**: Added 400ms debounced full-quality render after interaction ends
 
 ### Phase 2 Complete When:
-- [ ] Draft renders at 1/2 resolution
-- [ ] Histogram updates without blocking
-- [ ] GPU timing data visible in debug mode
-- [ ] Progressive refinement state machine working
+- [x] Draft renders at 1/2 resolution
+- [x] Histogram updates without blocking
+- [x] GPU timing data visible in debug mode
+- [x] Progressive refinement state machine working
+
+**Phase 2 Implementation Details** (2026-01-26):
+- **2.1**: Half-resolution draft mode via `targetResolution: 0.5` parameter in edit-pipeline
+  - Added `downsamplePixels()` function for 2x2 block averaging
+  - Pipeline processes 75% fewer pixels during draft renders
+- **2.2**: Triple-buffered async histogram via `StagingBufferPool` class
+  - Non-blocking readback with fire-and-forget pattern
+  - Fallback to cached histogram data when pool exhausted
+  - Added `computeAsync()` method to HistogramPipeline
+- **2.3**: GPU timestamp profiling via `TimingHelper` class
+  - Uses modern WebGPU `timestampWrites` API for render/compute passes
+  - Per-stage GPU timing (rotation, adjustments, toneCurve, masks)
+  - Integrated into GPUEditPipeline with automatic feature detection
+- **2.4**: Progressive refinement state machine in `useEditPreview.ts`
+  - States: `idle` → `interacting` → `refining` → `complete` → `idle`
+  - 33ms throttled draft renders during interaction
+  - 400ms debounced full-quality refinement after interaction ends
+  - Can interrupt refining state with new user input
+
+**New Files Created:**
+- `packages/core/src/gpu/utils/timing-helper.ts` - GPU timestamp profiling
+- `packages/core/src/gpu/utils/staging-buffer-pool.ts` - Triple-buffered readback
+- `packages/core/src/gpu/utils/index.ts` - Utils exports
+- `packages/core/src/gpu/__tests__/timing-helper.test.ts` - 43 tests
+- `packages/core/src/gpu/__tests__/staging-buffer-pool.test.ts` - 39 tests
+- `packages/core/src/gpu/__tests__/histogram-async.test.ts` - 27 tests
+- `packages/core/src/gpu/__tests__/edit-pipeline-draft.test.ts` - 30 tests
+- `packages/core/src/gpu/__tests__/pipeline-benchmarks.test.ts` - 18 tests
+- `apps/web/test/progressive-refinement.test.ts` - 48 tests
+
+**Test Coverage:** 205 new tests added across all Phase 2 features
 
 ### Phase 3 Complete When:
 - [ ] Single-pass uber-shader benchmarks faster than multi-pass

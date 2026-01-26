@@ -38,6 +38,17 @@ import { useGpuStatusStore } from '~/stores/gpuStatus'
 // ============================================================================
 
 /**
+ * Render state for progressive refinement state machine.
+ *
+ * States:
+ * - idle: Ready for next interaction, no rendering in progress
+ * - interacting: User is actively adjusting (slider drag, etc.), using draft quality
+ * - refining: Interaction ended, rendering full-quality version
+ * - complete: Full-quality render finished, ready to transition to idle
+ */
+export type RenderState = 'idle' | 'interacting' | 'refining' | 'complete'
+
+/**
  * Per-channel clipping detection flags.
  */
 export interface ChannelClipping {
@@ -100,6 +111,8 @@ export interface UseEditPreviewReturn {
   adjustedDimensions: Ref<{ width: number, height: number } | null>
   /** Whether we're waiting for a high-quality preview to load (never show thumbnail) */
   isWaitingForPreview: Ref<boolean>
+  /** Current render state for progressive refinement (readonly for UI feedback) */
+  renderState: Readonly<Ref<RenderState>>
 }
 
 // ============================================================================
@@ -529,6 +542,36 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /** Whether we're waiting for a high-quality preview to load (never show thumbnail in edit view) */
   const isWaitingForPreview = ref(false)
 
+  /** Current render state for progressive refinement state machine */
+  const renderState = ref<RenderState>('idle')
+
+  /**
+   * Valid state transitions for the progressive refinement state machine.
+   * This ensures predictable state flow and prevents invalid transitions.
+   */
+  const validTransitions: Record<RenderState, RenderState[]> = {
+    idle: ['interacting'],
+    interacting: ['interacting', 'refining'],
+    refining: ['complete', 'interacting'], // Can interrupt refining with new interaction
+    complete: ['idle', 'interacting'],
+  }
+
+  /**
+   * Transition the render state machine to a new state.
+   * Only allows valid transitions as defined in validTransitions.
+   *
+   * @param newState - The target state to transition to
+   * @returns true if transition was valid and applied, false otherwise
+   */
+  function transitionState(newState: RenderState): boolean {
+    if (validTransitions[renderState.value].includes(newState)) {
+      renderState.value = newState
+      return true
+    }
+    console.warn(`[useEditPreview] Invalid state transition: ${renderState.value} -> ${newState}`)
+    return false
+  }
+
   /** Cached source pixels to avoid re-loading on every adjustment */
   const sourceCache = ref<{
     assetId: string
@@ -724,11 +767,19 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           }
         }
 
+        // Determine target resolution based on quality mode
+        // Draft mode uses 0.5 for faster rendering during interaction
+        // Full mode uses 1.0 for highest quality output
+        const targetResolution = quality === 'draft' ? 0.5 : 1.0
+
         if (pipelineReady && !hasCrop) {
           // ===== PATH A: No crop - Use unified pipeline for ALL operations =====
           // This gives us 1 GPU round-trip instead of 4
           try {
-            const pipelineParams: EditPipelineParams = {}
+            const pipelineParams: EditPipelineParams = {
+              // Set target resolution for progressive refinement
+              targetResolution,
+            }
 
             // Add rotation if needed
             if (hasRotation) {
@@ -782,7 +833,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             if (hasRotation) {
               const rotationResult = await gpuPipeline.process(
                 { pixels: currentPixels, width: currentWidth, height: currentHeight },
-                { rotation: totalRotation },
+                { rotation: totalRotation, targetResolution },
               )
               console.log(`[useEditPreview] GPU Pipeline (rotation stage): ${JSON.stringify(rotationResult.timing)}`)
               currentPixels = rotationResult.pixels
@@ -805,7 +856,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             // Stage 3: Adjustments + Tone Curve + Masks via unified pipeline
             const hasPostCropEdits = hasAdjustments || hasToneCurve || hasMasks
             if (hasPostCropEdits) {
-              const postCropParams: EditPipelineParams = {}
+              const postCropParams: EditPipelineParams = {
+                // Set target resolution for progressive refinement
+                targetResolution,
+              }
 
               if (hasAdjustments) {
                 postCropParams.adjustments = convertToBasicAdjustments(adjustments)
@@ -1009,17 +1063,42 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /**
    * Debounced full-quality render for when interaction ends.
    * Fires 400ms after the last call, providing high-quality output after the user stops dragging.
+   * Transitions state: interacting -> refining -> complete -> idle
    */
-  const debouncedFullRender = debounce(() => {
-    renderPreview('full')
+  const debouncedFullRender = debounce(async () => {
+    // Transition to refining state (400ms passed with no interaction)
+    transitionState('refining')
+
+    // Render full quality
+    await renderPreview('full')
+
+    // Transition to complete, then immediately to idle
+    transitionState('complete')
+    transitionState('idle')
   }, 400)
 
   /**
    * Throttled render for use during slider drag.
    * First update is immediate, subsequent updates throttled to 33ms (~30 FPS).
    * After each draft render, schedules a debounced full-quality render.
+   *
+   * State machine integration:
+   * - Each call transitions to 'interacting' state
+   * - Throttled draft renders stay in 'interacting' state
+   * - After 400ms of inactivity, debouncedFullRender transitions to 'refining'
    */
   const throttledRender = throttle(() => {
+    // Transition to interacting state when user starts or continues adjusting
+    // Valid from: idle, interacting, refining (can interrupt), complete
+    if (renderState.value === 'idle' || renderState.value === 'complete') {
+      transitionState('interacting')
+    }
+    else if (renderState.value === 'refining') {
+      // Interrupt refining with new interaction
+      transitionState('interacting')
+    }
+    // If already in 'interacting', state stays the same (valid self-transition)
+
     renderPreview('draft')
     // Schedule full-quality render for when interaction ends
     debouncedFullRender()
@@ -1343,5 +1422,6 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     adjustedPixels,
     adjustedDimensions,
     isWaitingForPreview,
+    renderState: readonly(renderState),
   }
 }

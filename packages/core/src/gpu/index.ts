@@ -153,3 +153,11 @@ export {
   resetGPUTransformService,
   applyRotationAdaptive,
 } from './gpu-transform-service'
+
+// GPU utilities
+export {
+  TimingHelper,
+  createTimingHelper,
+  StagingBufferPool,
+  type StagingBufferPoolStats,
+} from './utils'

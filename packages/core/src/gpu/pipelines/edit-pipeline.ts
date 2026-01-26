@@ -16,6 +16,7 @@ import {
   rgbaToRgb,
   TexturePool,
 } from '../texture-utils'
+import { TimingHelper } from '../utils/timing-helper'
 import {
   getAdjustmentsPipeline,
   type BasicAdjustments,
@@ -58,6 +59,8 @@ export interface EditPipelineParams {
   toneCurveLut?: ToneCurveLut
   /** Mask stack for local adjustments */
   masks?: MaskStackInput
+  /** Target resolution scale (0.5 for half-resolution draft, 1.0 for full) */
+  targetResolution?: number
 }
 
 /**
@@ -66,6 +69,8 @@ export interface EditPipelineParams {
 export interface EditPipelineTiming {
   /** Total pipeline time including all stages */
   total: number
+  /** Downsampling time (0 if skipped) */
+  downsample: number
   /** Time to upload RGB pixels to GPU as RGBA texture */
   upload: number
   /** Time for rotation stage (0 if skipped) */
@@ -78,6 +83,14 @@ export interface EditPipelineTiming {
   masks: number
   /** Time to read RGBA pixels from GPU and convert to RGB */
   readback: number
+  /** GPU-measured rotation time (nanoseconds) */
+  gpuRotation?: number
+  /** GPU-measured adjustments time (nanoseconds) */
+  gpuAdjustments?: number
+  /** GPU-measured tone curve time (nanoseconds) */
+  gpuToneCurve?: number
+  /** GPU-measured masks time (nanoseconds) */
+  gpuMasks?: number
 }
 
 /**
@@ -104,6 +117,7 @@ export class GPUEditPipeline {
   private device: GPUDevice | null = null
   private _initialized = false
   private texturePool: TexturePool | null = null
+  private timingHelper: TimingHelper | null = null
 
   /**
    * Whether the pipeline is ready to process images.
@@ -136,8 +150,104 @@ export class GPUEditPipeline {
     // Pool size of 8 allows for all pipeline stages plus some headroom
     this.texturePool = new TexturePool(this.device, 8)
 
+    // Only create if device supports timestamp queries
+    this.timingHelper = new TimingHelper(this.device, 16)
+    if (this.timingHelper.isSupported()) {
+      this.timingHelper.initialize()
+    } else {
+      this.timingHelper = null
+    }
+
     this._initialized = true
     return true
+  }
+
+  /**
+   * Downsample pixels using simple 2x2 block averaging.
+   *
+   * For 0.5 scale (half resolution), each 2x2 block of pixels is averaged
+   * into a single pixel. This provides a fast CPU-based downsampling for
+   * draft mode preview processing.
+   *
+   * @param input - The input image data
+   * @param targetScale - The target scale factor (e.g., 0.5 for half resolution)
+   * @returns New EditPipelineInput with downsampled pixels and reduced dimensions
+   */
+  private downsamplePixels(
+    input: EditPipelineInput,
+    targetScale: number
+  ): EditPipelineInput {
+    // If targetScale is 1.0 or greater, return input unchanged
+    if (targetScale >= 1.0) {
+      return input
+    }
+
+    // Calculate new dimensions (floor to ensure we don't exceed bounds)
+    // For 0.5 scale, this gives us half the dimensions
+    const newWidth = Math.floor(input.width * targetScale)
+    const newHeight = Math.floor(input.height * targetScale)
+
+    // Ensure we have at least 1x1 output
+    if (newWidth < 1 || newHeight < 1) {
+      return input
+    }
+
+    // Calculate the block size (inverse of scale)
+    // For 0.5 scale, blockSize = 2 (2x2 blocks)
+    const blockSize = Math.round(1 / targetScale)
+
+    // Create output buffer (RGB, 3 bytes per pixel)
+    const outputPixels = new Uint8Array(newWidth * newHeight * 3)
+
+    // Process each output pixel by averaging the corresponding input block
+    for (let outY = 0; outY < newHeight; outY++) {
+      for (let outX = 0; outX < newWidth; outX++) {
+        // Calculate the starting position in the input
+        const inStartX = outX * blockSize
+        const inStartY = outY * blockSize
+
+        // Accumulate RGB values from the block
+        let sumR = 0
+        let sumG = 0
+        let sumB = 0
+        let count = 0
+
+        // Iterate through the block (e.g., 2x2 for 0.5 scale)
+        for (let dy = 0; dy < blockSize; dy++) {
+          const inY = inStartY + dy
+          if (inY >= input.height) continue
+
+          for (let dx = 0; dx < blockSize; dx++) {
+            const inX = inStartX + dx
+            if (inX >= input.width) continue
+
+            // Calculate input pixel index (RGB, 3 bytes per pixel)
+            const inIdx = (inY * input.width + inX) * 3
+
+            sumR += input.pixels[inIdx]
+            sumG += input.pixels[inIdx + 1]
+            sumB += input.pixels[inIdx + 2]
+            count++
+          }
+        }
+
+        // Calculate output pixel index
+        const outIdx = (outY * newWidth + outX) * 3
+
+        // Store averaged values
+        if (count > 0) {
+          outputPixels[outIdx] = Math.round(sumR / count)
+          outputPixels[outIdx + 1] = Math.round(sumG / count)
+          outputPixels[outIdx + 2] = Math.round(sumB / count)
+        }
+      }
+    }
+
+    return {
+      pixels: outputPixels,
+      width: newWidth,
+      height: newHeight,
+    }
   }
 
   /**
@@ -164,6 +274,7 @@ export class GPUEditPipeline {
 
     const timing: EditPipelineTiming = {
       total: 0,
+      downsample: 0,
       upload: 0,
       rotation: 0,
       adjustments: 0,
@@ -173,6 +284,15 @@ export class GPUEditPipeline {
     }
 
     const totalStart = performance.now()
+
+    // Downsample input if targetResolution is set and < 1.0
+    let processInput = input
+    const targetResolution = params.targetResolution ?? 1.0
+    if (targetResolution < 1.0) {
+      const downsampleStart = performance.now()
+      processInput = this.downsamplePixels(input, targetResolution)
+      timing.downsample = performance.now() - downsampleStart
+    }
 
     // Get all required pipelines
     const [rotationPipeline, adjustmentsPipeline, toneCurvePipeline, maskPipeline] =
@@ -186,15 +306,16 @@ export class GPUEditPipeline {
       ])
 
     // Track current dimensions (may change after rotation)
-    let currentWidth = input.width
-    let currentHeight = input.height
+    // Use processInput dimensions which may be downsampled
+    let currentWidth = processInput.width
+    let currentHeight = processInput.height
 
     // Convert RGB to RGBA and upload to GPU
     const uploadStart = performance.now()
-    const rgba = rgbToRgba(input.pixels, input.width, input.height)
+    const rgba = rgbToRgba(processInput.pixels, processInput.width, processInput.height)
     let inputTexture = this.texturePool!.acquire(
-      input.width,
-      input.height,
+      processInput.width,
+      processInput.height,
       TextureUsage.PINGPONG,
       'Edit Pipeline Input'
     )
@@ -202,8 +323,8 @@ export class GPUEditPipeline {
     this.device.queue.writeTexture(
       { texture: inputTexture },
       rgba.buffer,
-      { bytesPerRow: input.width * 4, rowsPerImage: input.height, offset: rgba.byteOffset },
-      { width: input.width, height: input.height, depthOrArrayLayers: 1 }
+      { bytesPerRow: processInput.width * 4, rowsPerImage: processInput.height, offset: rgba.byteOffset },
+      { width: processInput.width, height: processInput.height, depthOrArrayLayers: 1 }
     )
     timing.upload = performance.now() - uploadStart
 
@@ -214,6 +335,9 @@ export class GPUEditPipeline {
 
     // Track textures for cleanup with their dimensions for pool release
     const texturesToRelease: TextureWithDims[] = []
+
+    // Track GPU timing stage indices: [rotation, adjustments, toneCurve, masks]
+    const gpuTimingIndices: (number | null)[] = [null, null, null, null]
 
     // Stage 1: Rotation (changes dimensions)
     if (rotationPipeline && params.rotation && Math.abs(params.rotation) > 0.001) {
@@ -233,6 +357,12 @@ export class GPUEditPipeline {
         TextureUsage.PINGPONG,
         'Edit Pipeline Rotation Output'
       )
+
+      // GPU timing: reserve pair index for rotation
+      // Note: Actual GPU timing capture requires sub-pipelines to support timestampWrites
+      if (this.timingHelper) {
+        gpuTimingIndices[0] = this.timingHelper.beginTimestamp()
+      }
 
       // Apply rotation
       encoder = rotationPipeline.applyToTextures(
@@ -264,6 +394,7 @@ export class GPUEditPipeline {
       encoder,
       texturesToRelease,
       texturePool: this.texturePool!,
+      timingHelper: this.timingHelper,
     }
 
     // Stage 2: Adjustments
@@ -274,6 +405,9 @@ export class GPUEditPipeline {
       ctx.inputTexture = result.inputTexture
       ctx.encoder = result.encoder
       timing.adjustments = result.elapsedTime
+      if (result.gpuTimingIndex !== null) {
+        gpuTimingIndices[1] = result.gpuTimingIndex
+      }
     }
 
     // Stage 3: Tone Curve
@@ -287,6 +421,9 @@ export class GPUEditPipeline {
         ctx.inputTexture = result.inputTexture
         ctx.encoder = result.encoder
         timing.toneCurve = result.elapsedTime
+        if (result.gpuTimingIndex !== null) {
+          gpuTimingIndices[2] = result.gpuTimingIndex
+        }
       }
     }
 
@@ -298,11 +435,17 @@ export class GPUEditPipeline {
       ctx.inputTexture = result.inputTexture
       ctx.encoder = result.encoder
       timing.masks = result.elapsedTime
+      if (result.gpuTimingIndex !== null) {
+        gpuTimingIndices[3] = result.gpuTimingIndex
+      }
     }
 
     // Extract final values from context
     inputTexture = ctx.inputTexture
     encoder = ctx.encoder
+
+    // Resolve GPU timestamps after all stages
+    this.timingHelper?.resolveTimestamps(encoder)
 
     // Submit all GPU commands at once
     this.device.queue.submit([encoder.finish()])
@@ -316,6 +459,27 @@ export class GPUEditPipeline {
       currentHeight
     )
     timing.readback = performance.now() - readStart
+
+    // Read GPU timings if available
+    if (this.timingHelper) {
+      const gpuTimings = await this.timingHelper.readTimings()
+
+      // Map GPU timings to the timing result
+      if (gpuTimingIndices[0] !== null && gpuTimings[gpuTimingIndices[0]] !== undefined) {
+        timing.gpuRotation = gpuTimings[gpuTimingIndices[0]]
+      }
+      if (gpuTimingIndices[1] !== null && gpuTimings[gpuTimingIndices[1]] !== undefined) {
+        timing.gpuAdjustments = gpuTimings[gpuTimingIndices[1]]
+      }
+      if (gpuTimingIndices[2] !== null && gpuTimings[gpuTimingIndices[2]] !== undefined) {
+        timing.gpuToneCurve = gpuTimings[gpuTimingIndices[2]]
+      }
+      if (gpuTimingIndices[3] !== null && gpuTimings[gpuTimingIndices[3]] !== undefined) {
+        timing.gpuMasks = gpuTimings[gpuTimingIndices[3]]
+      }
+
+      this.timingHelper.reset()
+    }
 
     // Release textures back to pool instead of destroying
     this.texturePool!.release(inputTexture, currentWidth, currentHeight, TextureUsage.PINGPONG)
@@ -340,6 +504,8 @@ export class GPUEditPipeline {
    * Destroy the pipeline and release resources.
    */
   destroy(): void {
+    this.timingHelper?.destroy()
+    this.timingHelper = null
     this.texturePool?.clear()
     this.texturePool = null
     this.device = null
@@ -371,6 +537,7 @@ interface StageContext {
   encoder: GPUCommandEncoder
   texturesToRelease: TextureWithDims[]
   texturePool: TexturePool
+  timingHelper: TimingHelper | null
 }
 
 /**
@@ -380,6 +547,7 @@ interface StageResult {
   inputTexture: GPUTexture
   encoder: GPUCommandEncoder
   elapsedTime: number
+  gpuTimingIndex: number | null
 }
 
 /**
@@ -404,6 +572,13 @@ function applyStage(
     label
   )
 
+  // GPU timing: reserve pair index for this stage
+  // Note: Actual GPU timing capture requires sub-pipelines to support timestampWrites
+  let gpuTimingIndex: number | null = null
+  if (ctx.timingHelper) {
+    gpuTimingIndex = ctx.timingHelper.beginTimestamp()
+  }
+
   const encoder = applyFn(ctx.inputTexture, outputTexture, ctx.encoder)
 
   // Track old texture with its dimensions for pool release
@@ -413,6 +588,7 @@ function applyStage(
     inputTexture: outputTexture,
     encoder,
     elapsedTime: performance.now() - start,
+    gpuTimingIndex,
   }
 }
 
@@ -511,6 +687,98 @@ export function resetGPUEditPipeline(): void {
 }
 
 /**
+ * Downsample RGB pixels using simple 2x2 block averaging.
+ *
+ * For 0.5 scale (half resolution), each 2x2 block of pixels is averaged
+ * into a single pixel. This provides a fast CPU-based downsampling for
+ * draft mode preview processing.
+ *
+ * @param pixels - RGB pixel data (3 bytes per pixel)
+ * @param width - Input image width in pixels
+ * @param height - Input image height in pixels
+ * @param scale - Target scale factor (e.g., 0.5 for half resolution)
+ * @returns Object containing downsampled pixels and new dimensions
+ */
+export function downsamplePixels(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  scale: number
+): { pixels: Uint8Array; width: number; height: number } {
+  // If scale is 1.0 or greater, return input unchanged
+  if (scale >= 1.0) {
+    return { pixels, width, height }
+  }
+
+  // Calculate new dimensions (floor to ensure we don't exceed bounds)
+  // For 0.5 scale, this gives us half the dimensions
+  const newWidth = Math.floor(width * scale)
+  const newHeight = Math.floor(height * scale)
+
+  // Ensure we have at least 1x1 output
+  if (newWidth < 1 || newHeight < 1) {
+    return { pixels, width, height }
+  }
+
+  // Calculate the block size (inverse of scale)
+  // For 0.5 scale, blockSize = 2 (2x2 blocks)
+  const blockSize = Math.round(1 / scale)
+
+  // Create output buffer (RGB, 3 bytes per pixel)
+  const outputPixels = new Uint8Array(newWidth * newHeight * 3)
+
+  // Process each output pixel by averaging the corresponding input block
+  for (let outY = 0; outY < newHeight; outY++) {
+    for (let outX = 0; outX < newWidth; outX++) {
+      // Calculate the starting position in the input
+      const inStartX = outX * blockSize
+      const inStartY = outY * blockSize
+
+      // Accumulate RGB values from the block
+      let sumR = 0
+      let sumG = 0
+      let sumB = 0
+      let count = 0
+
+      // Iterate through the block (e.g., 2x2 for 0.5 scale)
+      for (let dy = 0; dy < blockSize; dy++) {
+        const inY = inStartY + dy
+        if (inY >= height) continue
+
+        for (let dx = 0; dx < blockSize; dx++) {
+          const inX = inStartX + dx
+          if (inX >= width) continue
+
+          // Calculate input pixel index (RGB, 3 bytes per pixel)
+          const inIdx = (inY * width + inX) * 3
+
+          sumR += pixels[inIdx]!
+          sumG += pixels[inIdx + 1]!
+          sumB += pixels[inIdx + 2]!
+          count++
+        }
+      }
+
+      // Calculate output pixel index
+      const outIdx = (outY * newWidth + outX) * 3
+
+      // Store averaged values
+      if (count > 0) {
+        outputPixels[outIdx] = Math.round(sumR / count)
+        outputPixels[outIdx + 1] = Math.round(sumG / count)
+        outputPixels[outIdx + 2] = Math.round(sumB / count)
+      }
+    }
+  }
+
+  return {
+    pixels: outputPixels,
+    width: newWidth,
+    height: newHeight,
+  }
+}
+
+/**
  * Internal exports for testing.
  * @internal
  */
@@ -521,4 +789,5 @@ export const _internal = {
   shouldApplyMasks,
   rgbToRgba,
   rgbaToRgb,
+  downsamplePixels,
 }

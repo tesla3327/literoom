@@ -9,6 +9,7 @@
 import { getGPUCapabilityService } from '../capabilities'
 import { HISTOGRAM_SHADER_SOURCE } from '../shaders'
 import { calculateDispatchSize } from '../texture-utils'
+import { StagingBufferPool } from '../utils/staging-buffer-pool'
 
 /**
  * Histogram result containing 256 bins for each channel.
@@ -35,6 +36,10 @@ export class HistogramPipeline {
   // Reusable buffers
   private histogramBuffer: GPUBuffer | null = null // 4KB storage (4 channels × 256 bins × 4 bytes)
   private dimensionsBuffer: GPUBuffer | null = null
+
+  // Triple-buffered async readback
+  private stagingPool: StagingBufferPool | null = null
+  private lastHistogramData: HistogramResult | null = null
 
   // Workgroup size (must match shader)
   private static readonly WORKGROUP_SIZE = 16
@@ -125,6 +130,14 @@ export class HistogramPipeline {
       size: HistogramPipeline.DIMENSIONS_BUFFER_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
+
+    // Create staging buffer pool for async readback (triple-buffered)
+    // HISTOGRAM_BUFFER_SIZE = 4 channels × 256 bins × 4 bytes = 4096 bytes
+    this.stagingPool = new StagingBufferPool(
+      this.device,
+      HistogramPipeline.HISTOGRAM_BUFFER_SIZE,
+      3 // Triple buffer
+    )
   }
 
   /**
@@ -274,15 +287,122 @@ export class HistogramPipeline {
   }
 
   /**
+   * Compute histogram asynchronously with non-blocking readback.
+   *
+   * This method dispatches the compute shader and uses triple-buffered
+   * async readback to avoid blocking the main thread. The callback is
+   * invoked when the result is ready.
+   *
+   * @param inputTexture - Input GPU texture (rgba8unorm or compatible)
+   * @param width - Image width in pixels
+   * @param height - Image height in pixels
+   * @param onComplete - Callback invoked with the histogram result
+   */
+  computeAsync(
+    inputTexture: GPUTexture,
+    width: number,
+    height: number,
+    onComplete: (result: HistogramResult) => void
+  ): void {
+    if (!this.pipeline || !this.bindGroupLayout || !this.stagingPool) {
+      throw new Error('Pipeline not initialized. Call initialize() first.')
+    }
+
+    // Clear histogram buffer to zeros
+    const zeroData = new Uint32Array(256 * 4)
+    this.device.queue.writeBuffer(this.histogramBuffer!, 0, zeroData.buffer)
+
+    // Update dimensions uniform buffer
+    const dimensionsData = new Uint32Array([width, height])
+    this.device.queue.writeBuffer(
+      this.dimensionsBuffer!,
+      0,
+      dimensionsData.buffer
+    )
+
+    // Create bind group
+    const bindGroup = this.device.createBindGroup({
+      label: 'Histogram Bind Group (Async)',
+      layout: this.bindGroupLayout,
+      entries: [
+        { binding: 0, resource: inputTexture.createView() },
+        { binding: 1, resource: { buffer: this.histogramBuffer! } },
+        { binding: 2, resource: { buffer: this.dimensionsBuffer! } },
+      ],
+    })
+
+    // Calculate dispatch sizes
+    const [workgroupsX, workgroupsY] = calculateDispatchSize(
+      width,
+      height,
+      HistogramPipeline.WORKGROUP_SIZE
+    )
+
+    // Create command encoder
+    const encoder = this.device.createCommandEncoder({
+      label: 'Histogram Command Encoder (Async)',
+    })
+
+    // Begin compute pass
+    const pass = encoder.beginComputePass({
+      label: 'Histogram Compute Pass (Async)',
+    })
+    pass.setPipeline(this.pipeline)
+    pass.setBindGroup(0, bindGroup)
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY, 1)
+    pass.end()
+
+    // Use staging pool for async readback (fire-and-forget pattern)
+    this.stagingPool.readbackAsync(
+      encoder,
+      this.histogramBuffer!,
+      (resultData: Uint32Array) => {
+        // Parse histogram data into separate channels
+        // Layout: [red[0..255], green[0..255], blue[0..255], luminance[0..255]]
+        const result: HistogramResult = {
+          red: resultData.slice(0, 256),
+          green: resultData.slice(256, 512),
+          blue: resultData.slice(512, 768),
+          luminance: resultData.slice(768, 1024),
+        }
+
+        // Cache the result
+        this.lastHistogramData = result
+
+        // Invoke callback
+        onComplete(result)
+      }
+    )
+
+    // Submit commands
+    this.device.queue.submit([encoder.finish()])
+  }
+
+  /**
+   * Get the last computed histogram result.
+   *
+   * Returns the most recent histogram data from either compute() or computeAsync().
+   * Useful for getting immediate feedback when the async result isn't ready yet.
+   *
+   * @returns The last histogram result, or null if no histogram has been computed
+   */
+  getLastHistogram(): HistogramResult | null {
+    return this.lastHistogramData
+  }
+
+  /**
    * Destroy the pipeline and release resources.
    */
   destroy(): void {
     this.histogramBuffer?.destroy()
     this.dimensionsBuffer?.destroy()
+    this.stagingPool?.clear()
     this.histogramBuffer = null
     this.dimensionsBuffer = null
+    this.stagingPool = null
     this.pipeline = null
     this.bindGroupLayout = null
+    this.lastHistogramData = null
   }
 }
 

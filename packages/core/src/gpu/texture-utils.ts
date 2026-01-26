@@ -458,6 +458,74 @@ export function calculateDispatchSize(
 // ============================================================================
 
 /**
+ * Downsample RGBA pixel data by averaging 2x2 blocks.
+ *
+ * Used for draft mode processing to reduce workload during interactive editing.
+ * The algorithm averages each 2x2 block of pixels into a single output pixel.
+ *
+ * @param pixels - RGBA pixel data (4 bytes per pixel)
+ * @param width - Input image width in pixels
+ * @param height - Input image height in pixels
+ * @param scale - Target scale (0.5 for half resolution, 1.0 for no change)
+ * @returns Object containing downsampled pixels and new dimensions
+ */
+export function downsamplePixels(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  scale: number
+): { pixels: Uint8Array; width: number; height: number } {
+  // No downsampling needed for scale >= 1.0
+  if (scale >= 1.0) {
+    return { pixels, width, height }
+  }
+
+  // For scale 0.5, we average 2x2 blocks
+  const newWidth = Math.floor(width / 2)
+  const newHeight = Math.floor(height / 2)
+
+  // Handle edge case where dimensions are too small
+  if (newWidth < 1 || newHeight < 1) {
+    return { pixels, width, height }
+  }
+
+  const result = new Uint8Array(newWidth * newHeight * 4)
+
+  for (let y = 0; y < newHeight; y++) {
+    for (let x = 0; x < newWidth; x++) {
+      // Source coordinates for 2x2 block
+      const srcX = x * 2
+      const srcY = y * 2
+
+      // Get indices for the 4 source pixels
+      const idx00 = (srcY * width + srcX) * 4
+      const idx10 = (srcY * width + srcX + 1) * 4
+      const idx01 = ((srcY + 1) * width + srcX) * 4
+      const idx11 = ((srcY + 1) * width + srcX + 1) * 4
+
+      // Destination index
+      const dstIdx = (y * newWidth + x) * 4
+
+      // Average each channel (R, G, B, A)
+      result[dstIdx] = Math.round(
+        (pixels[idx00]! + pixels[idx10]! + pixels[idx01]! + pixels[idx11]!) / 4
+      )
+      result[dstIdx + 1] = Math.round(
+        (pixels[idx00 + 1]! + pixels[idx10 + 1]! + pixels[idx01 + 1]! + pixels[idx11 + 1]!) / 4
+      )
+      result[dstIdx + 2] = Math.round(
+        (pixels[idx00 + 2]! + pixels[idx10 + 2]! + pixels[idx01 + 2]! + pixels[idx11 + 2]!) / 4
+      )
+      result[dstIdx + 3] = Math.round(
+        (pixels[idx00 + 3]! + pixels[idx10 + 3]! + pixels[idx01 + 3]! + pixels[idx11 + 3]!) / 4
+      )
+    }
+  }
+
+  return { pixels: result, width: newWidth, height: newHeight }
+}
+
+/**
  * Convert RGB pixel data to RGBA.
  *
  * @param rgb - RGB pixel data (3 bytes per pixel)
