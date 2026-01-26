@@ -10,6 +10,7 @@
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
+- [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
@@ -301,6 +302,36 @@ A summary should be shown somewhere (tooltip, badge, or text) indicating:
 
 **Screenshots**:
 - `docs/screenshots/qa-section11-07-after-copy-paste-enabled.png` - After copy, only Paste button enablement indicates success
+
+---
+
+### Export missing "Include rejected" option
+
+**Severity**: Low | **Type**: UX Enhancement | **Found**: 2026-01-25
+
+**Problem**:
+The Export modal has no option to include rejected photos. The "All" scope automatically excludes rejected photos (shows 40 instead of 50 when 10 photos are marked as rejected).
+
+**Current Behavior**:
+- "Picks" scope: Only photos flagged as Pick (23 images)
+- "Selected" scope: Only selected photos (filtered to exclude rejects)
+- "All" scope: All photos EXCEPT rejected ones (40 = 50 total - 10 rejects)
+
+**Expected Behavior**:
+Add an "Include rejected" checkbox that, when checked:
+1. Makes "All" scope export all 50 images
+2. Makes "Selected" scope include selected rejected photos
+
+**Use Case**:
+Users may want to export rejected photos for backup purposes or to share them for a second opinion before final deletion.
+
+**Screenshots**:
+- `docs/screenshots/qa-section14-04-export-scope-all.png` - "All" shows 40, not 50
+- `docs/screenshots/qa-section14-12-all-excludes-rejects.png` - Confirms rejects excluded
+
+**Files to Investigate**:
+- `apps/web/app/components/export/ExportModal.vue` - Export modal UI
+- `apps/web/app/composables/useExport.ts` - Export logic
 
 ---
 
