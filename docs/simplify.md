@@ -29,3 +29,4 @@
 - apps/web/app/composables/maskUtils.ts (extracted distance and clamp01 helpers to canvasCoords.ts to DRY 5 distance calculations and 5 clamp operations in maskUtils.ts; extracted getMaskColors helper to DRY color selection in drawLinearMask and drawRadialMask; also updated cropUtils.ts to use distance helper)
 - apps/web/app/stores/editUI.ts (extracted getDimensions helper to DRY repeated dimension parameter passing; exported hasValidDimensions from zoomCalculations.ts to DRY dimension validation; added STANDARD_PRESETS set to DRY preset checking in initializeZoom)
 - packages/core/src/gpu/gpu-tone-curve-service.ts (extracted isLinearCurve to decode/curve-utils.ts to DRY duplicate linear curve detection in gpu-tone-curve-service.ts and mock-decode-service.ts)
+- apps/web/app/composables/useHistogramDisplaySVG.ts (extracted sampleHistogramToPoints helper and removed unused histogramToStrokePath function to DRY histogram path generation)

@@ -90,17 +90,14 @@ function catmullRomToBezierPath(points: Point[], closed: boolean = false): strin
 }
 
 /**
- * Convert histogram data to SVG path with smooth curves.
- * Returns a closed path suitable for filling.
+ * Sample histogram data to points with bin averaging for smooth curves.
  */
-function histogramToPath(
+function sampleHistogramToPoints(
   data: Uint32Array,
   maxValue: number,
   width: number,
   height: number,
-): string {
-  if (maxValue === 0) return ''
-
+): Point[] {
   const points: Point[] = []
 
   // Sample the histogram data at regular intervals for smoother curves
@@ -127,17 +124,14 @@ function histogramToPath(
     y: height - (lastValue / maxValue) * height,
   })
 
-  // Create the curve path
-  const curvePath = catmullRomToBezierPath(points)
-
-  // Close the path along the bottom for filling
-  return `${curvePath} L ${width} ${height} L 0 ${height} Z`
+  return points
 }
 
 /**
- * Convert histogram data to SVG stroke path (no fill, just the curve).
+ * Convert histogram data to SVG path with smooth curves.
+ * Returns a closed path suitable for filling.
  */
-function histogramToStrokePath(
+function histogramToPath(
   data: Uint32Array,
   maxValue: number,
   width: number,
@@ -145,32 +139,11 @@ function histogramToStrokePath(
 ): string {
   if (maxValue === 0) return ''
 
-  const points: Point[] = []
+  const points = sampleHistogramToPoints(data, maxValue, width, height)
+  const curvePath = catmullRomToBezierPath(points)
 
-  // Sample the histogram data
-  for (let i = 0; i < 256; i += SAMPLE_RATE) {
-    let sum = 0
-    let count = 0
-    for (let j = Math.max(0, i - SAMPLE_RATE / 2); j < Math.min(256, i + SAMPLE_RATE / 2); j++) {
-      sum += data[j] ?? 0
-      count++
-    }
-    const value = sum / count
-
-    const x = (i / 255) * width
-    const y = height - (value / maxValue) * height
-
-    points.push({ x, y })
-  }
-
-  // Add the last point
-  const lastValue = data[255] ?? 0
-  points.push({
-    x: width,
-    y: height - (lastValue / maxValue) * height,
-  })
-
-  return catmullRomToBezierPath(points)
+  // Close the path along the bottom for filling
+  return `${curvePath} L ${width} ${height} L 0 ${height} Z`
 }
 
 // ============================================================================
