@@ -246,101 +246,53 @@ export class GPUEditPipeline {
       timing.rotation = performance.now() - rotStart
     }
 
+    // Stage context for reuse across stages
+    const ctx: StageContext = {
+      device: this.device,
+      inputTexture,
+      currentWidth,
+      currentHeight,
+      encoder,
+      texturesToDestroy,
+    }
+
     // Stage 2: Adjustments
     if (adjustmentsPipeline && params.adjustments) {
-      const adjStart = performance.now()
-
-      // Create output texture
-      const outputTexture = createOutputTexture(
-        this.device,
-        currentWidth,
-        currentHeight,
-        TextureUsage.PINGPONG,
-        'Edit Pipeline Adjustments Output'
+      const result = applyStage(ctx, 'Edit Pipeline Adjustments Output', (input, output, enc) =>
+        adjustmentsPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.adjustments!, enc)
       )
-
-      // Apply adjustments
-      encoder = adjustmentsPipeline.applyToTextures(
-        inputTexture,
-        outputTexture,
-        currentWidth,
-        currentHeight,
-        params.adjustments,
-        encoder
-      )
-
-      // Update current state
-      texturesToDestroy.push(inputTexture)
-      inputTexture = outputTexture
-
-      timing.adjustments = performance.now() - adjStart
+      ctx.inputTexture = result.inputTexture
+      ctx.encoder = result.encoder
+      timing.adjustments = result.elapsedTime
     }
 
     // Stage 3: Tone Curve
     if (toneCurvePipeline) {
-      // Generate or use provided LUT
       const lut = params.toneCurveLut ?? generateLutFromCurvePoints(params.toneCurvePoints!)
 
-      // Skip identity curves
       if (!isIdentityLut(lut)) {
-        const curveStart = performance.now()
-
-        // Create output texture
-        const outputTexture = createOutputTexture(
-          this.device,
-          currentWidth,
-          currentHeight,
-          TextureUsage.PINGPONG,
-          'Edit Pipeline Tone Curve Output'
+        const result = applyStage(ctx, 'Edit Pipeline Tone Curve Output', (input, output, enc) =>
+          toneCurvePipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, lut, enc)
         )
-
-        // Apply tone curve
-        encoder = toneCurvePipeline.applyToTextures(
-          inputTexture,
-          outputTexture,
-          currentWidth,
-          currentHeight,
-          lut,
-          encoder
-        )
-
-        // Update current state
-        texturesToDestroy.push(inputTexture)
-        inputTexture = outputTexture
-
-        timing.toneCurve = performance.now() - curveStart
+        ctx.inputTexture = result.inputTexture
+        ctx.encoder = result.encoder
+        timing.toneCurve = result.elapsedTime
       }
     }
 
     // Stage 4: Masks
     if (maskPipeline && params.masks) {
-      const maskStart = performance.now()
-
-      // Create output texture
-      const outputTexture = createOutputTexture(
-        this.device,
-        currentWidth,
-        currentHeight,
-        TextureUsage.PINGPONG,
-        'Edit Pipeline Masks Output'
+      const result = applyStage(ctx, 'Edit Pipeline Masks Output', (input, output, enc) =>
+        maskPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.masks!, enc)
       )
-
-      // Apply masks
-      encoder = maskPipeline.applyToTextures(
-        inputTexture,
-        outputTexture,
-        currentWidth,
-        currentHeight,
-        params.masks,
-        encoder
-      )
-
-      // Update current state
-      texturesToDestroy.push(inputTexture)
-      inputTexture = outputTexture
-
-      timing.masks = performance.now() - maskStart
+      ctx.inputTexture = result.inputTexture
+      ctx.encoder = result.encoder
+      timing.masks = result.elapsedTime
     }
+
+    // Extract final values from context
+    inputTexture = ctx.inputTexture
+    encoder = ctx.encoder
 
     // Submit all GPU commands at once
     this.device.queue.submit([encoder.finish()])
@@ -386,6 +338,61 @@ export class GPUEditPipeline {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Context for applying a pipeline stage.
+ */
+interface StageContext {
+  device: GPUDevice
+  inputTexture: GPUTexture
+  currentWidth: number
+  currentHeight: number
+  encoder: GPUCommandEncoder
+  texturesToDestroy: GPUTexture[]
+}
+
+/**
+ * Result from applying a pipeline stage.
+ */
+interface StageResult {
+  inputTexture: GPUTexture
+  encoder: GPUCommandEncoder
+  elapsedTime: number
+}
+
+/**
+ * Apply a single pipeline stage, handling texture creation, application, and cleanup tracking.
+ *
+ * @param ctx - The stage context with device, textures, and encoder
+ * @param label - Label for the output texture
+ * @param applyFn - Function that applies the stage operation
+ * @returns Updated context with new texture and elapsed time
+ */
+function applyStage(
+  ctx: StageContext,
+  label: string,
+  applyFn: (inputTexture: GPUTexture, outputTexture: GPUTexture, encoder: GPUCommandEncoder) => GPUCommandEncoder
+): StageResult {
+  const start = performance.now()
+
+  const outputTexture = createOutputTexture(
+    ctx.device,
+    ctx.currentWidth,
+    ctx.currentHeight,
+    TextureUsage.PINGPONG,
+    label
+  )
+
+  const encoder = applyFn(ctx.inputTexture, outputTexture, ctx.encoder)
+
+  ctx.texturesToDestroy.push(ctx.inputTexture)
+
+  return {
+    inputTexture: outputTexture,
+    encoder,
+    elapsedTime: performance.now() - start,
+  }
+}
 
 /**
  * Check if rotation should be applied.
