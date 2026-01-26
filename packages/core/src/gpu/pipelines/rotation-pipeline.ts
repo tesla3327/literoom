@@ -162,6 +162,49 @@ export class RotationPipeline {
   }
 
   /**
+   * Build rotation parameters buffer data.
+   *
+   * @param srcWidth - Source image width
+   * @param srcHeight - Source image height
+   * @param dstWidth - Destination image width
+   * @param dstHeight - Destination image height
+   * @param angleDegrees - Rotation angle in degrees
+   * @returns ArrayBuffer with packed rotation parameters
+   */
+  private buildRotationParams(
+    srcWidth: number,
+    srcHeight: number,
+    dstWidth: number,
+    dstHeight: number,
+    angleDegrees: number
+  ): ArrayBuffer {
+    // Shader uses inverse rotation, so we pass cos(-angle), sin(-angle)
+    const angleRad = (angleDegrees * Math.PI) / 180
+    const cosAngle = Math.cos(-angleRad)
+    const sinAngle = Math.sin(-angleRad)
+    const srcCx = srcWidth / 2
+    const srcCy = srcHeight / 2
+    const dstCx = dstWidth / 2
+    const dstCy = dstHeight / 2
+
+    // Layout: cos_angle (f32), sin_angle (f32), src_cx (f32), src_cy (f32),
+    //         dst_cx (f32), dst_cy (f32), src_width (u32), src_height (u32)
+    const paramsData = new ArrayBuffer(32)
+    const floatView = new Float32Array(paramsData)
+    const uintView = new Uint32Array(paramsData)
+    floatView[0] = cosAngle
+    floatView[1] = sinAngle
+    floatView[2] = srcCx
+    floatView[3] = srcCy
+    floatView[4] = dstCx
+    floatView[5] = dstCy
+    uintView[6] = srcWidth
+    uintView[7] = srcHeight
+
+    return paramsData
+  }
+
+  /**
    * Apply rotation to an image.
    *
    * @param inputPixels - Input RGB pixel data (width * height * 3 bytes)
@@ -213,30 +256,8 @@ export class RotationPipeline {
         GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    // Calculate rotation parameters
-    // Shader uses inverse rotation, so we pass cos(-angle), sin(-angle)
-    const angleRad = (angleDegrees * Math.PI) / 180
-    const cosAngle = Math.cos(-angleRad)
-    const sinAngle = Math.sin(-angleRad)
-    const srcCx = width / 2
-    const srcCy = height / 2
-    const dstCx = outDims.width / 2
-    const dstCy = outDims.height / 2
-
     // Update params uniform buffer
-    // Layout: cos_angle (f32), sin_angle (f32), src_cx (f32), src_cy (f32),
-    //         dst_cx (f32), dst_cy (f32), src_width (u32), src_height (u32)
-    const paramsData = new ArrayBuffer(32)
-    const floatView = new Float32Array(paramsData)
-    const uintView = new Uint32Array(paramsData)
-    floatView[0] = cosAngle
-    floatView[1] = sinAngle
-    floatView[2] = srcCx
-    floatView[3] = srcCy
-    floatView[4] = dstCx
-    floatView[5] = dstCy
-    uintView[6] = width
-    uintView[7] = height
+    const paramsData = this.buildRotationParams(width, height, outDims.width, outDims.height, angleDegrees)
     this.device.queue.writeBuffer(this.paramsBuffer!, 0, paramsData)
 
     // Update dimensions uniform buffer (output dimensions)
@@ -348,30 +369,8 @@ export class RotationPipeline {
       throw new Error('Pipeline not initialized. Call initialize() first.')
     }
 
-    // Calculate rotation parameters
-    // Shader uses inverse rotation, so we pass cos(-angle), sin(-angle)
-    const angleRad = (angleDegrees * Math.PI) / 180
-    const cosAngle = Math.cos(-angleRad)
-    const sinAngle = Math.sin(-angleRad)
-    const srcCx = srcWidth / 2
-    const srcCy = srcHeight / 2
-    const dstCx = dstWidth / 2
-    const dstCy = dstHeight / 2
-
     // Update params uniform buffer
-    // Layout: cos_angle (f32), sin_angle (f32), src_cx (f32), src_cy (f32),
-    //         dst_cx (f32), dst_cy (f32), src_width (u32), src_height (u32)
-    const paramsData = new ArrayBuffer(32)
-    const floatView = new Float32Array(paramsData)
-    const uintView = new Uint32Array(paramsData)
-    floatView[0] = cosAngle
-    floatView[1] = sinAngle
-    floatView[2] = srcCx
-    floatView[3] = srcCy
-    floatView[4] = dstCx
-    floatView[5] = dstCy
-    uintView[6] = srcWidth
-    uintView[7] = srcHeight
+    const paramsData = this.buildRotationParams(srcWidth, srcHeight, dstWidth, dstHeight, angleDegrees)
     this.device.queue.writeBuffer(this.paramsBuffer!, 0, paramsData)
 
     // Update dimensions uniform buffer (output dimensions)
