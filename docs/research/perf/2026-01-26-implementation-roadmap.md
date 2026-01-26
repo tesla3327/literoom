@@ -76,6 +76,66 @@ Analysis of all research phases reveals a clear implementation path. The biggest
 
 ---
 
+## 🚨 PRIORITY INVESTIGATION: Performance Not Improving
+
+**Status**: BLOCKING - Must resolve before Phase 3
+
+**Observation**: GPU badge still showing ~50-70ms for operations after Phase 1 and Phase 2 optimizations. Expected improvement not visible in production.
+
+### Investigation Tasks
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| INV-1 | **Verify draft mode is being triggered** | HIGH | [x] ✓ Verified working |
+| INV-2 | **Check if targetResolution=0.5 is actually being passed** | HIGH | [x] ✓ Verified working |
+| INV-3 | **Verify async histogram is being used** | HIGH | [x] **FIXED** - Added computeHistogramAsync() |
+| INV-4 | **Profile where the 50-70ms is actually being spent** | HIGH | [x] **FIXED** - Path B timing recording |
+| INV-5 | **Check if state machine transitions are working** | MEDIUM | [x] ✓ Verified working |
+| INV-6 | **Compare GPU timestamps vs CPU timing** | MEDIUM | [ ] Future work
+
+### Root Causes Found & Fixed
+
+1. **Draft mode not being triggered** ✓ VERIFIED WORKING
+   - renderQuality is correctly set to 'draft' during interactions
+   - targetResolution=0.5 is properly passed through the pipeline
+
+2. **Half-resolution not working** ✓ VERIFIED WORKING
+   - Downsampling works correctly via downsamplePixels()
+   - GPU pipeline processes at reduced resolution
+
+3. **Async histogram not used** 🔧 **FIXED**
+   - Added `computeHistogramAsync()` and `computeHistogramRgbaAsync()` methods to GPUHistogramService
+   - Uses triple-buffered StagingBufferPool for non-blocking readback
+
+4. **Path B not recording timing** 🔧 **FIXED**
+   - Path B (GPU pipeline with crop) now calls `gpuStatus.setRenderTiming()`
+   - Combines timing from rotation stage and post-crop stage
+
+5. **Histogram computed during draft mode** 🔧 **FIXED**
+   - useHistogramDisplay.ts now skips scheduling during draft mode
+   - Cancels pending debounced computations when entering draft mode
+   - Triggers computation when transitioning from draft → full
+
+### Investigation Approach
+
+1. Add console.log debugging to verify:
+   - `renderState` transitions
+   - `renderQuality` value during interactions
+   - `targetResolution` value passed to GPU pipeline
+   - Which histogram method is called (compute vs computeAsync)
+
+2. Check GPU badge timing source:
+   - Is it measuring CPU time or GPU time?
+   - Does it include readback time?
+   - Is the timing from the right pipeline stage?
+
+3. Profile with Chrome DevTools:
+   - Record performance trace during slider drag
+   - Check GPU utilization and frame timing
+   - Identify actual bottleneck
+
+---
+
 ## Detailed Implementation Plan
 
 ### Phase 1: Quick Wins (Days 1-2)

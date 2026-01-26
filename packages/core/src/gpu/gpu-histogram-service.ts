@@ -21,14 +21,26 @@ import { rgbToRgba } from './texture-utils'
  * interface as the WASM-based histogram in DecodeService.
  */
 export class GPUHistogramService {
-  private pipeline: HistogramPipeline | null = null
+  private _pipeline: HistogramPipeline | null = null
   private initialized = false
+
+  // Reusable texture for async operations (avoids creating/destroying per call)
+  private asyncTexture: GPUTexture | null = null
+  private asyncTextureSize: { width: number; height: number } = { width: 0, height: 0 }
+  private device: GPUDevice | null = null
 
   /**
    * Check if the service is initialized and ready.
    */
   isReady(): boolean {
-    return this.initialized && this.pipeline !== null
+    return this.initialized && this._pipeline !== null
+  }
+
+  /**
+   * Get the underlying pipeline (for direct access to computeAsync, etc.).
+   */
+  get pipeline(): HistogramPipeline | null {
+    return this._pipeline
   }
 
   /**
@@ -38,13 +50,21 @@ export class GPUHistogramService {
    */
   async initialize(): Promise<boolean> {
     if (this.initialized) {
-      return this.pipeline !== null
+      return this._pipeline !== null
     }
 
     try {
-      this.pipeline = await getHistogramPipeline()
+      this._pipeline = await getHistogramPipeline()
       this.initialized = true
-      return this.pipeline !== null
+
+      // Store device reference for texture creation
+      if (this._pipeline) {
+        const { getGPUCapabilityService } = await import('./capabilities')
+        const gpuService = getGPUCapabilityService()
+        this.device = gpuService.device
+      }
+
+      return this._pipeline !== null
     } catch (error) {
       console.error('[GPUHistogramService] Initialization failed:', error)
       this.initialized = true
@@ -89,24 +109,132 @@ export class GPUHistogramService {
     width: number,
     height: number
   ): Promise<HistogramData> {
-    if (!this.pipeline) {
+    if (!this._pipeline) {
       throw new Error(
         'GPU histogram service not initialized. Call initialize() first.'
       )
     }
 
     // Compute histogram on GPU
-    const result = await this.pipeline.computeFromPixels(pixels, width, height)
+    const result = await this._pipeline.computeFromPixels(pixels, width, height)
 
     // Convert pipeline result to HistogramData
     return convertToHistogramData(result)
   }
 
   /**
+   * Compute histogram asynchronously with non-blocking readback.
+   *
+   * This method uses triple-buffered async readback to avoid blocking
+   * the main thread. The callback is invoked when the result is ready.
+   *
+   * @param pixels - Input RGB pixel data (width * height * 3 bytes)
+   * @param width - Image width in pixels
+   * @param height - Image height in pixels
+   * @param onComplete - Callback invoked with the histogram result
+   */
+  computeHistogramAsync(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    onComplete: (result: HistogramData) => void
+  ): void {
+    // Convert RGB to RGBA (GPU expects RGBA)
+    const rgbaPixels = rgbToRgba(pixels, width, height)
+    this.computeHistogramRgbaAsync(rgbaPixels, width, height, onComplete)
+  }
+
+  /**
+   * Compute histogram asynchronously from RGBA pixel data.
+   *
+   * This method uses triple-buffered async readback to avoid blocking
+   * the main thread. The callback is invoked when the result is ready.
+   *
+   * @param pixels - Input RGBA pixel data (width * height * 4 bytes)
+   * @param width - Image width in pixels
+   * @param height - Image height in pixels
+   * @param onComplete - Callback invoked with the histogram result
+   */
+  computeHistogramRgbaAsync(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    onComplete: (result: HistogramData) => void
+  ): void {
+    if (!this._pipeline || !this.device) {
+      throw new Error(
+        'GPU histogram service not initialized. Call initialize() first.'
+      )
+    }
+
+    // Create or reuse texture (recreate if size changed)
+    const texture = this.getOrCreateTexture(width, height)
+
+    // Upload pixels to texture
+    this.device.queue.writeTexture(
+      { texture },
+      pixels.buffer,
+      {
+        bytesPerRow: width * 4,
+        rowsPerImage: height,
+        offset: pixels.byteOffset,
+      },
+      { width, height, depthOrArrayLayers: 1 }
+    )
+
+    // Use the async non-blocking method
+    this._pipeline.computeAsync(texture, width, height, (result) => {
+      // Convert pipeline result to HistogramData
+      onComplete(convertToHistogramData(result))
+    })
+  }
+
+  /**
+   * Get or create a reusable texture for async operations.
+   * Recreates the texture if the size has changed.
+   */
+  private getOrCreateTexture(width: number, height: number): GPUTexture {
+    if (!this.device) {
+      throw new Error('Device not available')
+    }
+
+    // Check if we can reuse the existing texture
+    if (
+      this.asyncTexture &&
+      this.asyncTextureSize.width === width &&
+      this.asyncTextureSize.height === height
+    ) {
+      return this.asyncTexture
+    }
+
+    // Destroy old texture if it exists
+    if (this.asyncTexture) {
+      this.asyncTexture.destroy()
+    }
+
+    // Create new texture
+    this.asyncTexture = this.device.createTexture({
+      label: 'Histogram Async Input Texture',
+      size: { width, height, depthOrArrayLayers: 1 },
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    })
+    this.asyncTextureSize = { width, height }
+
+    return this.asyncTexture
+  }
+
+  /**
    * Destroy the service and release resources.
    */
   destroy(): void {
-    this.pipeline = null
+    if (this.asyncTexture) {
+      this.asyncTexture.destroy()
+      this.asyncTexture = null
+    }
+    this.asyncTextureSize = { width: 0, height: 0 }
+    this._pipeline = null
+    this.device = null
     this.initialized = false
   }
 }

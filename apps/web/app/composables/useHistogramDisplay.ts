@@ -522,8 +522,17 @@ export function useHistogramDisplay(
 
   /**
    * Schedule debounced histogram computation from adjusted pixels.
+   * Skips scheduling entirely during draft mode to avoid queuing up computations.
    */
   function scheduleComputeFromPixels(pixels: Uint8Array, width: number, height: number) {
+    // Don't schedule histogram computation during draft mode
+    // The histogram will be computed when quality changes to 'full'
+    if (renderQualityRef?.value === 'draft') {
+      // Cancel any pending debounced computation to avoid stale updates
+      debouncedComputeFromPixels.cancel()
+      return
+    }
+
     pendingAdjustedPixels = { pixels, width, height }
     debouncedComputeFromPixels()
   }
@@ -656,6 +665,28 @@ export function useHistogramDisplay(
       },
       { immediate: true },
     )
+
+    /**
+     * Watch for render quality changes from 'draft' to 'full'.
+     * When transitioning to full quality, immediately compute histogram with current pixels.
+     * This ensures the histogram updates after slider interactions complete.
+     */
+    if (renderQualityRef) {
+      watch(
+        renderQualityRef,
+        (newQuality, oldQuality) => {
+          // Only trigger when transitioning from draft to full
+          if (oldQuality === 'draft' && newQuality === 'full') {
+            const pixels = adjustedPixelsRef.value
+            const dims = adjustedDimensionsRef.value
+            if (pixels && dims) {
+              // Compute immediately (not debounced) since interaction is complete
+              computeHistogramFromPixels(pixels, dims.width, dims.height)
+            }
+          }
+        },
+      )
+    }
   }
 
   /**

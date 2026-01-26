@@ -28,6 +28,7 @@ import {
   applyToneCurveFromPointsAdaptive,
   getGPUEditPipeline,
   type EditPipelineParams,
+  type EditPipelineTiming,
   type MaskStackInput,
   type BasicAdjustments,
 } from '@literoom/core/gpu'
@@ -829,6 +830,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           // Stage 3: Adjustments + Tone Curve + Masks via unified pipeline (without rotation)
           // This gives us 2 GPU round-trips (necessary due to crop)
           try {
+            // Track timing from each stage for gpuStatusStore
+            let rotationStageTiming: EditPipelineTiming | undefined
+            let postCropStageTiming: EditPipelineTiming | undefined
+
             // Stage 1: Rotation only (if needed)
             if (hasRotation) {
               const rotationResult = await gpuPipeline.process(
@@ -836,6 +841,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
                 { rotation: totalRotation, targetResolution },
               )
               console.log(`[useEditPreview] GPU Pipeline (rotation stage): ${JSON.stringify(rotationResult.timing)}`)
+              rotationStageTiming = rotationResult.timing
               currentPixels = rotationResult.pixels
               currentWidth = rotationResult.width
               currentHeight = rotationResult.height
@@ -878,10 +884,24 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
                 postCropParams,
               )
               console.log(`[useEditPreview] GPU Pipeline (post-crop stage): ${JSON.stringify(postCropResult.timing)}`)
+              postCropStageTiming = postCropResult.timing
               currentPixels = postCropResult.pixels
               currentWidth = postCropResult.width
               currentHeight = postCropResult.height
             }
+
+            // Record timing to gpuStatusStore (same as Path A)
+            const gpuStatus = useGpuStatusStore()
+            gpuStatus.setRenderTiming({
+              total: (rotationStageTiming?.total ?? 0) + (postCropStageTiming?.total ?? 0),
+              upload: rotationStageTiming?.upload ?? 0,
+              rotation: rotationStageTiming?.rotation ?? 0,
+              adjustments: postCropStageTiming?.adjustments ?? 0,
+              toneCurve: postCropStageTiming?.toneCurve ?? 0,
+              masks: postCropStageTiming?.masks ?? 0,
+              readback: postCropStageTiming?.readback ?? 0,
+              downsample: (rotationStageTiming?.downsample ?? 0) + (postCropStageTiming?.downsample ?? 0),
+            })
 
             usedUnifiedPipeline = true
           }
