@@ -62,3 +62,6 @@ export {
   createTestImage,
   type MockDecodeServiceOptions
 } from './mock-decode-service'
+
+// Curve utilities
+export { isLinearCurve, CURVE_POINT_TOLERANCE } from './curve-utils'

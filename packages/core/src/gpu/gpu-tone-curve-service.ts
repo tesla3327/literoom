@@ -17,27 +17,11 @@ import {
 import { getAdaptiveProcessor } from './adaptive-processor'
 import { rgbToRgba, rgbaToRgb } from './texture-utils'
 import type { CurvePoint } from '../decode/types'
+import { isLinearCurve } from '../decode/curve-utils'
 
 // Re-export types
 export { type ToneCurveLut, createIdentityLut, isIdentityLut }
-
-// ============================================================================
-// LUT Generation from Curve Points (Fritsch-Carlson Algorithm)
-// ============================================================================
-
-/**
- * Check if curve points form a linear curve (identity).
- */
-function isLinearCurve(points: readonly CurvePoint[]): boolean {
-  if (points.length !== 2) return false
-  const [p0, p1] = points
-  return (
-    Math.abs(p0.x) < 0.001 &&
-    Math.abs(p0.y) < 0.001 &&
-    Math.abs(p1.x - 1) < 0.001 &&
-    Math.abs(p1.y - 1) < 0.001
-  )
-}
+export { isLinearCurve }
 
 /**
  * Compute monotonic tangents using Fritsch-Carlson algorithm.

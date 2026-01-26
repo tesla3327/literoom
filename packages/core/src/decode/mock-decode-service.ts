@@ -22,6 +22,7 @@ import type {
   HistogramData
 } from './types'
 import { DecodeError } from './types'
+import { isLinearCurve } from './curve-utils'
 
 /**
  * Configuration options for MockDecodeService.
@@ -443,14 +444,7 @@ export class MockDecodeService implements IDecodeService {
     await this.simulateOperation()
 
     // Check if curve is linear (identity)
-    const isLinear =
-      points.length === 2 &&
-      Math.abs(points[0].x) < 0.001 &&
-      Math.abs(points[0].y) < 0.001 &&
-      Math.abs(points[1].x - 1) < 0.001 &&
-      Math.abs(points[1].y - 1) < 0.001
-
-    if (isLinear) {
+    if (isLinearCurve(points)) {
       // Return unchanged pixels for identity curve
       return { width, height, pixels: new Uint8Array(pixels) }
     }
