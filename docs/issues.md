@@ -18,6 +18,8 @@
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
+- [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
+- [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle)
 
 ### Recently Solved
 - [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
@@ -564,6 +566,86 @@ Adjustment change:    [Cached] → Adjustments → Tone Curve → Masks
 
 **Decision Needed**:
 Research whether staged caching would meaningfully improve performance or if it adds unnecessary complexity for marginal gains.
+
+---
+
+### Masks panel collapses unexpectedly when scrolling page
+
+**Severity**: Medium | **Type**: UX Bug | **Found**: 2026-01-27
+
+**Problem**:
+When the Masks accordion panel is expanded and the user scrolls the page (using mouse wheel or scrollbar), the Masks panel unexpectedly collapses. This forces users to repeatedly re-expand the panel while working with masks.
+
+**Steps to Reproduce**:
+1. Open a photo in edit view
+2. Expand the "Masks" accordion panel
+3. Create a mask (either Linear or Radial)
+4. Scroll the page up or down using the mouse wheel or page scroll
+5. Observe: The Masks accordion collapses automatically
+
+**Expected Behavior**:
+The accordion panel should remain in its expanded state regardless of page scrolling.
+
+**Actual Behavior**:
+The accordion collapses when the page is scrolled, hiding the mask controls and requiring the user to click to re-expand it.
+
+**Impact**:
+- Disrupts mask editing workflow
+- Forces extra clicks to re-expand panel
+- May cause confusion about mask state
+
+**Files to Investigate**:
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Accordion component
+- `apps/web/app/components/edit/EditMaskPanel.vue` - Mask panel component
+
+**Screenshots**:
+- `docs/screenshots/qa-section10-masks-14-masks-expanded-again.png` - Panel before scroll
+- `docs/screenshots/qa-section10-masks-16-after-scroll-up.png` - Panel collapsed after scroll
+
+---
+
+### Masks disappear after panel collapse/expand cycle
+
+**Severity**: High | **Type**: Bug | **Found**: 2026-01-27
+
+**Problem**:
+Masks that have been created appear to disappear or lose their state after the Masks accordion panel is collapsed and re-expanded. The Linear/Radial buttons become enabled again as if no masks exist, and the mask overlay is no longer visible on the canvas.
+
+**Steps to Reproduce**:
+1. Open a photo in edit view
+2. Expand the "Masks" accordion panel
+3. Create a Linear mask by clicking Linear button and dragging on the preview
+4. Verify the mask appears in the list with "Hide mask" and "Delete mask" buttons
+5. Collapse the Masks accordion (by clicking the header or scrolling the page)
+6. Re-expand the Masks accordion
+7. Observe: The mask list may be empty, Linear/Radial buttons are enabled again
+
+**Expected Behavior**:
+Created masks should persist and remain visible after collapsing and re-expanding the Masks panel.
+
+**Actual Behavior**:
+Masks appear to be lost or hidden after the accordion collapse/expand cycle. The mask overlay canvas also disappears.
+
+**Technical Details**:
+- The mask overlay canvas (`data-testid="mask-overlay-canvas"`) disappears when the panel collapses
+- When re-expanded, the mask controls sometimes show no masks created
+- This may be related to Vue component mounting/unmounting during accordion state changes
+
+**Impact**:
+- **Critical workflow blocker**: Users cannot reliably work with masks
+- Work is lost without warning
+- Users may think their masks were not created
+
+**Files to Investigate**:
+- `apps/web/app/components/edit/EditMaskPanel.vue` - Mask panel component
+- `apps/web/app/composables/useMaskOverlay.ts` - Mask overlay composable
+- `apps/web/app/stores/edit.ts` - Edit state management for masks
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Accordion behavior
+
+**Screenshots**:
+- `docs/screenshots/qa-section10-masks-09-linear-mask-with-handles.png` - Mask visible before collapse
+- `docs/screenshots/qa-section10-masks-17-mask-panel-expanded.png` - After re-expand, mask buttons visible
+- `docs/screenshots/qa-section10-masks-25-check-radial-mask.png` - Masks appear missing
 
 ---
 
