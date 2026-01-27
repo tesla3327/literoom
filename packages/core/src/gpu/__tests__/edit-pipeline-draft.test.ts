@@ -279,6 +279,10 @@ vi.mock('../pipelines/mask-pipeline', () => ({
   getMaskPipeline: vi.fn(),
 }))
 
+vi.mock('../pipelines/downsample-pipeline', () => ({
+  getDownsamplePipeline: vi.fn().mockResolvedValue(null),
+}))
+
 // Track created textures for testing
 let createdTextures: Array<{ destroy: ReturnType<typeof vi.fn> }> = []
 
@@ -379,6 +383,7 @@ vi.mock('../gpu-tone-curve-service', () => ({
 
 import { getGPUCapabilityService } from '../capabilities'
 import { readTexturePixels } from '../texture-utils'
+import { getDownsamplePipeline } from '../pipelines/downsample-pipeline'
 
 // ============================================================================
 // Test Suites
@@ -389,6 +394,7 @@ describe('GPUEditPipeline Draft Mode', () => {
     resetGPUEditPipeline()
     vi.clearAllMocks()
     createdTextures = []
+    vi.mocked(getDownsamplePipeline).mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -566,6 +572,7 @@ describe('GPUEditPipeline Draft Mode', () => {
         device: mockDevice as unknown as GPUDevice,
         initialize: vi.fn().mockResolvedValue(undefined),
       } as any)
+      vi.mocked(getDownsamplePipeline).mockResolvedValue(null)
 
       pipeline = new GPUEditPipeline()
       await pipeline.initialize()
@@ -669,6 +676,7 @@ describe('GPUEditPipeline Draft Mode', () => {
         device: mockDevice as unknown as GPUDevice,
         initialize: vi.fn().mockResolvedValue(undefined),
       } as any)
+      vi.mocked(getDownsamplePipeline).mockResolvedValue(null)
 
       pipeline = new GPUEditPipeline()
       await pipeline.initialize()

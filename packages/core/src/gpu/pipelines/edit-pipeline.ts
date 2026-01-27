@@ -30,6 +30,7 @@ import {
 import { getUberPipeline } from './uber-pipeline'
 import { getMaskPipeline, type MaskStackInput } from './mask-pipeline'
 import { getRotationPipeline, RotationPipeline } from './rotation-pipeline'
+import { getDownsamplePipeline, type DownsampleParams } from './downsample-pipeline'
 import type { CurvePoint } from '../../decode/types'
 import { generateLutFromCurvePoints } from '../gpu-tone-curve-service'
 
@@ -291,15 +292,6 @@ export class GPUEditPipeline {
 
     const totalStart = performance.now()
 
-    // Downsample input if targetResolution is set and < 1.0
-    let processInput = input
-    const targetResolution = params.targetResolution ?? 1.0
-    if (targetResolution < 1.0) {
-      const downsampleStart = performance.now()
-      processInput = this.downsamplePixels(input, targetResolution)
-      timing.downsample = performance.now() - downsampleStart
-    }
-
     // Determine which features are needed
     const needsAdjustments = shouldApplyAdjustments(params.adjustments)
     const needsToneCurve = shouldApplyToneCurve(params.toneCurvePoints, params.toneCurveLut)
@@ -307,8 +299,12 @@ export class GPUEditPipeline {
     // Use uber-pipeline when BOTH adjustments AND tone curve are needed (75% bandwidth reduction)
     const useUberPipeline = needsAdjustments && needsToneCurve
 
-    // Get all required pipelines
-    const [rotationPipeline, adjustmentsPipeline, toneCurvePipeline, uberPipeline, maskPipeline] =
+    // Check if downsampling is needed
+    const targetResolution = params.targetResolution ?? 1.0
+    const needsDownsample = targetResolution < 1.0
+
+    // Get all required pipelines (including downsample if needed)
+    const [rotationPipeline, adjustmentsPipeline, toneCurvePipeline, uberPipeline, maskPipeline, downsamplePipeline] =
       await Promise.all([
         shouldApplyRotation(params.rotation) ? getRotationPipeline() : null,
         // Only get individual pipelines if not using uber-pipeline
@@ -317,19 +313,20 @@ export class GPUEditPipeline {
         // Get uber-pipeline when both features are needed
         useUberPipeline ? getUberPipeline() : null,
         shouldApplyMasks(params.masks) ? getMaskPipeline() : null,
+        // Get downsample pipeline if needed
+        needsDownsample ? getDownsamplePipeline() : null,
       ])
 
-    // Track current dimensions (may change after rotation)
-    // Use processInput dimensions which may be downsampled
-    let currentWidth = processInput.width
-    let currentHeight = processInput.height
+    // Track current dimensions (may change after downsampling or rotation)
+    let currentWidth = input.width
+    let currentHeight = input.height
 
-    // Convert RGB to RGBA and upload to GPU
+    // Convert full-res RGB to RGBA and upload to GPU
     const uploadStart = performance.now()
-    const rgba = rgbToRgba(processInput.pixels, processInput.width, processInput.height)
+    const rgba = rgbToRgba(input.pixels, input.width, input.height)
     let inputTexture = this.texturePool!.acquire(
-      processInput.width,
-      processInput.height,
+      input.width,
+      input.height,
       TextureUsage.PINGPONG,
       'Edit Pipeline Input'
     )
@@ -337,18 +334,98 @@ export class GPUEditPipeline {
     this.device.queue.writeTexture(
       { texture: inputTexture },
       rgba.buffer,
-      { bytesPerRow: processInput.width * 4, rowsPerImage: processInput.height, offset: rgba.byteOffset },
-      { width: processInput.width, height: processInput.height, depthOrArrayLayers: 1 }
+      { bytesPerRow: input.width * 4, rowsPerImage: input.height, offset: rgba.byteOffset },
+      { width: input.width, height: input.height, depthOrArrayLayers: 1 }
     )
     timing.upload = performance.now() - uploadStart
+
+    // Track textures for cleanup with their dimensions for pool release
+    const texturesToRelease: TextureWithDims[] = []
+
+    // GPU Downsample if needed (after upload, before other processing)
+    if (needsDownsample) {
+      const downsampleStart = performance.now()
+
+      // Calculate output dimensions
+      const outputWidth = Math.max(1, Math.floor(input.width * targetResolution))
+      const outputHeight = Math.max(1, Math.floor(input.height * targetResolution))
+
+      if (downsamplePipeline) {
+        // GPU downsample path
+        const outputTexture = this.texturePool!.acquire(
+          outputWidth,
+          outputHeight,
+          TextureUsage.PINGPONG,
+          'Edit Pipeline Downsample Output'
+        )
+
+        const downsampleParams: DownsampleParams = {
+          inputWidth: input.width,
+          inputHeight: input.height,
+          outputWidth,
+          outputHeight,
+          scale: targetResolution,
+        }
+
+        // Create a separate encoder for downsampling and submit it
+        const downsampleEncoder = downsamplePipeline.downsampleToTextures(
+          inputTexture,
+          outputTexture,
+          downsampleParams
+        )
+        this.device.queue.submit([downsampleEncoder.finish()])
+
+        // Track old full-res texture for release
+        texturesToRelease.push({ texture: inputTexture, width: input.width, height: input.height })
+
+        // Update to use downsampled texture
+        inputTexture = outputTexture
+        currentWidth = outputWidth
+        currentHeight = outputHeight
+
+        timing.downsample = performance.now() - downsampleStart
+        console.log(
+          `[edit-pipeline] GPU downsample: ${input.width}x${input.height} → ${outputWidth}x${outputHeight} in ${timing.downsample.toFixed(2)}ms`
+        )
+      } else {
+        // CPU fallback: need to read back, downsample on CPU, and re-upload
+        // This is slower but ensures functionality when GPU downsample is unavailable
+        const cpuDownsampled = this.downsamplePixels(input, targetResolution)
+
+        // Release the full-res texture and create a smaller one
+        texturesToRelease.push({ texture: inputTexture, width: input.width, height: input.height })
+
+        // Convert downsampled RGB to RGBA
+        const downsampledRgba = rgbToRgba(cpuDownsampled.pixels, cpuDownsampled.width, cpuDownsampled.height)
+
+        inputTexture = this.texturePool!.acquire(
+          cpuDownsampled.width,
+          cpuDownsampled.height,
+          TextureUsage.PINGPONG,
+          'Edit Pipeline Input (CPU Downsampled)'
+        )
+
+        this.device.queue.writeTexture(
+          { texture: inputTexture },
+          downsampledRgba.buffer,
+          { bytesPerRow: cpuDownsampled.width * 4, rowsPerImage: cpuDownsampled.height, offset: downsampledRgba.byteOffset },
+          { width: cpuDownsampled.width, height: cpuDownsampled.height, depthOrArrayLayers: 1 }
+        )
+
+        currentWidth = cpuDownsampled.width
+        currentHeight = cpuDownsampled.height
+
+        timing.downsample = performance.now() - downsampleStart
+        console.log(
+          `[edit-pipeline] CPU downsample (fallback): ${input.width}x${input.height} → ${currentWidth}x${currentHeight} in ${timing.downsample.toFixed(2)}ms`
+        )
+      }
+    }
 
     // Create command encoder for chaining all operations
     let encoder = this.device.createCommandEncoder({
       label: 'Edit Pipeline Command Encoder',
     })
-
-    // Track textures for cleanup with their dimensions for pool release
-    const texturesToRelease: TextureWithDims[] = []
 
     // Track GPU timing stage indices: [rotation, adjustments/uber, toneCurve, masks]
     const gpuTimingIndices: (number | null)[] = [null, null, null, null]

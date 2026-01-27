@@ -1543,6 +1543,10 @@ const mockUberPipeline = {
   applyToTextures: vi.fn((input, output, w, h, adj, lut, encoder) => encoder),
 }
 
+const mockDownsamplePipeline = {
+  downsampleToTextures: vi.fn((input, output, params, encoder) => encoder || { finish: vi.fn() }),
+}
+
 // Mock texture tracking for cleanup tests
 let createdTextures: Array<{ destroy: ReturnType<typeof vi.fn> }> = []
 
@@ -1579,6 +1583,10 @@ vi.mock('./mask-pipeline', () => ({
 
 vi.mock('./uber-pipeline', () => ({
   getUberPipeline: vi.fn(),
+}))
+
+vi.mock('./downsample-pipeline', () => ({
+  getDownsamplePipeline: vi.fn(),
 }))
 
 // Mock texture utilities
@@ -1677,6 +1685,7 @@ import { getRotationPipeline, RotationPipeline } from './rotation-pipeline'
 import { getToneCurvePipeline, isIdentityLut } from './tone-curve-pipeline'
 import { getMaskPipeline } from './mask-pipeline'
 import { getUberPipeline } from './uber-pipeline'
+import { getDownsamplePipeline } from './downsample-pipeline'
 import { createTextureFromPixels, createOutputTexture, readTexturePixels } from '../texture-utils'
 import { generateLutFromCurvePoints } from '../gpu-tone-curve-service'
 
@@ -1727,6 +1736,7 @@ describe('GPUEditPipeline.process()', () => {
     vi.mocked(getAdjustmentsPipeline).mockResolvedValue(null)
     vi.mocked(getToneCurvePipeline).mockResolvedValue(null)
     vi.mocked(getMaskPipeline).mockResolvedValue(null)
+    vi.mocked(getDownsamplePipeline).mockResolvedValue(null)
     vi.mocked(generateLutFromCurvePoints).mockClear()
     vi.mocked(isIdentityLut).mockReturnValue(true) // Default to identity
 
