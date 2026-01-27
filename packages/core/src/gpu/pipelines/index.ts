@@ -53,6 +53,7 @@ export {
   type EditPipelineParams,
   type EditPipelineTiming,
   type EditPipelineResult,
+  type PixelFormat,
 } from './edit-pipeline'
 
 export {

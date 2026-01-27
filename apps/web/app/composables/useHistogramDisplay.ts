@@ -9,7 +9,7 @@
  */
 import type { Ref } from 'vue'
 import type { HistogramData } from '@literoom/core/decode'
-import { computeHistogramAdaptive } from '@literoom/core/gpu'
+import { computeHistogramAdaptive, computeHistogramAdaptiveRgba } from '@literoom/core/gpu'
 
 // ============================================================================
 // Types
@@ -452,7 +452,7 @@ export function useHistogramDisplay(
    * Compute histogram directly from provided pixel data.
    * Used when adjusted pixels are passed from the preview pipeline.
    *
-   * @param pixels - RGB pixel data (3 bytes per pixel)
+   * @param pixels - RGBA pixel data (4 bytes per pixel)
    * @param width - Image width
    * @param height - Image height
    */
@@ -472,11 +472,22 @@ export function useHistogramDisplay(
 
     try {
       // Compute histogram via GPU (with WASM fallback)
-      const { result, backend, timing } = await computeHistogramAdaptive(
+      // Use RGBA version since adjusted pixels are now RGBA
+      const { result, backend, timing } = await computeHistogramAdaptiveRgba(
         pixels,
         width,
         height,
-        () => $decodeService.computeHistogram(pixels, width, height),
+        // WASM fallback needs RGB - convert RGBA to RGB
+        async () => {
+          const pixelCount = width * height
+          const rgb = new Uint8Array(pixelCount * 3)
+          for (let i = 0, j = 0; i < pixels.length; i += 4, j += 3) {
+            rgb[j] = pixels[i]!
+            rgb[j + 1] = pixels[i + 1]!
+            rgb[j + 2] = pixels[i + 2]!
+          }
+          return $decodeService.computeHistogram(rgb, width, height)
+        },
       )
       console.log(`[useHistogramDisplay] Histogram (from pixels) computed via ${backend} in ${timing.toFixed(1)}ms`)
 

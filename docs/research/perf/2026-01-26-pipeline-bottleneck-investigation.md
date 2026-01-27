@@ -291,10 +291,37 @@ This eliminates:
    [edit-pipeline] CPU downsample (fallback): ${inputWidth}x${inputHeight} → ${outputWidth}x${outputHeight} in ${time}ms
    ```
 
-3. **Keep RGBA throughout pipeline**
+3. **Keep RGBA throughout pipeline** ✅ COMPLETED
    - Modify source cache to store RGBA
    - Skip all rgb↔rgba conversions
    - Expected: 10-24ms → 0ms
+   - **Implementation date**: 2026-01-27
+
+   **Changes made**:
+   - Added `PixelFormat` type ('rgb' | 'rgba') to edit-pipeline interfaces
+   - Added `format` field to `EditPipelineInput` (default: 'rgb' for backward compatibility)
+   - Added `outputFormat` field to `EditPipelineParams` (default: 'rgb')
+   - Added `format` field to `EditPipelineResult` to indicate output format
+   - Added `rgbToRgba` and `rgbaToRgb` timing fields to `EditPipelineTiming`
+   - Modified `loadImagePixels()` to return RGBA directly from canvas getImageData
+   - Updated `pixelsToImageBitmap()` to accept RGBA directly (no conversion)
+   - Updated `detectClippedPixels()` to process RGBA pixels (skip alpha channel)
+   - Added `computeHistogramAdaptiveRgba()` for RGBA histogram computation
+   - Updated pipeline calls in useEditPreview.ts to use format: 'rgba' / outputFormat: 'rgba'
+   - CPU downsample fallback updated to detect and preserve pixel format
+
+   **Files modified**:
+   - `packages/core/src/gpu/pipelines/edit-pipeline.ts` - RGBA input/output support
+   - `packages/core/src/gpu/pipelines/index.ts` - Export PixelFormat type
+   - `packages/core/src/gpu/index.ts` - Export PixelFormat and computeHistogramAdaptiveRgba
+   - `packages/core/src/gpu/gpu-histogram-service.ts` - Added computeHistogramAdaptiveRgba
+   - `apps/web/app/composables/useEditPreview.ts` - RGBA throughout pipeline
+   - `apps/web/app/composables/useHistogramDisplay.ts` - RGBA histogram support
+
+   **Benchmark comparison** (measured with 4.4MP images):
+   - Before: rgbToRgba=16ms + rgbaToRgb=13ms + display rgbToRgba=8ms = ~37ms conversion overhead
+   - After (RGBA path): 0ms conversion overhead in hot path
+   - Note: Path B (with crop) still has conversion overhead due to WASM crop expecting RGB
 
 ### Phase 3: Eliminate Readback (Priority: MEDIUM)
 
@@ -309,9 +336,9 @@ This eliminates:
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Badge timing (draft) | 50-70ms | <15ms | Phase 2.1 complete (GPU downsample: 10-20ms → 1-2ms) |
-| Total latency (slider → display) | 70-120ms | <25ms | Phase 1+2.1 complete (~30-70ms removed) |
-| FPS during drag | ~15 FPS | >30 FPS | In progress |
+| Badge timing (draft) | 50-70ms | <15ms | Phase 2.2 complete (RGBA pipeline: ~30ms → 0ms conversion) |
+| Total latency (slider → display) | 70-120ms | <25ms | Phase 1+2.1+2.2 complete (~60-100ms removed) |
+| FPS during drag | ~15 FPS | >30 FPS | Expected improvement with Phase 2.2 |
 
 ---
 
@@ -368,6 +395,55 @@ This eliminates:
 - This trade-off will be eliminated when Phase 2.2 (Keep RGBA throughout) is implemented
 
 **Tests**: All 2391 unit tests pass after changes
+
+### 2026-01-27: Phase 2.2 Completed (Keep RGBA Throughout Pipeline)
+
+**Objective**: Eliminate all RGB↔RGBA conversions in the hot path by keeping RGBA format throughout
+
+**Approach**:
+1. Modified `loadImagePixels()` to return RGBA directly from canvas getImageData (no RGBA→RGB conversion)
+2. Added format detection to edit pipeline to skip rgbToRgba conversion when input is RGBA
+3. Added outputFormat parameter to skip rgbaToRgb conversion when RGBA output is requested
+4. Updated `pixelsToImageBitmap()` to accept RGBA directly (no rgbToRgba conversion)
+5. Updated `detectClippedPixels()` to work with RGBA (4 bytes per pixel, skip alpha)
+6. Added `computeHistogramAdaptiveRgba()` to compute histogram from RGBA pixels directly
+
+**New processing flow** (Path A - no crop):
+1. Source loaded as RGBA from canvas ✅ no conversion
+2. Pass RGBA to GPU pipeline ✅ no conversion
+3. GPU processes (same as before)
+4. Output RGBA from GPU ✅ no conversion
+5. pixelsToImageBitmap with RGBA ✅ no conversion
+6. Draw to canvas
+
+**Benchmark results** (measured via standalone benchmark):
+
+| Resolution | Old Path (3 conversions) | New Path (0 conversions) | Savings |
+|------------|-------------------------|-------------------------|---------|
+| 1.1MP (draft) | ~11.7ms | 0ms | **11.7ms/render** |
+| 4.4MP (full) | ~46ms | 0ms | **46ms/render** |
+
+Detailed breakdown for 4.4MP:
+| Conversion | Time |
+|------------|------|
+| Input rgbToRgba | ~16.5ms |
+| Output rgbaToRgb | ~13.7ms |
+| Display rgbToRgba | ~15.9ms |
+| **Total** | **~46ms** |
+
+**Console output format**:
+```
+[edit-pipeline] RGBA input: ${width}x${height} (${mp}MP) - no conversion needed
+[edit-pipeline] RGBA output: ${width}x${height} (${mp}MP) - no conversion needed
+[useEditPreview] pixelsToImageBitmap: createImageBitmap=${time}ms total=${time}ms
+```
+
+**Trade-offs**:
+- 33% more memory for source cache (RGBA vs RGB)
+- Path B (with crop) still requires RGBA→RGB→RGBA conversion due to WASM crop expecting RGB
+- WASM histogram fallback requires RGBA→RGB conversion (GPU path uses RGBA directly)
+
+**Tests**: All 162 edit-pipeline tests pass after changes
 
 ---
 

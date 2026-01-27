@@ -353,3 +353,45 @@ export async function computeHistogramAdaptive(
   const timing = performance.now() - startTime
   return { result, backend: 'wasm', timing }
 }
+
+/**
+ * Compute histogram from RGBA pixel data using the adaptive processor.
+ *
+ * This is more efficient when the caller already has RGBA data,
+ * as it avoids the RGB to RGBA conversion on the GPU path.
+ *
+ * @param pixels - Input RGBA pixel data (4 bytes per pixel)
+ * @param width - Image width
+ * @param height - Image height
+ * @param wasmFallback - WASM fallback function (expects RGB, will convert)
+ * @returns HistogramData with timing and backend info
+ */
+export async function computeHistogramAdaptiveRgba(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  wasmFallback: () => Promise<HistogramData>
+): Promise<{ result: HistogramData; backend: 'webgpu' | 'wasm'; timing: number }> {
+  const gpuService = getGPUHistogramService()
+
+  const startTime = performance.now()
+
+  // Try GPU path if available (uses RGBA directly)
+  if (gpuService.isReady()) {
+    try {
+      const result = await gpuService.computeHistogramRgba(pixels, width, height)
+      const timing = performance.now() - startTime
+      return { result, backend: 'webgpu', timing }
+    } catch (error) {
+      console.warn(
+        '[computeHistogramAdaptiveRgba] GPU failed, falling back to WASM:',
+        error
+      )
+    }
+  }
+
+  // WASM fallback (note: WASM expects RGB, so caller should provide appropriate fallback)
+  const result = await wasmFallback()
+  const timing = performance.now() - startTime
+  return { result, backend: 'wasm', timing }
+}

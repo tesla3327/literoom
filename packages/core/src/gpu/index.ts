@@ -97,6 +97,7 @@ export {
   type EditPipelineParams,
   type EditPipelineTiming,
   type EditPipelineResult,
+  type PixelFormat,
 } from './pipelines'
 
 // Texture utilities
@@ -144,6 +145,7 @@ export {
   getGPUHistogramService,
   resetGPUHistogramService,
   computeHistogramAdaptive,
+  computeHistogramAdaptiveRgba,
 } from './gpu-histogram-service'
 
 // GPU transform service

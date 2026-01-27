@@ -311,14 +311,14 @@ async function pixelsToUrl(
 interface PixelsToImageBitmapResult {
   bitmap: ImageBitmap
   timing: {
-    rgbToRgba: number
     createImageBitmap: number
     total: number
   }
 }
 
 /**
- * Convert pixels to an ImageBitmap for direct canvas rendering.
+ * Convert RGBA pixels to an ImageBitmap for direct canvas rendering.
+ * Accepts RGBA pixels directly - no conversion needed.
  * This is much faster than pixelsToUrl because it avoids JPEG encoding.
  */
 async function pixelsToImageBitmap(
@@ -328,33 +328,26 @@ async function pixelsToImageBitmap(
 ): Promise<PixelsToImageBitmapResult> {
   const totalStart = performance.now()
 
-  // Step 1: Convert RGB to RGBA
-  const rgbToRgbaStart = performance.now()
-  const rgbaPixels = rgbToRgba(pixels)
-  const rgbToRgbaTime = performance.now() - rgbToRgbaStart
-
-  // Step 2: Create ImageData - use the same pattern as pixelsToUrl
-  // to avoid TypeScript issues with ArrayBuffer types
+  // Create ImageData from RGBA pixels directly
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')!
   const imageData = ctx.createImageData(width, height)
-  imageData.data.set(rgbaPixels)
+  imageData.data.set(pixels)
 
-  // Step 3: Create ImageBitmap (this is fast, no encoding needed)
+  // Create ImageBitmap (this is fast, no encoding needed)
   const createBitmapStart = performance.now()
   const bitmap = await createImageBitmap(imageData)
   const createBitmapTime = performance.now() - createBitmapStart
 
   const totalTime = performance.now() - totalStart
 
-  console.log(`[useEditPreview] pixelsToImageBitmap: rgbToRgba=${rgbToRgbaTime.toFixed(1)}ms createImageBitmap=${createBitmapTime.toFixed(1)}ms total=${totalTime.toFixed(1)}ms`)
+  console.log(`[useEditPreview] pixelsToImageBitmap: createImageBitmap=${createBitmapTime.toFixed(1)}ms total=${totalTime.toFixed(1)}ms`)
 
   return {
     bitmap,
     timing: {
-      rgbToRgba: rgbToRgbaTime,
       createImageBitmap: createBitmapTime,
       total: totalTime,
     },
@@ -362,7 +355,8 @@ async function pixelsToImageBitmap(
 }
 
 /**
- * Load an image from a URL and return its pixels.
+ * Load an image from a URL and return its pixels as RGBA.
+ * Returns RGBA directly to avoid conversion overhead.
  */
 async function loadImagePixels(
   url: string,
@@ -385,27 +379,21 @@ async function loadImagePixels(
   ctx.drawImage(img, 0, 0)
 
   const imageData = ctx.getImageData(0, 0, img.width, img.height)
-  const rgba = imageData.data
+  // Return RGBA directly - no conversion needed
+  // Canvas getImageData already returns RGBA (Uint8ClampedArray)
+  const rgba = new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.length)
 
-  // Convert RGBA to RGB
-  const rgb = new Uint8Array((rgba.length / 4) * 3)
-  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
-    rgb[j] = rgba[i]! // R
-    rgb[j + 1] = rgba[i + 1]! // G
-    rgb[j + 2] = rgba[i + 2]! // B
-  }
-
-  return { pixels: rgb, width: img.width, height: img.height }
+  return { pixels: rgba, width: img.width, height: img.height }
 }
 
 /**
- * Detect clipped pixels in an RGB image with per-channel tracking.
+ * Detect clipped pixels in an RGBA image with per-channel tracking.
  * Uses 6-bit encoding per pixel to track which specific channels are clipped.
  *
  * Shadow clipping: channel at 0
  * Highlight clipping: channel at 255
  *
- * @param pixels - RGB pixel data (3 bytes per pixel)
+ * @param pixels - RGBA pixel data (4 bytes per pixel)
  * @param width - Image width
  * @param height - Image height
  * @returns ClippingMap with per-pixel and per-channel clipping info
@@ -420,10 +408,12 @@ function detectClippedPixels(
   const shadowClipping: ChannelClipping = { r: false, g: false, b: false }
   const highlightClipping: ChannelClipping = { r: false, g: false, b: false }
 
-  for (let i = 0, idx = 0; i < pixels.length; i += 3, idx++) {
+  // Process RGBA pixels (4 bytes per pixel, skip alpha)
+  for (let i = 0, idx = 0; i < pixels.length; i += 4, idx++) {
     const r = pixels[i]!
     const g = pixels[i + 1]!
     const b = pixels[i + 2]!
+    // Alpha channel (pixels[i + 3]) is ignored for clipping detection
     let clipType = 0
 
     // Per-channel shadow clipping (channel at 0)
@@ -882,6 +872,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             const pipelineParams: EditPipelineParams = {
               // Set target resolution for progressive refinement
               targetResolution,
+              // Output RGBA to avoid conversion overhead
+              outputFormat: 'rgba',
             }
 
             // Add rotation if needed
@@ -905,7 +897,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             }
 
             const result = await gpuPipeline.process(
-              { pixels, width, height },
+              // Input is RGBA from canvas getImageData
+              { pixels, width, height, format: 'rgba' },
               pipelineParams,
             )
 
@@ -937,19 +930,29 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             let postCropStageTiming: EditPipelineTiming | undefined
 
             // Stage 1: Rotation only (if needed)
+            // Output RGB because crop (WASM) expects RGB input
             if (hasRotation) {
               const rotationResult = await gpuPipeline.process(
-                { pixels: currentPixels, width: currentWidth, height: currentHeight },
-                { rotation: totalRotation, targetResolution },
+                { pixels: currentPixels, width: currentWidth, height: currentHeight, format: 'rgba' },
+                { rotation: totalRotation, targetResolution, outputFormat: 'rgb' },
               )
               console.log(`[useEditPreview] GPU Pipeline (rotation stage): ${JSON.stringify(rotationResult.timing)}`)
               rotationStageTiming = rotationResult.timing
               currentPixels = rotationResult.pixels
               currentWidth = rotationResult.width
               currentHeight = rotationResult.height
+            } else {
+              // No rotation - need to convert RGBA to RGB for crop (WASM expects RGB)
+              const rgbPixels = new Uint8Array(currentWidth * currentHeight * 3)
+              for (let i = 0, j = 0; i < currentPixels.length; i += 4, j += 3) {
+                rgbPixels[j] = currentPixels[i]!
+                rgbPixels[j + 1] = currentPixels[i + 1]!
+                rgbPixels[j + 2] = currentPixels[i + 2]!
+              }
+              currentPixels = rgbPixels
             }
 
-            // Stage 2: Crop via WASM (CPU operation)
+            // Stage 2: Crop via WASM (CPU operation) - expects RGB
             console.log('[useEditPreview] Applying crop:', crop)
             const cropped = await $decodeService.applyCrop(
               currentPixels,
@@ -967,6 +970,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
               const postCropParams: EditPipelineParams = {
                 // Set target resolution for progressive refinement
                 targetResolution,
+                // Output RGBA for display (crop output is RGB, pipeline will convert)
+                outputFormat: 'rgba',
               }
 
               if (hasAdjustments) {
@@ -981,8 +986,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
                 postCropParams.masks = convertMasksToGPUFormat(editStore.masks)
               }
 
+              // Note: Crop output is RGB (from WASM), pipeline will convert to RGBA
               const postCropResult = await gpuPipeline.process(
-                { pixels: currentPixels, width: currentWidth, height: currentHeight },
+                { pixels: currentPixels, width: currentWidth, height: currentHeight, format: 'rgb' },
                 postCropParams,
               )
               console.log(`[useEditPreview] GPU Pipeline (post-crop stage): ${JSON.stringify(postCropResult.timing)}`)
@@ -997,9 +1003,12 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             gpuStatus.setRenderTiming({
               total: (rotationStageTiming?.total ?? 0) + (postCropStageTiming?.total ?? 0),
               upload: rotationStageTiming?.upload ?? 0,
+              rgbToRgba: (rotationStageTiming?.rgbToRgba ?? 0) + (postCropStageTiming?.rgbToRgba ?? 0),
+              rgbaToRgb: (rotationStageTiming?.rgbaToRgb ?? 0) + (postCropStageTiming?.rgbaToRgb ?? 0),
               rotation: rotationStageTiming?.rotation ?? 0,
               adjustments: postCropStageTiming?.adjustments ?? 0,
               toneCurve: postCropStageTiming?.toneCurve ?? 0,
+              uberPipeline: postCropStageTiming?.uberPipeline ?? 0,
               masks: postCropStageTiming?.masks ?? 0,
               readback: postCropStageTiming?.readback ?? 0,
               downsample: (rotationStageTiming?.downsample ?? 0) + (postCropStageTiming?.downsample ?? 0),

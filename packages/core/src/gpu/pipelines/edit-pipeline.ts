@@ -35,15 +35,22 @@ import type { CurvePoint } from '../../decode/types'
 import { generateLutFromCurvePoints } from '../gpu-tone-curve-service'
 
 /**
+ * Pixel format for edit pipeline input/output.
+ */
+export type PixelFormat = 'rgb' | 'rgba'
+
+/**
  * Input to the edit pipeline.
  */
 export interface EditPipelineInput {
-  /** RGB pixel data (3 bytes per pixel) */
+  /** Pixel data (RGB: 3 bytes per pixel, RGBA: 4 bytes per pixel) */
   pixels: Uint8Array
   /** Image width in pixels */
   width: number
   /** Image height in pixels */
   height: number
+  /** Pixel format (default: 'rgb' for backward compatibility) */
+  format?: PixelFormat
 }
 
 /**
@@ -63,6 +70,8 @@ export interface EditPipelineParams {
   masks?: MaskStackInput
   /** Target resolution scale (0.5 for half-resolution draft, 1.0 for full) */
   targetResolution?: number
+  /** Output pixel format (default: 'rgb' for backward compatibility) */
+  outputFormat?: PixelFormat
 }
 
 /**
@@ -73,8 +82,12 @@ export interface EditPipelineTiming {
   total: number
   /** Downsampling time (0 if skipped) */
   downsample: number
-  /** Time to upload RGB pixels to GPU as RGBA texture */
+  /** Time to upload pixels to GPU texture */
   upload: number
+  /** Time for RGB→RGBA conversion (0 if input is RGBA) */
+  rgbToRgba: number
+  /** Time for RGBA→RGB conversion (0 if output is RGBA) */
+  rgbaToRgb: number
   /** Time for rotation stage (0 if skipped) */
   rotation: number
   /** Time for adjustments stage (0 if skipped) */
@@ -85,7 +98,7 @@ export interface EditPipelineTiming {
   uberPipeline: number
   /** Time for masks stage (0 if skipped) */
   masks: number
-  /** Time to read RGBA pixels from GPU and convert to RGB */
+  /** Time to read pixels from GPU */
   readback: number
   /** GPU-measured rotation time (nanoseconds) */
   gpuRotation?: number
@@ -103,7 +116,7 @@ export interface EditPipelineTiming {
  * Result of the edit pipeline.
  */
 export interface EditPipelineResult {
-  /** RGB pixel data (3 bytes per pixel) */
+  /** Pixel data (format depends on outputFormat parameter) */
   pixels: Uint8Array
   /** Output width (may differ from input if rotated) */
   width: number
@@ -111,6 +124,8 @@ export interface EditPipelineResult {
   height: number
   /** Timing breakdown for each stage */
   timing: EditPipelineTiming
+  /** Output pixel format */
+  format: PixelFormat
 }
 
 /**
@@ -198,12 +213,17 @@ export class GPUEditPipeline {
       return input
     }
 
+    // Detect format from pixel data size
+    const pixelCount = input.width * input.height
+    const isRgba = input.pixels.length === pixelCount * 4
+    const bytesPerPixel = isRgba ? 4 : 3
+
     // Calculate the block size (inverse of scale)
     // For 0.5 scale, blockSize = 2 (2x2 blocks)
     const blockSize = Math.round(1 / targetScale)
 
-    // Create output buffer (RGB, 3 bytes per pixel)
-    const outputPixels = new Uint8Array(newWidth * newHeight * 3)
+    // Create output buffer
+    const outputPixels = new Uint8Array(newWidth * newHeight * bytesPerPixel)
 
     // Process each output pixel by averaging the corresponding input block
     for (let outY = 0; outY < newHeight; outY++) {
@@ -212,10 +232,11 @@ export class GPUEditPipeline {
         const inStartX = outX * blockSize
         const inStartY = outY * blockSize
 
-        // Accumulate RGB values from the block
+        // Accumulate RGBA values from the block
         let sumR = 0
         let sumG = 0
         let sumB = 0
+        let sumA = 0
         let count = 0
 
         // Iterate through the block (e.g., 2x2 for 0.5 scale)
@@ -227,24 +248,30 @@ export class GPUEditPipeline {
             const inX = inStartX + dx
             if (inX >= input.width) continue
 
-            // Calculate input pixel index (RGB, 3 bytes per pixel)
-            const inIdx = (inY * input.width + inX) * 3
+            // Calculate input pixel index
+            const inIdx = (inY * input.width + inX) * bytesPerPixel
 
-            sumR += input.pixels[inIdx]
-            sumG += input.pixels[inIdx + 1]
-            sumB += input.pixels[inIdx + 2]
+            sumR += input.pixels[inIdx]!
+            sumG += input.pixels[inIdx + 1]!
+            sumB += input.pixels[inIdx + 2]!
+            if (isRgba) {
+              sumA += input.pixels[inIdx + 3]!
+            }
             count++
           }
         }
 
         // Calculate output pixel index
-        const outIdx = (outY * newWidth + outX) * 3
+        const outIdx = (outY * newWidth + outX) * bytesPerPixel
 
         // Store averaged values
         if (count > 0) {
           outputPixels[outIdx] = Math.round(sumR / count)
           outputPixels[outIdx + 1] = Math.round(sumG / count)
           outputPixels[outIdx + 2] = Math.round(sumB / count)
+          if (isRgba) {
+            outputPixels[outIdx + 3] = Math.round(sumA / count)
+          }
         }
       }
     }
@@ -253,6 +280,7 @@ export class GPUEditPipeline {
       pixels: outputPixels,
       width: newWidth,
       height: newHeight,
+      format: isRgba ? 'rgba' : 'rgb',
     }
   }
 
@@ -282,6 +310,8 @@ export class GPUEditPipeline {
       total: 0,
       downsample: 0,
       upload: 0,
+      rgbToRgba: 0,
+      rgbaToRgb: 0,
       rotation: 0,
       adjustments: 0,
       toneCurve: 0,
@@ -289,6 +319,10 @@ export class GPUEditPipeline {
       masks: 0,
       readback: 0,
     }
+
+    // Determine input/output formats
+    const inputFormat = input.format ?? 'rgb'
+    const outputFormat = params.outputFormat ?? 'rgb'
 
     const totalStart = performance.now()
 
@@ -321,9 +355,20 @@ export class GPUEditPipeline {
     let currentWidth = input.width
     let currentHeight = input.height
 
-    // Convert full-res RGB to RGBA and upload to GPU
+    // Convert to RGBA if needed and upload to GPU
     const uploadStart = performance.now()
-    const rgba = rgbToRgba(input.pixels, input.width, input.height)
+    let rgba: Uint8Array
+    if (inputFormat === 'rgba') {
+      // Input is already RGBA, use directly
+      rgba = input.pixels
+      console.log(`[edit-pipeline] RGBA input: ${input.width}x${input.height} (${(input.width * input.height / 1e6).toFixed(2)}MP) - no conversion needed`)
+    } else {
+      // Convert RGB to RGBA
+      const rgbToRgbaStart = performance.now()
+      rgba = rgbToRgba(input.pixels, input.width, input.height)
+      timing.rgbToRgba = performance.now() - rgbToRgbaStart
+      console.log(`[edit-pipeline] rgbToRgba: ${input.width}x${input.height} (${(input.width * input.height / 1e6).toFixed(2)}MP) in ${timing.rgbToRgba.toFixed(2)}ms`)
+    }
     let inputTexture = this.texturePool!.acquire(
       input.width,
       input.height,
@@ -395,8 +440,13 @@ export class GPUEditPipeline {
         // Release the full-res texture and create a smaller one
         texturesToRelease.push({ texture: inputTexture, width: input.width, height: input.height })
 
-        // Convert downsampled RGB to RGBA
-        const downsampledRgba = rgbToRgba(cpuDownsampled.pixels, cpuDownsampled.width, cpuDownsampled.height)
+        // Convert to RGBA if needed (CPU downsample preserves input format)
+        let downsampledRgba: Uint8Array
+        if (cpuDownsampled.format === 'rgba') {
+          downsampledRgba = cpuDownsampled.pixels
+        } else {
+          downsampledRgba = rgbToRgba(cpuDownsampled.pixels, cpuDownsampled.width, cpuDownsampled.height)
+        }
 
         inputTexture = this.texturePool!.acquire(
           cpuDownsampled.width,
@@ -570,22 +620,27 @@ export class GPUEditPipeline {
       const gpuTimings = await this.timingHelper.readTimings()
 
       // Map GPU timings to the timing result
-      if (gpuTimingIndices[0] !== null && gpuTimings[gpuTimingIndices[0]] !== undefined) {
-        timing.gpuRotation = gpuTimings[gpuTimingIndices[0]]
+      const rotIdx = gpuTimingIndices[0]
+      const adjIdx = gpuTimingIndices[1]
+      const toneIdx = gpuTimingIndices[2]
+      const maskIdx = gpuTimingIndices[3]
+
+      if (rotIdx !== null && gpuTimings[rotIdx] !== undefined) {
+        timing.gpuRotation = gpuTimings[rotIdx]
       }
-      if (gpuTimingIndices[1] !== null && gpuTimings[gpuTimingIndices[1]] !== undefined) {
+      if (adjIdx !== null && gpuTimings[adjIdx] !== undefined) {
         // Index 1 is used for either adjustments or uber-pipeline
         if (timing.uberPipeline > 0) {
-          timing.gpuUberPipeline = gpuTimings[gpuTimingIndices[1]]
+          timing.gpuUberPipeline = gpuTimings[adjIdx]
         } else {
-          timing.gpuAdjustments = gpuTimings[gpuTimingIndices[1]]
+          timing.gpuAdjustments = gpuTimings[adjIdx]
         }
       }
-      if (gpuTimingIndices[2] !== null && gpuTimings[gpuTimingIndices[2]] !== undefined) {
-        timing.gpuToneCurve = gpuTimings[gpuTimingIndices[2]]
+      if (toneIdx !== null && gpuTimings[toneIdx] !== undefined) {
+        timing.gpuToneCurve = gpuTimings[toneIdx]
       }
-      if (gpuTimingIndices[3] !== null && gpuTimings[gpuTimingIndices[3]] !== undefined) {
-        timing.gpuMasks = gpuTimings[gpuTimingIndices[3]]
+      if (maskIdx !== null && gpuTimings[maskIdx] !== undefined) {
+        timing.gpuMasks = gpuTimings[maskIdx]
       }
 
       this.timingHelper.reset()
@@ -597,16 +652,28 @@ export class GPUEditPipeline {
       this.texturePool!.release(item.texture, item.width, item.height, TextureUsage.PINGPONG)
     }
 
-    // Convert RGBA back to RGB
-    const resultRgb = rgbaToRgb(resultRgba, currentWidth, currentHeight)
+    // Convert RGBA to RGB if needed
+    let resultPixels: Uint8Array
+    if (outputFormat === 'rgba') {
+      // Output as RGBA, no conversion needed
+      resultPixels = resultRgba
+      console.log(`[edit-pipeline] RGBA output: ${currentWidth}x${currentHeight} (${(currentWidth * currentHeight / 1e6).toFixed(2)}MP) - no conversion needed`)
+    } else {
+      // Convert RGBA to RGB
+      const rgbaToRgbStart = performance.now()
+      resultPixels = rgbaToRgb(resultRgba, currentWidth, currentHeight)
+      timing.rgbaToRgb = performance.now() - rgbaToRgbStart
+      console.log(`[edit-pipeline] rgbaToRgb: ${currentWidth}x${currentHeight} (${(currentWidth * currentHeight / 1e6).toFixed(2)}MP) in ${timing.rgbaToRgb.toFixed(2)}ms`)
+    }
 
     timing.total = performance.now() - totalStart
 
     return {
-      pixels: resultRgb,
+      pixels: resultPixels,
       width: currentWidth,
       height: currentHeight,
       timing,
+      format: outputFormat,
     }
   }
 
