@@ -97,6 +97,7 @@ export {
   type EditPipelineParams,
   type EditPipelineTiming,
   type EditPipelineResult,
+  type EditPipelineTextureResult,
   type PixelFormat,
 } from './pipelines'
 

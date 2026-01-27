@@ -129,6 +129,18 @@ export interface EditPipelineResult {
 }
 
 /**
+ * Result of processToTexture - returns timing and dimensions without pixel data.
+ */
+export interface EditPipelineTextureResult {
+  /** Timing breakdown for each stage */
+  timing: EditPipelineTiming
+  /** Output width (may differ from input if rotated) */
+  outputWidth: number
+  /** Output height (may differ from input if rotated) */
+  outputHeight: number
+}
+
+/**
  * Unified GPU edit pipeline.
  *
  * Chains all GPU operations (rotation, adjustments, tone curve, masks)
@@ -625,22 +637,35 @@ export class GPUEditPipeline {
       const toneIdx = gpuTimingIndices[2]
       const maskIdx = gpuTimingIndices[3]
 
-      if (rotIdx !== null && gpuTimings[rotIdx] !== undefined) {
-        timing.gpuRotation = gpuTimings[rotIdx]
-      }
-      if (adjIdx !== null && gpuTimings[adjIdx] !== undefined) {
-        // Index 1 is used for either adjustments or uber-pipeline
-        if (timing.uberPipeline > 0) {
-          timing.gpuUberPipeline = gpuTimings[adjIdx]
-        } else {
-          timing.gpuAdjustments = gpuTimings[adjIdx]
+      // Use != null to check for both null and undefined (array access can return undefined)
+      if (rotIdx != null) {
+        const rotValue = gpuTimings[rotIdx]
+        if (rotValue !== undefined) {
+          timing.gpuRotation = rotValue
         }
       }
-      if (toneIdx !== null && gpuTimings[toneIdx] !== undefined) {
-        timing.gpuToneCurve = gpuTimings[toneIdx]
+      if (adjIdx != null) {
+        const adjValue = gpuTimings[adjIdx]
+        if (adjValue !== undefined) {
+          // Index 1 is used for either adjustments or uber-pipeline
+          if (timing.uberPipeline > 0) {
+            timing.gpuUberPipeline = adjValue
+          } else {
+            timing.gpuAdjustments = adjValue
+          }
+        }
       }
-      if (maskIdx !== null && gpuTimings[maskIdx] !== undefined) {
-        timing.gpuMasks = gpuTimings[maskIdx]
+      if (toneIdx != null) {
+        const toneValue = gpuTimings[toneIdx]
+        if (toneValue !== undefined) {
+          timing.gpuToneCurve = toneValue
+        }
+      }
+      if (maskIdx != null) {
+        const maskValue = gpuTimings[maskIdx]
+        if (maskValue !== undefined) {
+          timing.gpuMasks = maskValue
+        }
       }
 
       this.timingHelper.reset()
@@ -675,6 +700,416 @@ export class GPUEditPipeline {
       timing,
       format: outputFormat,
     }
+  }
+
+  /**
+   * Process an image directly to a target texture (WebGPU canvas texture).
+   *
+   * This method eliminates the CPU readback bottleneck by copying the final
+   * processed texture directly to the WebGPU canvas texture for display.
+   *
+   * IMPORTANT: The target texture must have the RENDER_ATTACHMENT usage flag
+   * and match the format returned by navigator.gpu.getPreferredCanvasFormat().
+   *
+   * Pipeline stages (in order):
+   * 1. Rotation (if rotation !== 0)
+   * 2. Adjustments (if any non-default values)
+   * 3. Tone Curve (if non-identity curve)
+   * 4. Masks (if any enabled masks)
+   *
+   * @param input - Input image (RGB or RGBA pixels)
+   * @param params - Edit parameters
+   * @param targetTexture - WebGPU texture to copy final result to (typically from canvas.getCurrentTexture())
+   * @returns Timing breakdown and output dimensions (no pixels - they're on the GPU)
+   * @throws Error if pipeline not initialized or GPU processing fails
+   */
+  async processToTexture(
+    input: EditPipelineInput,
+    params: EditPipelineParams,
+    targetTexture: GPUTexture
+  ): Promise<EditPipelineTextureResult> {
+    if (!this.device) {
+      throw new Error('GPUEditPipeline not initialized. Call initialize() first.')
+    }
+
+    const timing: EditPipelineTiming = {
+      total: 0,
+      downsample: 0,
+      upload: 0,
+      rgbToRgba: 0,
+      rgbaToRgb: 0,
+      rotation: 0,
+      adjustments: 0,
+      toneCurve: 0,
+      uberPipeline: 0,
+      masks: 0,
+      readback: 0, // Will be 0 since we're not reading back
+    }
+
+    // Determine input format
+    const inputFormat = input.format ?? 'rgb'
+
+    const totalStart = performance.now()
+
+    // Determine which features are needed
+    const needsAdjustments = shouldApplyAdjustments(params.adjustments)
+    const needsToneCurve = shouldApplyToneCurve(params.toneCurvePoints, params.toneCurveLut)
+
+    // Use uber-pipeline when BOTH adjustments AND tone curve are needed (75% bandwidth reduction)
+    const useUberPipeline = needsAdjustments && needsToneCurve
+
+    // Check if downsampling is needed
+    const targetResolution = params.targetResolution ?? 1.0
+    const needsDownsample = targetResolution < 1.0
+
+    // Get all required pipelines (including downsample if needed)
+    const [rotationPipeline, adjustmentsPipeline, toneCurvePipeline, uberPipeline, maskPipeline, downsamplePipeline] =
+      await Promise.all([
+        shouldApplyRotation(params.rotation) ? getRotationPipeline() : null,
+        // Only get individual pipelines if not using uber-pipeline
+        needsAdjustments && !useUberPipeline ? getAdjustmentsPipeline() : null,
+        needsToneCurve && !useUberPipeline ? getToneCurvePipeline() : null,
+        // Get uber-pipeline when both features are needed
+        useUberPipeline ? getUberPipeline() : null,
+        shouldApplyMasks(params.masks) ? getMaskPipeline() : null,
+        // Get downsample pipeline if needed
+        needsDownsample ? getDownsamplePipeline() : null,
+      ])
+
+    // Track current dimensions (may change after downsampling or rotation)
+    let currentWidth = input.width
+    let currentHeight = input.height
+
+    // Convert to RGBA if needed and upload to GPU
+    const uploadStart = performance.now()
+    let rgba: Uint8Array
+    if (inputFormat === 'rgba') {
+      // Input is already RGBA, use directly
+      rgba = input.pixels
+      console.log(`[edit-pipeline] processToTexture: RGBA input: ${input.width}x${input.height} (${(input.width * input.height / 1e6).toFixed(2)}MP) - no conversion needed`)
+    } else {
+      // Convert RGB to RGBA
+      const rgbToRgbaStart = performance.now()
+      rgba = rgbToRgba(input.pixels, input.width, input.height)
+      timing.rgbToRgba = performance.now() - rgbToRgbaStart
+      console.log(`[edit-pipeline] processToTexture: rgbToRgba: ${input.width}x${input.height} (${(input.width * input.height / 1e6).toFixed(2)}MP) in ${timing.rgbToRgba.toFixed(2)}ms`)
+    }
+    let inputTexture = this.texturePool!.acquire(
+      input.width,
+      input.height,
+      TextureUsage.PINGPONG,
+      'Edit Pipeline Input (ToTexture)'
+    )
+    // Upload pixels to acquired texture
+    this.device.queue.writeTexture(
+      { texture: inputTexture },
+      rgba.buffer,
+      { bytesPerRow: input.width * 4, rowsPerImage: input.height, offset: rgba.byteOffset },
+      { width: input.width, height: input.height, depthOrArrayLayers: 1 }
+    )
+    timing.upload = performance.now() - uploadStart
+
+    // Track textures for cleanup with their dimensions for pool release
+    const texturesToRelease: TextureWithDims[] = []
+
+    // GPU Downsample if needed (after upload, before other processing)
+    if (needsDownsample) {
+      const downsampleStart = performance.now()
+
+      // Calculate output dimensions
+      const outputWidth = Math.max(1, Math.floor(input.width * targetResolution))
+      const outputHeight = Math.max(1, Math.floor(input.height * targetResolution))
+
+      if (downsamplePipeline) {
+        // GPU downsample path
+        const outputTexture = this.texturePool!.acquire(
+          outputWidth,
+          outputHeight,
+          TextureUsage.PINGPONG,
+          'Edit Pipeline Downsample Output (ToTexture)'
+        )
+
+        const downsampleParams: DownsampleParams = {
+          inputWidth: input.width,
+          inputHeight: input.height,
+          outputWidth,
+          outputHeight,
+          scale: targetResolution,
+        }
+
+        // Create a separate encoder for downsampling and submit it
+        const downsampleEncoder = downsamplePipeline.downsampleToTextures(
+          inputTexture,
+          outputTexture,
+          downsampleParams
+        )
+        this.device.queue.submit([downsampleEncoder.finish()])
+
+        // Track old full-res texture for release
+        texturesToRelease.push({ texture: inputTexture, width: input.width, height: input.height })
+
+        // Update to use downsampled texture
+        inputTexture = outputTexture
+        currentWidth = outputWidth
+        currentHeight = outputHeight
+
+        timing.downsample = performance.now() - downsampleStart
+        console.log(
+          `[edit-pipeline] processToTexture: GPU downsample: ${input.width}x${input.height} → ${outputWidth}x${outputHeight} in ${timing.downsample.toFixed(2)}ms`
+        )
+      } else {
+        // CPU fallback: need to read back, downsample on CPU, and re-upload
+        // This is slower but ensures functionality when GPU downsample is unavailable
+        const cpuDownsampled = this.downsamplePixels(input, targetResolution)
+
+        // Release the full-res texture and create a smaller one
+        texturesToRelease.push({ texture: inputTexture, width: input.width, height: input.height })
+
+        // Convert to RGBA if needed (CPU downsample preserves input format)
+        let downsampledRgba: Uint8Array
+        if (cpuDownsampled.format === 'rgba') {
+          downsampledRgba = cpuDownsampled.pixels
+        } else {
+          downsampledRgba = rgbToRgba(cpuDownsampled.pixels, cpuDownsampled.width, cpuDownsampled.height)
+        }
+
+        inputTexture = this.texturePool!.acquire(
+          cpuDownsampled.width,
+          cpuDownsampled.height,
+          TextureUsage.PINGPONG,
+          'Edit Pipeline Input (CPU Downsampled, ToTexture)'
+        )
+
+        this.device.queue.writeTexture(
+          { texture: inputTexture },
+          downsampledRgba.buffer,
+          { bytesPerRow: cpuDownsampled.width * 4, rowsPerImage: cpuDownsampled.height, offset: downsampledRgba.byteOffset },
+          { width: cpuDownsampled.width, height: cpuDownsampled.height, depthOrArrayLayers: 1 }
+        )
+
+        currentWidth = cpuDownsampled.width
+        currentHeight = cpuDownsampled.height
+
+        timing.downsample = performance.now() - downsampleStart
+        console.log(
+          `[edit-pipeline] processToTexture: CPU downsample (fallback): ${input.width}x${input.height} → ${currentWidth}x${currentHeight} in ${timing.downsample.toFixed(2)}ms`
+        )
+      }
+    }
+
+    // Create command encoder for chaining all operations
+    let encoder = this.device.createCommandEncoder({
+      label: 'Edit Pipeline Command Encoder (ToTexture)',
+    })
+
+    // Track GPU timing stage indices: [rotation, adjustments/uber, toneCurve, masks]
+    const gpuTimingIndices: (number | null)[] = [null, null, null, null]
+
+    // Stage 1: Rotation (changes dimensions)
+    if (rotationPipeline && params.rotation && Math.abs(params.rotation) > 0.001) {
+      const rotStart = performance.now()
+
+      // Calculate output dimensions
+      const rotDims = RotationPipeline.computeRotatedDimensions(
+        currentWidth,
+        currentHeight,
+        params.rotation
+      )
+
+      // Create output texture with new dimensions from pool
+      const outputTexture = this.texturePool!.acquire(
+        rotDims.width,
+        rotDims.height,
+        TextureUsage.PINGPONG,
+        'Edit Pipeline Rotation Output (ToTexture)'
+      )
+
+      // GPU timing: reserve pair index for rotation
+      if (this.timingHelper) {
+        gpuTimingIndices[0] = this.timingHelper.beginTimestamp()
+      }
+
+      // Apply rotation
+      encoder = rotationPipeline.applyToTextures(
+        inputTexture,
+        outputTexture,
+        currentWidth,
+        currentHeight,
+        rotDims.width,
+        rotDims.height,
+        params.rotation,
+        encoder
+      )
+
+      // Update current state - track old texture with its dimensions
+      texturesToRelease.push({ texture: inputTexture, width: currentWidth, height: currentHeight })
+      inputTexture = outputTexture
+      currentWidth = rotDims.width
+      currentHeight = rotDims.height
+
+      timing.rotation = performance.now() - rotStart
+    }
+
+    // Stage context for reuse across stages
+    const ctx: StageContext = {
+      device: this.device,
+      inputTexture,
+      currentWidth,
+      currentHeight,
+      encoder,
+      texturesToRelease,
+      texturePool: this.texturePool!,
+      timingHelper: this.timingHelper,
+    }
+
+    // Stage 2+3: Use uber-pipeline for combined adjustments+toneCurve (single pass, 75% bandwidth reduction)
+    if (uberPipeline && params.adjustments) {
+      const lut = params.toneCurveLut ?? generateLutFromCurvePoints(params.toneCurvePoints!)
+      const result = applyStage(ctx, 'Edit Pipeline Uber Output (ToTexture)', (input, output, enc) =>
+        uberPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.adjustments!, lut, enc)
+      )
+      ctx.inputTexture = result.inputTexture
+      ctx.encoder = result.encoder
+      timing.uberPipeline = result.elapsedTime
+      if (result.gpuTimingIndex !== null) {
+        gpuTimingIndices[1] = result.gpuTimingIndex // Use adjustments slot for uber timing
+      }
+    } else {
+      // Stage 2: Adjustments (only when not using uber-pipeline)
+      if (adjustmentsPipeline && params.adjustments) {
+        const result = applyStage(ctx, 'Edit Pipeline Adjustments Output (ToTexture)', (input, output, enc) =>
+          adjustmentsPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.adjustments!, enc)
+        )
+        ctx.inputTexture = result.inputTexture
+        ctx.encoder = result.encoder
+        timing.adjustments = result.elapsedTime
+        if (result.gpuTimingIndex !== null) {
+          gpuTimingIndices[1] = result.gpuTimingIndex
+        }
+      }
+
+      // Stage 3: Tone Curve (only when not using uber-pipeline)
+      if (toneCurvePipeline) {
+        const lut = params.toneCurveLut ?? generateLutFromCurvePoints(params.toneCurvePoints!)
+
+        if (!isIdentityLut(lut)) {
+          const result = applyStage(ctx, 'Edit Pipeline Tone Curve Output (ToTexture)', (input, output, enc) =>
+            toneCurvePipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, lut, enc)
+          )
+          ctx.inputTexture = result.inputTexture
+          ctx.encoder = result.encoder
+          timing.toneCurve = result.elapsedTime
+          if (result.gpuTimingIndex !== null) {
+            gpuTimingIndices[2] = result.gpuTimingIndex
+          }
+        }
+      }
+    }
+
+    // Stage 4: Masks
+    if (maskPipeline && params.masks) {
+      const result = applyStage(ctx, 'Edit Pipeline Masks Output (ToTexture)', (input, output, enc) =>
+        maskPipeline.applyToTextures(input, output, ctx.currentWidth, ctx.currentHeight, params.masks!, enc)
+      )
+      ctx.inputTexture = result.inputTexture
+      ctx.encoder = result.encoder
+      timing.masks = result.elapsedTime
+      if (result.gpuTimingIndex !== null) {
+        gpuTimingIndices[3] = result.gpuTimingIndex
+      }
+    }
+
+    // Extract final values from context
+    inputTexture = ctx.inputTexture
+    encoder = ctx.encoder
+
+    // ========== KEY DIFFERENCE FROM process() ==========
+    // Instead of reading back pixels, copy the final texture directly to the target (canvas) texture.
+    // This eliminates the 15-30ms readback bottleneck!
+    const copyStart = performance.now()
+
+    // Copy the processed texture to the target canvas texture
+    encoder.copyTextureToTexture(
+      { texture: inputTexture },
+      { texture: targetTexture },
+      { width: currentWidth, height: currentHeight }
+    )
+
+    console.log(`[edit-pipeline] processToTexture: texture copy scheduled in ${(performance.now() - copyStart).toFixed(2)}ms`)
+
+    // Resolve GPU timestamps after all stages
+    this.timingHelper?.resolveTimestamps(encoder)
+
+    // Submit all GPU commands at once
+    this.device.queue.submit([encoder.finish()])
+
+    // Read GPU timings if available
+    if (this.timingHelper) {
+      const gpuTimings = await this.timingHelper.readTimings()
+
+      // Map GPU timings to the timing result
+      const rotIdx = gpuTimingIndices[0]
+      const adjIdx = gpuTimingIndices[1]
+      const toneIdx = gpuTimingIndices[2]
+      const maskIdx = gpuTimingIndices[3]
+
+      // Use != null to check for both null and undefined (array access can return undefined)
+      if (rotIdx != null) {
+        const rotValue = gpuTimings[rotIdx]
+        if (rotValue !== undefined) {
+          timing.gpuRotation = rotValue
+        }
+      }
+      if (adjIdx != null) {
+        const adjValue = gpuTimings[adjIdx]
+        if (adjValue !== undefined) {
+          // Index 1 is used for either adjustments or uber-pipeline
+          if (timing.uberPipeline > 0) {
+            timing.gpuUberPipeline = adjValue
+          } else {
+            timing.gpuAdjustments = adjValue
+          }
+        }
+      }
+      if (toneIdx != null) {
+        const toneValue = gpuTimings[toneIdx]
+        if (toneValue !== undefined) {
+          timing.gpuToneCurve = toneValue
+        }
+      }
+      if (maskIdx != null) {
+        const maskValue = gpuTimings[maskIdx]
+        if (maskValue !== undefined) {
+          timing.gpuMasks = maskValue
+        }
+      }
+
+      this.timingHelper.reset()
+    }
+
+    // Release textures back to pool instead of destroying
+    this.texturePool!.release(inputTexture, currentWidth, currentHeight, TextureUsage.PINGPONG)
+    for (const item of texturesToRelease) {
+      this.texturePool!.release(item.texture, item.width, item.height, TextureUsage.PINGPONG)
+    }
+
+    timing.total = performance.now() - totalStart
+
+    console.log(`[edit-pipeline] processToTexture complete: ${currentWidth}x${currentHeight} in ${timing.total.toFixed(2)}ms (no readback!)`)
+
+    return {
+      timing,
+      outputWidth: currentWidth,
+      outputHeight: currentHeight,
+    }
+  }
+
+  /**
+   * Get the GPU device for external use (e.g., configuring WebGPU canvas).
+   * @returns The GPU device if initialized, null otherwise
+   */
+  getDevice(): GPUDevice | null {
+    return this.device
   }
 
   /**

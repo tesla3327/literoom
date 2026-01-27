@@ -29,6 +29,7 @@ import {
   getGPUEditPipeline,
   type EditPipelineParams,
   type EditPipelineTiming,
+  type EditPipelineTextureResult,
   type MaskStackInput,
   type BasicAdjustments,
 } from '@literoom/core/gpu'
@@ -93,6 +94,22 @@ export const CLIP_HIGHLIGHT_R = 8
 export const CLIP_HIGHLIGHT_G = 16
 export const CLIP_HIGHLIGHT_B = 32
 
+/**
+ * WebGPU canvas binding interface for direct GPU rendering.
+ */
+export interface WebGPUCanvasBinding {
+  /** Configure the canvas for WebGPU rendering */
+  configureWebGPUCanvas: () => Promise<boolean>
+  /** Get the current WebGPU texture for rendering */
+  getCurrentWebGPUTexture: () => GPUTexture | null
+  /** Whether WebGPU canvas mode is active */
+  isWebGPUCanvasMode: Ref<boolean>
+  /** Unconfigure WebGPU and fall back to 2D canvas */
+  unconfigureWebGPUCanvas: () => void
+  /** Update canvas dimensions after WebGPU render */
+  updateWebGPUCanvasDimensions: (width: number, height: number) => void
+}
+
 export interface UseEditPreviewReturn {
   /** URL of the current preview (with edits applied when available) */
   previewUrl: Ref<string | null>
@@ -116,6 +133,10 @@ export interface UseEditPreviewReturn {
   isWaitingForPreview: Ref<boolean>
   /** Current render state for progressive refinement (readonly for UI feedback) */
   renderState: Readonly<Ref<RenderState>>
+  /** Bind WebGPU canvas for direct GPU rendering (significant performance improvement) */
+  bindWebGPUCanvas: (binding: WebGPUCanvasBinding) => void
+  /** Whether WebGPU direct rendering is active */
+  isWebGPURenderingActive: Readonly<Ref<boolean>>
 }
 
 // ============================================================================
@@ -638,6 +659,22 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /** ImageBitmap for direct canvas rendering (avoids JPEG encoding) */
   const previewBitmap = shallowRef<ImageBitmap | null>(null)
 
+  // ============================================================================
+  // WebGPU Direct Rendering State
+  // ============================================================================
+
+  /** WebGPU canvas binding for direct GPU rendering */
+  const webgpuBinding = ref<WebGPUCanvasBinding | null>(null)
+
+  /** Whether WebGPU direct rendering is currently active */
+  const isWebGPURenderingActive = ref(false)
+
+  /** Last histogram/clipping update timestamp for throttling */
+  let lastHistogramUpdate = 0
+
+  /** Minimum interval between histogram updates (ms) - allow 2 updates per second during interaction */
+  const HISTOGRAM_UPDATE_INTERVAL = 500
+
   /**
    * Valid state transitions for the progressive refinement state machine.
    * This ensures predictable state flow and prevents invalid transitions.
@@ -868,6 +905,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         if (pipelineReady && !hasCrop) {
           // ===== PATH A: No crop - Use unified pipeline for ALL operations =====
           // This gives us 1 GPU round-trip instead of 4
+          // When WebGPU canvas is bound, we eliminate readback entirely!
           try {
             const pipelineParams: EditPipelineParams = {
               // Set target resolution for progressive refinement
@@ -896,6 +934,75 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
               pipelineParams.masks = convertMasksToGPUFormat(editStore.masks)
             }
 
+            // ===== WebGPU DIRECT RENDERING PATH =====
+            // When WebGPU canvas is bound, render directly to canvas texture (no CPU readback!)
+            // This saves 15-30ms per frame by eliminating mapAsync + pixelsToImageBitmap
+            const binding = webgpuBinding.value
+            if (binding && binding.isWebGPUCanvasMode.value) {
+              const canvasTexture = binding.getCurrentWebGPUTexture()
+              if (canvasTexture) {
+                console.log('[useEditPreview] Using WebGPU direct rendering path')
+
+                // Render directly to canvas texture
+                const textureResult = await gpuPipeline.processToTexture(
+                  { pixels, width, height, format: 'rgba' },
+                  pipelineParams,
+                  canvasTexture,
+                )
+
+                console.log(`[useEditPreview] WebGPU Direct Render: ${JSON.stringify(textureResult.timing)}`)
+
+                // Update GPU status store with timing
+                const gpuStatus = useGpuStatusStore()
+                gpuStatus.setRenderTiming(textureResult.timing)
+
+                // Update canvas dimensions
+                binding.updateWebGPUCanvasDimensions(textureResult.outputWidth, textureResult.outputHeight)
+
+                // Update preview dimensions for overlays
+                currentWidth = textureResult.outputWidth
+                currentHeight = textureResult.outputHeight
+                previewDimensions.value = { width: currentWidth, height: currentHeight }
+
+                // For histogram/clipping, we need pixel data - throttle this update
+                // Only do full pixel readback occasionally (every 500ms during interaction, or on full quality)
+                const now = performance.now()
+                const shouldUpdateHistogram = quality === 'full' || (now - lastHistogramUpdate) > HISTOGRAM_UPDATE_INTERVAL
+
+                if (shouldUpdateHistogram) {
+                  lastHistogramUpdate = now
+                  console.log('[useEditPreview] Running throttled histogram/clipping update')
+
+                  // Run a separate readback for histogram/clipping data
+                  // This doesn't block display since the canvas already shows the result
+                  const histogramResult = await gpuPipeline.process(
+                    { pixels, width, height, format: 'rgba' },
+                    pipelineParams,
+                  )
+
+                  // Detect clipping for overlay
+                  clippingMap.value = detectClippedPixels(histogramResult.pixels, histogramResult.width, histogramResult.height)
+
+                  // Store adjusted pixels for histogram
+                  adjustedPixels.value = histogramResult.pixels
+                  adjustedDimensions.value = { width: histogramResult.width, height: histogramResult.height }
+                }
+
+                usedUnifiedPipeline = true
+                isWebGPURenderingActive.value = true
+
+                // Skip the bitmap path since we rendered directly to canvas
+                // Don't update previewBitmap - it will stay null/stale but that's fine
+                // since the canvas shows the correct image
+
+                // Continue to finally block
+                return
+              } else {
+                console.log('[useEditPreview] WebGPU canvas texture not available, falling back to bitmap path')
+              }
+            }
+
+            // ===== STANDARD PATH (with CPU readback) =====
             const result = await gpuPipeline.process(
               // Input is RGBA from canvas getImageData
               { pixels, width, height, format: 'rgba' },
@@ -912,10 +1019,12 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             currentWidth = result.width
             currentHeight = result.height
             usedUnifiedPipeline = true
+            isWebGPURenderingActive.value = false
           }
           catch (e) {
             console.warn('[useEditPreview] GPU unified pipeline failed, falling back to sequential:', e)
             usedUnifiedPipeline = false
+            isWebGPURenderingActive.value = false
           }
         }
         else if (pipelineReady && hasCrop) {
@@ -1564,6 +1673,41 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   )
 
   // ============================================================================
+  // WebGPU Canvas Binding
+  // ============================================================================
+
+  /**
+   * Bind a WebGPU canvas for direct GPU rendering.
+   *
+   * When bound, the preview will render directly to the WebGPU canvas texture,
+   * eliminating the CPU readback bottleneck (15-30ms savings per frame).
+   *
+   * Call this after the EditPreviewCanvas has initialized its WebGPU context.
+   *
+   * @param binding - WebGPU canvas binding from EditPreviewCanvas
+   */
+  function bindWebGPUCanvas(binding: WebGPUCanvasBinding): void {
+    webgpuBinding.value = binding
+    console.log('[useEditPreview] WebGPU canvas binding registered')
+
+    // Attempt to configure the canvas for WebGPU
+    binding.configureWebGPUCanvas().then((success) => {
+      if (success) {
+        console.log('[useEditPreview] WebGPU canvas configured successfully')
+        isWebGPURenderingActive.value = true
+
+        // Trigger a re-render to use the new path
+        if (sourceCache.value) {
+          renderPreview('full')
+        }
+      } else {
+        console.log('[useEditPreview] WebGPU canvas configuration failed, using fallback')
+        isWebGPURenderingActive.value = false
+      }
+    })
+  }
+
+  // ============================================================================
   // Cleanup
   // ============================================================================
 
@@ -1578,6 +1722,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     if (previewBitmap.value) {
       previewBitmap.value.close()
     }
+    // Clear WebGPU binding
+    webgpuBinding.value = null
+    isWebGPURenderingActive.value = false
   })
 
   return {
@@ -1592,5 +1739,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     adjustedDimensions,
     isWaitingForPreview,
     renderState: readonly(renderState),
+    bindWebGPUCanvas,
+    isWebGPURenderingActive: readonly(isWebGPURenderingActive),
   }
 }

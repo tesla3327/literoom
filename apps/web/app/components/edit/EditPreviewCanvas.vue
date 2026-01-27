@@ -3,7 +3,7 @@
  * EditPreviewCanvas Component
  *
  * Displays the photo preview in the edit view with:
- * - Source image display
+ * - Source image display (WebGPU canvas for direct GPU rendering, fallback to 2D canvas)
  * - Zoom/pan support via CSS transforms
  * - Clipping overlay (shadow/highlight clipping indicators)
  * - Crop and mask overlays
@@ -14,7 +14,13 @@
  * Uses the useEditPreview composable for preview management,
  * useClippingOverlay for rendering clipping indicators,
  * and useZoomPan for zoom/pan interactions.
+ *
+ * WebGPU Canvas Mode:
+ * When WebGPU is available, the preview canvas uses a WebGPU context for direct
+ * texture rendering. This eliminates the CPU readback bottleneck (15-30ms savings).
+ * Falls back to 2D canvas + ImageBitmap when WebGPU is not available.
  */
+import { getGPUEditPipeline } from '@literoom/core/gpu'
 
 interface Props {
   /** The asset ID to display */
@@ -43,6 +49,8 @@ const {
   adjustedPixels,
   adjustedDimensions,
   isWaitingForPreview,
+  bindWebGPUCanvas,
+  isWebGPURenderingActive,
 } = useEditPreview(toRef(props, 'assetId'))
 
 
@@ -66,6 +74,115 @@ const clippingCanvasRef = ref<HTMLCanvasElement | null>(null)
 const cropCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 // ============================================================================
+// WebGPU Canvas Mode
+// ============================================================================
+
+/** Whether WebGPU canvas mode is active (vs fallback 2D canvas mode) */
+const isWebGPUCanvasMode = ref(false)
+
+/** WebGPU context for direct GPU rendering (null if not in WebGPU mode) */
+const webgpuContext = ref<GPUCanvasContext | null>(null)
+
+/** Preferred WebGPU canvas format */
+const webgpuFormat = ref<GPUTextureFormat | null>(null)
+
+/**
+ * Configure the canvas for WebGPU rendering.
+ * Called when the canvas element is available and WebGPU is supported.
+ *
+ * @returns true if WebGPU canvas was successfully configured, false otherwise
+ */
+async function configureWebGPUCanvas(): Promise<boolean> {
+  const canvas = previewCanvasRef.value
+  if (!canvas) {
+    console.log('[EditPreviewCanvas] No canvas element available for WebGPU configuration')
+    return false
+  }
+
+  // Check if WebGPU is available
+  if (!navigator.gpu) {
+    console.log('[EditPreviewCanvas] WebGPU not available in this browser')
+    return false
+  }
+
+  // Get the GPU edit pipeline to access the device
+  const pipeline = getGPUEditPipeline()
+  if (!pipeline.isReady) {
+    try {
+      const initialized = await pipeline.initialize()
+      if (!initialized) {
+        console.log('[EditPreviewCanvas] GPU pipeline initialization failed')
+        return false
+      }
+    } catch (e) {
+      console.log('[EditPreviewCanvas] GPU pipeline initialization error:', e)
+      return false
+    }
+  }
+
+  const device = pipeline.getDevice()
+  if (!device) {
+    console.log('[EditPreviewCanvas] No GPU device available')
+    return false
+  }
+
+  try {
+    // Get WebGPU context from canvas
+    const context = canvas.getContext('webgpu') as GPUCanvasContext | null
+    if (!context) {
+      console.log('[EditPreviewCanvas] Failed to get WebGPU context from canvas')
+      return false
+    }
+
+    // Get the preferred format for this GPU
+    const format = navigator.gpu.getPreferredCanvasFormat()
+
+    // Configure the canvas context
+    context.configure({
+      device,
+      format,
+      alphaMode: 'premultiplied',
+    })
+
+    webgpuContext.value = context
+    webgpuFormat.value = format
+    isWebGPUCanvasMode.value = true
+
+    console.log(`[EditPreviewCanvas] WebGPU canvas configured with format: ${format}`)
+    return true
+  } catch (e) {
+    console.log('[EditPreviewCanvas] WebGPU canvas configuration failed:', e)
+    return false
+  }
+}
+
+/**
+ * Get the current WebGPU texture from the canvas for rendering.
+ * This is called each frame to get the texture to render to.
+ *
+ * @returns The current canvas texture, or null if not in WebGPU mode
+ */
+function getCurrentWebGPUTexture(): GPUTexture | null {
+  if (!isWebGPUCanvasMode.value || !webgpuContext.value) {
+    return null
+  }
+  return webgpuContext.value.getCurrentTexture()
+}
+
+/**
+ * Unconfigure WebGPU context and fall back to 2D canvas mode.
+ */
+function unconfigureWebGPUCanvas(): void {
+  if (webgpuContext.value) {
+    webgpuContext.value.unconfigure()
+  }
+  webgpuContext.value = null
+  webgpuFormat.value = null
+  isWebGPUCanvasMode.value = false
+  console.log('[EditPreviewCanvas] WebGPU canvas unconfigured, falling back to 2D mode')
+}
+
+// ============================================================================
 // Zoom/Pan
 // ============================================================================
 
@@ -85,19 +202,7 @@ const {
   imageRef: previewImageRef,
 })
 
-/**
- * Expose zoom methods for parent component (keyboard shortcuts).
- */
-defineExpose({
-  adjustedPixels,
-  adjustedDimensions,
-  renderQuality,
-  zoomIn,
-  zoomOut,
-  toggleZoom,
-  setPreset,
-  resetZoom,
-})
+// NOTE: defineExpose is called after updateWebGPUCanvasDimensions is defined
 
 /**
  * Cache/restore zoom state when switching assets.
@@ -121,17 +226,40 @@ watch(
 // ============================================================================
 
 /**
+ * Whether we have content ready to display (bitmap or WebGPU rendered).
+ * Used to determine when to show the canvas and UI elements.
+ */
+const hasPreviewContent = computed(() => {
+  // In WebGPU mode, content is ready if WebGPU is active and canvas has dimensions
+  if (isWebGPURenderingActive.value && previewDimensions.value) {
+    return true
+  }
+  // In bitmap mode, content is ready if bitmap exists
+  return !!previewBitmap.value
+})
+
+/**
  * Whether we're in an initial loading state.
  * This is true when:
- * - No preview bitmap exists yet, OR
+ * - No preview bitmap exists yet (and not in WebGPU direct render mode), OR
  * - We're waiting for the high-quality preview to generate
  *
  * IMPORTANT: Edit view should never show the small thumbnail (512px).
  * We display a loading state until the full preview (2560px) is ready.
+ *
+ * When WebGPU direct rendering is active, we don't need a previewBitmap
+ * since the GPU renders directly to the canvas.
  */
-const isInitialLoading = computed(() =>
-  (!previewBitmap.value && !error.value) || isWaitingForPreview.value,
-)
+const isInitialLoading = computed(() => {
+  // If waiting for preview, always show loading
+  if (isWaitingForPreview.value) return true
+
+  // If there's an error, don't show loading
+  if (error.value) return false
+
+  // Check if we have content to display
+  return !hasPreviewContent.value
+})
 
 /**
  * Actual rendered dimensions of the preview image.
@@ -178,15 +306,68 @@ onUnmounted(() => {
   if (resizeObserver) {
     resizeObserver.disconnect()
   }
+  // Clean up WebGPU context
+  unconfigureWebGPUCanvas()
+})
+
+/**
+ * Update canvas dimensions and rendered dimensions when WebGPU rendering completes.
+ * Called from useEditPreview after processToTexture completes.
+ */
+function updateWebGPUCanvasDimensions(width: number, height: number): void {
+  const canvas = previewCanvasRef.value
+  if (!canvas) return
+
+  // Update canvas element dimensions
+  canvas.width = width
+  canvas.height = height
+
+  // Update rendered dimensions for overlays
+  renderedDimensions.value = {
+    width: canvas.clientWidth,
+    height: canvas.clientHeight,
+  }
+
+  // Update image dimensions for zoom/pan (useZoomPan needs this)
+  editUIStore.setImageDimensions(width, height)
+}
+
+/**
+ * On mount, bind the WebGPU canvas to the preview composable.
+ * This enables direct GPU rendering without CPU readback.
+ */
+onMounted(() => {
+  // Wait for next tick to ensure canvas ref is available
+  nextTick(() => {
+    if (previewCanvasRef.value) {
+      // Bind WebGPU canvas to the preview composable
+      bindWebGPUCanvas({
+        configureWebGPUCanvas,
+        getCurrentWebGPUTexture,
+        isWebGPUCanvasMode,
+        unconfigureWebGPUCanvas,
+        updateWebGPUCanvasDimensions,
+      })
+    }
+  })
 })
 
 /**
  * Draw ImageBitmap to preview canvas whenever it changes.
  * This is much faster than using blob URLs with <img> tags.
+ *
+ * IMPORTANT: This watcher only runs when NOT in WebGPU canvas mode.
+ * In WebGPU mode, the GPU renders directly to the canvas texture.
  */
 watch(
   previewBitmap,
   (bitmap) => {
+    // Skip if in WebGPU mode - GPU renders directly to canvas
+    if (isWebGPUCanvasMode.value) {
+      console.log('[EditPreviewCanvas] Skipping bitmap draw - WebGPU mode active')
+      return
+    }
+
     if (!bitmap || !previewCanvasRef.value) return
 
     const canvas = previewCanvasRef.value
@@ -209,6 +390,25 @@ watch(
   },
   { immediate: true },
 )
+
+// Expose methods for parent component and WebGPU canvas binding
+defineExpose({
+  adjustedPixels,
+  adjustedDimensions,
+  renderQuality,
+  zoomIn,
+  zoomOut,
+  toggleZoom,
+  setPreset,
+  resetZoom,
+  // WebGPU canvas methods
+  isWebGPUCanvasMode,
+  configureWebGPUCanvas,
+  getCurrentWebGPUTexture,
+  unconfigureWebGPUCanvas,
+  updateWebGPUCanvasDimensions,
+  previewCanvasRef,
+})
 
 /**
  * Clipping overlay composable.
@@ -272,7 +472,7 @@ const { cursorStyle: maskCursorStyle } = useMaskOverlay({
       leave-to-class="opacity-0 -translate-y-2"
     >
       <EditCropActionBar
-        v-if="editUIStore.isCropToolActive && !isInitialLoading && previewBitmap"
+        v-if="editUIStore.isCropToolActive && !isInitialLoading && hasPreviewContent"
         class="absolute top-4 left-1/2 -translate-x-1/2 z-30"
       />
     </Transition>
@@ -288,7 +488,7 @@ const { cursorStyle: maskCursorStyle } = useMaskOverlay({
 
     <!-- Zoom percentage indicator (top-left, below quality) -->
     <div
-      v-if="editUIStore.zoomPreset !== 'fit' && !isInitialLoading && previewBitmap"
+      v-if="editUIStore.zoomPreset !== 'fit' && !isInitialLoading && hasPreviewContent"
       class="absolute top-4 left-4 z-10 px-2 py-1 bg-gray-800/80 rounded text-xs text-gray-400"
       :class="{ 'top-12': renderQuality === 'draft' }"
       data-testid="zoom-indicator"
@@ -311,7 +511,7 @@ const { cursorStyle: maskCursorStyle } = useMaskOverlay({
 
     <!-- Zoom container (receives wheel/mouse events) -->
     <div
-      v-else-if="previewBitmap"
+      v-else-if="hasPreviewContent"
       ref="zoomContainerRef"
       class="absolute inset-0 overflow-hidden"
       :style="{ cursor: zoomCursorStyle }"
@@ -416,7 +616,7 @@ const { cursorStyle: maskCursorStyle } = useMaskOverlay({
 
     <!-- Zoom controls (bottom-left, fixed position) -->
     <div
-      v-if="previewBitmap && !isInitialLoading"
+      v-if="hasPreviewContent && !isInitialLoading"
       class="absolute bottom-4 left-4 z-10 flex items-center gap-1 bg-gray-800/90 rounded-lg p-1"
       data-testid="zoom-controls"
     >
