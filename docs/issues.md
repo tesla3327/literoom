@@ -3,6 +3,7 @@
 ## Table of Contents
 
 ### Open Issues
+- [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos)
 - [Sort options don't work (High)](#sort-options-dont-work)
@@ -61,6 +62,46 @@
 ---
 
 ## Open Issues
+
+### previewUrl.value.startsWith is not a function
+
+**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-26
+
+**Problem**:
+During component unmount (when navigating between photos in edit view), the console logs an error `previewUrl.value.startsWith is not a function`. This error occurs in the `useEditPreview.ts` composable at line 847.
+
+**Steps to Reproduce**:
+1. Start app in Demo Mode (`LITEROOM_DEMO_MODE=true`)
+2. Open any photo in edit view
+3. Navigate to another photo (using arrow keys, filmstrip, or navigation buttons)
+4. Observe browser console - error appears during navigation
+
+**Expected Behavior**:
+No console errors during normal navigation operations.
+
+**Actual Behavior**:
+Error `previewUrl.value.startsWith is not a function` is logged during component unmount when navigating between photos.
+
+**Technical Details**:
+The error occurs in an unmount hook where the code attempts to call `.startsWith()` on `previewUrl.value`, but the value is not a string at that point. This could be because:
+1. `previewUrl` is null/undefined during cleanup
+2. `previewUrl` has been reset to a non-string value (e.g., Blob) before unmount
+
+**Console Output**:
+```
+[error] [useEditPreview] Asset load error: TypeError: previewUrl.value.startsWith is not a function
+    at useEditPreview.ts:847
+```
+
+**Files to Investigate**:
+- `apps/web/app/composables/useEditPreview.ts` - Line 847
+
+**Impact**:
+- Does not crash the application
+- Navigation still works correctly
+- May indicate improper cleanup of reactive refs during component unmount
+
+---
 
 ### debouncedFullRender.cancel is not a function
 

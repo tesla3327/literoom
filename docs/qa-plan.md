@@ -932,29 +932,47 @@ This is a critical UX bug - users expect adjustments to be preserved as they wor
 
 ## 22. Edge Cases
 
+**Tested**: 2026-01-26 | **Status**: PARTIAL PASS (1 bug found)
+
 ### 22.1 Empty States
-- [ ] No folder selected: welcome screen
-- [ ] Empty folder: appropriate message
-- [ ] No picks for export: disabled button
-- [ ] No masks: empty state message
+- [ ] No folder selected: welcome screen - **NOT TESTED** (Demo Mode bypasses welcome screen)
+- [ ] Empty folder: appropriate message - **NOT TESTED** (Demo Mode has 50 images)
+- [x] No picks for export: disabled button - verified, "Export 0 Images" button disabled when "Selected" scope has 0 items
+- [x] No masks: empty state message - verified, shows "No masks yet. Click a button above to add one." and "Select a mask to edit its adjustments"
 
 ### 22.2 Boundary Values
-- [ ] All sliders at minimum
-- [ ] All sliders at maximum
-- [ ] Extreme tone curves
-- [ ] Maximum zoom level
-- [ ] Minimum zoom level
+- [x] All sliders at minimum - verified, all 10 sliders set to min (-100 for most, -5.00 for Exposure)
+- [x] All sliders at maximum - verified, all 10 sliders set to max (+100 for most, +5.00 for Exposure)
+- [x] Extreme tone curves - verified, S-curves with multiple control points work correctly
+- [x] Maximum zoom level - verified, 400% maximum zoom (20 zoom-in clicks)
+- [x] Minimum zoom level - verified, 10% minimum zoom (40 zoom-out clicks)
 
 ### 22.3 Rapid User Actions
-- [ ] Double-click during loading
-- [ ] Navigate during export
-- [ ] Multiple mask draws quickly
-- [ ] Rapid undo attempts (no undo system)
+- [ ] Double-click during loading - not tested (Demo Mode loads instantly)
+- [ ] Navigate during export - **NOT TESTABLE** (Export requires real file system)
+- [x] Multiple mask draws quickly - verified, created 2 linear + 1 radial masks in quick succession, all work correctly
+- [x] Rapid flag changes (P/X/U) - verified, 10 rapid flag changes work correctly, counts update properly
+- [x] Rapid navigation between photos - verified, 10 rapid ArrowRight presses navigate correctly (8/50 → 18/50)
 
 ### 22.4 Concurrent Operations
-- [ ] Scan while generating thumbnails
-- [ ] Edit while export running
-- [ ] Navigate during preview render
+- [ ] Scan while generating thumbnails - **NOT TESTABLE** (Demo Mode)
+- [ ] Edit while export running - **NOT TESTABLE** (Demo Mode)
+- [x] Navigate during preview render - Works correctly, adjustments apply during rapid operations
+- [ ] **BUG**: Console error `previewUrl.value.startsWith is not a function` during component unmount (see issues.md)
+
+### Screenshots
+- `qa-section22-01-initial-load.png` - Demo catalog loaded
+- `qa-section22-02-masks-empty-state.png` - Masks panel empty state message
+- `qa-section22-03-export-zero-selected.png` - Export modal with 0 selected items (button disabled)
+- `qa-section22-04-all-sliders-minimum.png` - All sliders at minimum values
+- `qa-section22-05-all-sliders-maximum.png` - All sliders at maximum values
+- `qa-section22-06-extreme-tone-curve.png` - Tone curve with S-curve
+- `qa-section22-07-maximum-zoom.png` - Maximum zoom (400%)
+- `qa-section22-08-minimum-zoom.png` - Minimum zoom (10%)
+- `qa-section22-09-rapid-flag-changes.png` - After rapid P/X/U key presses
+- `qa-section22-10-multiple-masks-created.png` - 3 masks created in quick succession
+- `qa-section22-11-rapid-navigation.png` - After 10 rapid navigation presses
+- `qa-section22-12-concurrent-adjustment.png` - Adjustment during rapid operations
 
 ---
 
