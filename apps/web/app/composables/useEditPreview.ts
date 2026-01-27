@@ -96,6 +96,8 @@ export const CLIP_HIGHLIGHT_B = 32
 export interface UseEditPreviewReturn {
   /** URL of the current preview (with edits applied when available) */
   previewUrl: Ref<string | null>
+  /** ImageBitmap for direct canvas rendering (faster than URL) */
+  previewBitmap: Ref<ImageBitmap | null>
   /** Whether a render is in progress */
   isRendering: Ref<boolean>
   /** Current render quality level */
@@ -229,25 +231,54 @@ function rgbToRgba(rgb: Uint8Array): Uint8ClampedArray {
 }
 
 /**
+ * Timing information for pixelsToUrl operation.
+ */
+interface PixelsToUrlTiming {
+  rgbToRgba: number
+  putImageData: number
+  jpegEncode: number
+  total: number
+}
+
+/**
+ * Result of pixelsToUrl including URL and timing breakdown.
+ */
+interface PixelsToUrlResult {
+  url: string
+  timing: PixelsToUrlTiming
+}
+
+/**
  * Convert pixels to a blob URL for display in an <img> tag.
+ * Returns both the URL and detailed timing information for benchmarking.
  */
 async function pixelsToUrl(
   pixels: Uint8Array,
   width: number,
   height: number,
-): Promise<string> {
-  // Create canvas and draw pixels
+): Promise<PixelsToUrlResult> {
+  const totalStart = performance.now()
+
+  // Create canvas
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')!
 
+  // Step 1: RGB to RGBA conversion
+  const rgbToRgbaStart = performance.now()
   const rgbaPixels = rgbToRgba(pixels)
+  const rgbToRgbaTime = performance.now() - rgbToRgbaStart
+
+  // Step 2: createImageData + putImageData
+  const putImageDataStart = performance.now()
   const imageData = ctx.createImageData(width, height)
   imageData.data.set(rgbaPixels)
   ctx.putImageData(imageData, 0, 0)
+  const putImageDataTime = performance.now() - putImageDataStart
 
-  // Convert to blob URL
+  // Step 3: JPEG encoding via canvas.toBlob
+  const jpegEncodeStart = performance.now()
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (b) => {
@@ -258,8 +289,76 @@ async function pixelsToUrl(
       0.9,
     )
   })
+  const jpegEncodeTime = performance.now() - jpegEncodeStart
 
-  return URL.createObjectURL(blob)
+  const url = URL.createObjectURL(blob)
+  const totalTime = performance.now() - totalStart
+
+  const timing: PixelsToUrlTiming = {
+    rgbToRgba: rgbToRgbaTime,
+    putImageData: putImageDataTime,
+    jpegEncode: jpegEncodeTime,
+    total: totalTime,
+  }
+
+  console.log(
+    `[useEditPreview] pixelsToUrl: rgbToRgba=${timing.rgbToRgba.toFixed(1)}ms putImageData=${timing.putImageData.toFixed(1)}ms jpegEncode=${timing.jpegEncode.toFixed(1)}ms total=${timing.total.toFixed(1)}ms`,
+  )
+
+  return { url, timing }
+}
+
+interface PixelsToImageBitmapResult {
+  bitmap: ImageBitmap
+  timing: {
+    rgbToRgba: number
+    createImageBitmap: number
+    total: number
+  }
+}
+
+/**
+ * Convert pixels to an ImageBitmap for direct canvas rendering.
+ * This is much faster than pixelsToUrl because it avoids JPEG encoding.
+ */
+async function pixelsToImageBitmap(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): Promise<PixelsToImageBitmapResult> {
+  const totalStart = performance.now()
+
+  // Step 1: Convert RGB to RGBA
+  const rgbToRgbaStart = performance.now()
+  const rgbaPixels = rgbToRgba(pixels)
+  const rgbToRgbaTime = performance.now() - rgbToRgbaStart
+
+  // Step 2: Create ImageData - use the same pattern as pixelsToUrl
+  // to avoid TypeScript issues with ArrayBuffer types
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')!
+  const imageData = ctx.createImageData(width, height)
+  imageData.data.set(rgbaPixels)
+
+  // Step 3: Create ImageBitmap (this is fast, no encoding needed)
+  const createBitmapStart = performance.now()
+  const bitmap = await createImageBitmap(imageData)
+  const createBitmapTime = performance.now() - createBitmapStart
+
+  const totalTime = performance.now() - totalStart
+
+  console.log(`[useEditPreview] pixelsToImageBitmap: rgbToRgba=${rgbToRgbaTime.toFixed(1)}ms createImageBitmap=${createBitmapTime.toFixed(1)}ms total=${totalTime.toFixed(1)}ms`)
+
+  return {
+    bitmap,
+    timing: {
+      rgbToRgba: rgbToRgbaTime,
+      createImageBitmap: createBitmapTime,
+      total: totalTime,
+    },
+  }
 }
 
 /**
@@ -545,6 +644,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
   /** Current render state for progressive refinement state machine */
   const renderState = ref<RenderState>('idle')
+
+  /** ImageBitmap for direct canvas rendering (avoids JPEG encoding) */
+  const previewBitmap = shallowRef<ImageBitmap | null>(null)
 
   /**
    * Valid state transitions for the progressive refinement state machine.
@@ -1043,29 +1145,62 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         adjustedPixels.value = currentPixels
         adjustedDimensions.value = { width: currentWidth, height: currentHeight }
 
-        // Convert result to blob URL
-        resultUrl = await pixelsToUrl(currentPixels, currentWidth, currentHeight)
+        // Convert result to ImageBitmap (faster than blob URL, avoids JPEG encoding)
+        const bitmapResult = await pixelsToImageBitmap(currentPixels, currentWidth, currentHeight)
 
-        // Revoke old URL if it was owned (created by us, not borrowed from store)
+        // Check again if asset or generation changed (stale render protection)
+        if (cachedId !== assetId.value || renderGeneration.value !== currentGen) {
+          // Asset or generation changed, discard result
+          console.log('[useEditPreview] Discarding stale render result')
+          bitmapResult.bitmap.close()
+          return
+        }
+
+        // Close old ImageBitmap if exists
+        if (previewBitmap.value) {
+          previewBitmap.value.close()
+        }
+
+        // Store the new bitmap
+        previewBitmap.value = bitmapResult.bitmap
+
+        // Also update previewUrl to null since we're using bitmap now
+        // (keep this for backward compatibility checks)
         if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
           URL.revokeObjectURL(previewUrl.value)
         }
-
-        // Mark this new URL as owned
-        isPreviewUrlOwned.value = true
+        previewUrl.value = null
+        isPreviewUrlOwned.value = false
       }
 
-      // Check again if asset or generation changed (stale render protection)
-      if (cachedId !== assetId.value || renderGeneration.value !== currentGen) {
-        // Asset or generation changed, discard result
-        console.log('[useEditPreview] Discarding stale render result')
-        if (resultUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(resultUrl)
+      // For the no-edits case (first if branch), we still need to create a bitmap
+      // since the component now uses bitmap instead of URL
+      if (!hasAdjustments && !hasTransforms && !hasMasks) {
+        // Create bitmap from source pixels (no modifications)
+        const bitmapResult = await pixelsToImageBitmap(pixels, width, height)
+
+        // Check again if asset or generation changed (stale render protection)
+        if (cachedId !== assetId.value || renderGeneration.value !== currentGen) {
+          console.log('[useEditPreview] Discarding stale render result')
+          bitmapResult.bitmap.close()
+          return
         }
-        return
-      }
 
-      previewUrl.value = resultUrl
+        // Close old ImageBitmap if exists
+        if (previewBitmap.value) {
+          previewBitmap.value.close()
+        }
+
+        // Store the new bitmap
+        previewBitmap.value = bitmapResult.bitmap
+
+        // Clear any old blob URL
+        if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
+          URL.revokeObjectURL(previewUrl.value)
+        }
+        previewUrl.value = null
+        isPreviewUrlOwned.value = false
+      }
     }
     catch (e) {
       // Only update error state if still on same generation
@@ -1430,10 +1565,15 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
       URL.revokeObjectURL(previewUrl.value)
     }
+    // Close old ImageBitmap if exists
+    if (previewBitmap.value) {
+      previewBitmap.value.close()
+    }
   })
 
   return {
     previewUrl,
+    previewBitmap,
     isRendering,
     renderQuality,
     error,

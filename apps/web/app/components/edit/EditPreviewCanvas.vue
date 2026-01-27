@@ -27,16 +27,14 @@ const props = defineProps<Props>()
 // Composables
 // ============================================================================
 
-const catalogStore = useCatalogStore()
 const editUIStore = useEditUIStore()
-const selectionStore = useSelectionStore()
 
 /**
  * Preview management composable.
  * Handles rendering with debouncing and quality levels.
  */
 const {
-  previewUrl,
+  previewBitmap,
   isRendering,
   renderQuality,
   error,
@@ -55,8 +53,11 @@ const {
 /** Reference to the zoom container (receives wheel/mouse events) */
 const zoomContainerRef = ref<HTMLElement | null>(null)
 
-/** Reference to the preview image element */
+/** Reference to the preview image element (kept for useZoomPan compatibility) */
 const previewImageRef = ref<HTMLImageElement | null>(null)
+
+/** Reference to the preview canvas element (for direct ImageBitmap rendering) */
+const previewCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 /** Reference to the clipping overlay canvas */
 const clippingCanvasRef = ref<HTMLCanvasElement | null>(null)
@@ -74,7 +75,6 @@ const cropCanvasRef = ref<HTMLCanvasElement | null>(null)
 const {
   transformStyle,
   cursorStyle: zoomCursorStyle,
-  isSpacebarHeld,
   zoomIn,
   zoomOut,
   toggleZoom,
@@ -120,19 +120,17 @@ watch(
 // Computed
 // ============================================================================
 
-const asset = computed(() => catalogStore.assets.get(props.assetId))
-
 /**
  * Whether we're in an initial loading state.
  * This is true when:
- * - No preview URL exists yet, OR
+ * - No preview bitmap exists yet, OR
  * - We're waiting for the high-quality preview to generate
  *
  * IMPORTANT: Edit view should never show the small thumbnail (512px).
  * We display a loading state until the full preview (2560px) is ready.
  */
 const isInitialLoading = computed(() =>
-  (!previewUrl.value && !error.value) || isWaitingForPreview.value,
+  (!previewBitmap.value && !error.value) || isWaitingForPreview.value,
 )
 
 /**
@@ -141,46 +139,76 @@ const isInitialLoading = computed(() =>
  */
 const renderedDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 })
 
-/**
- * Update rendered dimensions when the image loads.
- */
-function onImageLoad(event: Event) {
-  const img = event.target as HTMLImageElement
-  if (img) {
-    renderedDimensions.value = {
-      width: img.clientWidth,
-      height: img.clientHeight,
-    }
-  }
-}
-
 // ============================================================================
 // Clipping Overlay
 // ============================================================================
 
 /**
- * Watch for image dimension changes via ResizeObserver.
+ * Watch for canvas dimension changes via ResizeObserver.
+ * The canvas element is watched instead of an img element since we render directly to canvas.
  */
-onMounted(() => {
-  if (!previewImageRef.value) return
+let resizeObserver: ResizeObserver | null = null
 
-  const observer = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      renderedDimensions.value = {
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      }
+watch(
+  previewCanvasRef,
+  (canvas) => {
+    // Clean up previous observer if any
+    if (resizeObserver) {
+      resizeObserver.disconnect()
+      resizeObserver = null
     }
-  })
 
-  if (previewImageRef.value) {
-    observer.observe(previewImageRef.value)
+    if (!canvas) return
+
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        renderedDimensions.value = {
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        }
+      }
+    })
+
+    resizeObserver.observe(canvas)
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
   }
-
-  onUnmounted(() => {
-    observer.disconnect()
-  })
 })
+
+/**
+ * Draw ImageBitmap to preview canvas whenever it changes.
+ * This is much faster than using blob URLs with <img> tags.
+ */
+watch(
+  previewBitmap,
+  (bitmap) => {
+    if (!bitmap || !previewCanvasRef.value) return
+
+    const canvas = previewCanvasRef.value
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.drawImage(bitmap, 0, 0)
+
+    // Update rendered dimensions for overlays
+    renderedDimensions.value = {
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
+    }
+
+    // Update image dimensions for zoom/pan (useZoomPan needs this)
+    editUIStore.setImageDimensions(bitmap.width, bitmap.height)
+  },
+  { immediate: true },
+)
 
 /**
  * Clipping overlay composable.
@@ -212,7 +240,7 @@ const maskCanvasRef = ref<HTMLCanvasElement | null>(null)
  * Mask overlay composable.
  * Renders and handles interaction with mask overlay on preview.
  */
-const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskCursorStyle } = useMaskOverlay({
+const { cursorStyle: maskCursorStyle } = useMaskOverlay({
   canvasRef: maskCanvasRef,
   displayWidth: computed(() => renderedDimensions.value.width),
   displayHeight: computed(() => renderedDimensions.value.height),
@@ -244,7 +272,7 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
       leave-to-class="opacity-0 -translate-y-2"
     >
       <EditCropActionBar
-        v-if="editUIStore.isCropToolActive && !isInitialLoading && previewUrl"
+        v-if="editUIStore.isCropToolActive && !isInitialLoading && previewBitmap"
         class="absolute top-4 left-1/2 -translate-x-1/2 z-30"
       />
     </Transition>
@@ -260,7 +288,7 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
 
     <!-- Zoom percentage indicator (top-left, below quality) -->
     <div
-      v-if="editUIStore.zoomPreset !== 'fit' && !isInitialLoading && previewUrl"
+      v-if="editUIStore.zoomPreset !== 'fit' && !isInitialLoading && previewBitmap"
       class="absolute top-4 left-4 z-10 px-2 py-1 bg-gray-800/80 rounded text-xs text-gray-400"
       :class="{ 'top-12': renderQuality === 'draft' }"
       data-testid="zoom-indicator"
@@ -283,7 +311,7 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
 
     <!-- Zoom container (receives wheel/mouse events) -->
     <div
-      v-else-if="previewUrl"
+      v-else-if="previewBitmap"
       ref="zoomContainerRef"
       class="absolute inset-0 overflow-hidden"
       :style="{ cursor: zoomCursorStyle }"
@@ -296,14 +324,15 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
         data-testid="transform-container"
       >
         <div class="relative">
-          <img
-            ref="previewImageRef"
-            :src="previewUrl"
-            :alt="asset?.filename"
-            class="block"
-            data-testid="preview-image"
-            @load="onImageLoad"
-          >
+          <canvas
+            ref="previewCanvasRef"
+            class="block max-w-full h-auto"
+            :style="{
+              width: previewDimensions?.width ? previewDimensions.width + 'px' : 'auto',
+              height: previewDimensions?.height ? previewDimensions.height + 'px' : 'auto',
+            }"
+            data-testid="preview-canvas"
+          />
 
           <!-- Clipping overlay canvas - positioned over the image -->
           <canvas
@@ -387,7 +416,7 @@ const { isDragging: isMaskDragging, isDrawing: isMaskDrawing, cursorStyle: maskC
 
     <!-- Zoom controls (bottom-left, fixed position) -->
     <div
-      v-if="previewUrl && !isInitialLoading"
+      v-if="previewBitmap && !isInitialLoading"
       class="absolute bottom-4 left-4 z-10 flex items-center gap-1 bg-gray-800/90 rounded-lg p-1"
       data-testid="zoom-controls"
     >
