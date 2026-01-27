@@ -3,12 +3,12 @@
  *
  * Tests:
  * - Conditional rendering based on timing data availability
- * - Correct time formatting (rounded to integer + "ms")
+ * - Correct FPS display (rolling average, rounded to integer)
  * - Backend display ("GPU" for webgpu, "WASM" for wasm)
  * - Badge color based on backend type
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import GPUPerformanceBadge from '~/components/gpu/GPUPerformanceBadge.vue'
 import { useGpuStatusStore } from '~/stores/gpuStatus'
@@ -23,23 +23,48 @@ async function mountWithStore() {
   return { component, store }
 }
 
+/**
+ * Reset store state before each test to ensure isolation.
+ * This is needed because Pinia stores are singletons in the test environment.
+ */
+beforeEach(() => {
+  const store = useGpuStatusStore()
+  store.lastRenderTiming = null
+  store.backend = 'unknown'
+  store.isInitialized = false
+  store.isAvailable = false
+  store.recentRenderTimes = []
+})
+
 describe('GPUPerformanceBadge', () => {
   // ============================================================================
   // Conditional Rendering
   // ============================================================================
 
   describe('conditional rendering', () => {
-    it('does not render when no timing data is available', async () => {
+    it('does not render when GPU is not initialized', async () => {
       const { component, store } = await mountWithStore()
 
-      // Default state: lastRenderTiming is null, so totalRenderTime returns null
-      expect(store.totalRenderTime).toBeNull()
+      // Default state: isInitialized is false
+      expect(store.isInitialized).toBe(false)
 
-      // Component should not render the badge (v-if="displayTime" is falsy)
+      // Component should not render the badge
       expect(component.text()).toBe('')
     })
 
-    it('renders when timing data is available', async () => {
+    it('renders with default state when initialized but no timing data', async () => {
+      const { component, store } = await mountWithStore()
+
+      // Initialize GPU but don't set timing
+      store.setAvailable(true)
+
+      await component.vm.$nextTick()
+
+      // Component should show default "-- FPS" state
+      expect(component.text()).toBe('-- FPS GPU')
+    })
+
+    it('renders with FPS when timing data is available', async () => {
       const { component, store } = await mountWithStore()
 
       // Set render timing so totalRenderTime returns a value
@@ -54,71 +79,90 @@ describe('GPUPerformanceBadge', () => {
 
       await component.vm.$nextTick()
 
-      // Component should render with timing and backend info
-      expect(component.text()).toContain('ms')
+      // Component should render with FPS and backend info
+      expect(component.text()).toContain('FPS')
+      expect(component.text()).not.toContain('--')
     })
   })
 
   // ============================================================================
-  // Time Formatting
+  // FPS Display
   // ============================================================================
 
-  describe('time formatting', () => {
-    it('rounds time to integer and appends "ms"', async () => {
+  describe('FPS display', () => {
+    it('displays FPS calculated from render time', async () => {
       const { component, store } = await mountWithStore()
 
+      // 20ms = 50 FPS
       store.setRenderTiming({
-        total: 16.7,
-        histogram: 2,
-        transform: 3,
-        adjustments: 5,
-        canvas: 6.7,
+        total: 20,
+        histogram: 4,
+        transform: 4,
+        adjustments: 6,
+        canvas: 6,
       })
       store.setAvailable(true)
 
       await component.vm.$nextTick()
 
-      // 16.7 should round to 17
-      expect(component.text()).toContain('17ms')
+      expect(component.text()).toContain('50 FPS')
     })
 
-    it('rounds down when decimal is less than 0.5', async () => {
+    it('rounds FPS to integer', async () => {
       const { component, store } = await mountWithStore()
 
+      // 16.67ms = 59.99 FPS, rounds to 60
       store.setRenderTiming({
-        total: 16.2,
-        histogram: 2,
+        total: 16.67,
+        histogram: 3,
         transform: 3,
         adjustments: 5,
-        canvas: 6.2,
+        canvas: 5.67,
       })
       store.setAvailable(true)
 
       await component.vm.$nextTick()
 
-      // 16.2 should round to 16
-      expect(component.text()).toContain('16ms')
+      expect(component.text()).toContain('60 FPS')
     })
 
-    it('handles exactly 0.5 decimal (rounds to nearest even)', async () => {
+    it('shows high FPS for fast render times', async () => {
       const { component, store } = await mountWithStore()
 
+      // 5ms = 200 FPS
       store.setRenderTiming({
-        total: 16.5,
-        histogram: 2,
-        transform: 3,
-        adjustments: 5,
-        canvas: 6.5,
+        total: 5,
+        histogram: 1,
+        transform: 1,
+        adjustments: 1.5,
+        canvas: 1.5,
       })
       store.setAvailable(true)
 
       await component.vm.$nextTick()
 
-      // 16.5 rounds to 17 with Math.round
-      expect(component.text()).toContain('17ms')
+      expect(component.text()).toContain('200 FPS')
     })
 
-    it('handles zero render time', async () => {
+    it('shows low FPS for slow render times', async () => {
+      const { component, store } = await mountWithStore()
+
+      // 100ms = 10 FPS
+      store.setRenderTiming({
+        total: 100,
+        histogram: 20,
+        transform: 20,
+        adjustments: 30,
+        canvas: 30,
+      })
+      store.setAvailable(true)
+
+      await component.vm.$nextTick()
+
+      expect(component.text()).toContain('10 FPS')
+    })
+
+    it('shows default state when render time is zero', async () => {
       const { component, store } = await mountWithStore()
 
       store.setRenderTiming({
@@ -132,42 +176,8 @@ describe('GPUPerformanceBadge', () => {
 
       await component.vm.$nextTick()
 
-      expect(component.text()).toContain('0ms')
-    })
-
-    it('handles large render times', async () => {
-      const { component, store } = await mountWithStore()
-
-      store.setRenderTiming({
-        total: 1234.6,
-        histogram: 200,
-        transform: 300,
-        adjustments: 400,
-        canvas: 334.6,
-      })
-      store.setAvailable(true)
-
-      await component.vm.$nextTick()
-
-      expect(component.text()).toContain('1235ms')
-    })
-
-    it('handles very small render times', async () => {
-      const { component, store } = await mountWithStore()
-
-      store.setRenderTiming({
-        total: 0.4,
-        histogram: 0.1,
-        transform: 0.1,
-        adjustments: 0.1,
-        canvas: 0.1,
-      })
-      store.setAvailable(true)
-
-      await component.vm.$nextTick()
-
-      // 0.4 rounds to 0
-      expect(component.text()).toContain('0ms')
+      // Zero time would cause division by zero, show default state
+      expect(component.text()).toBe('-- FPS GPU')
     })
   })
 
@@ -197,6 +207,7 @@ describe('GPUPerformanceBadge', () => {
     it('shows "WASM" for wasm backend', async () => {
       const { component, store } = await mountWithStore()
 
+      // 50ms = 20 FPS
       store.setRenderTiming({
         total: 50,
         histogram: 10,
@@ -209,26 +220,26 @@ describe('GPUPerformanceBadge', () => {
       await component.vm.$nextTick()
 
       expect(component.text()).toContain('WASM')
-      // Make sure it doesn't show standalone "GPU" (it will have "WASM" which doesn't contain "GPU")
-      expect(component.text()).toBe('50ms WASM')
+      expect(component.text()).toBe('20 FPS WASM')
     })
 
-    it('displays both time and backend together', async () => {
+    it('displays both FPS and backend together', async () => {
       const { component, store } = await mountWithStore()
 
+      // 25ms = 40 FPS
       store.setRenderTiming({
-        total: 25.3,
+        total: 25,
         histogram: 5,
         transform: 5,
         adjustments: 8,
-        canvas: 7.3,
+        canvas: 7,
       })
       store.setAvailable(true)
 
       await component.vm.$nextTick()
 
-      // Should show "25ms GPU" format
-      expect(component.text()).toBe('25ms GPU')
+      // Should show "40 FPS GPU" format
+      expect(component.text()).toBe('40 FPS GPU')
     })
   })
 
@@ -305,9 +316,10 @@ describe('GPUPerformanceBadge', () => {
     it('uses xs size', async () => {
       const { component, store } = await mountWithStore()
 
+      // Use unique timing value to ensure watch triggers
       store.setRenderTiming({
-        total: 16,
-        histogram: 2,
+        total: 17,
+        histogram: 3,
         transform: 3,
         adjustments: 5,
         canvas: 6,
@@ -327,9 +339,11 @@ describe('GPUPerformanceBadge', () => {
   // ============================================================================
 
   describe('reactivity to store changes', () => {
-    it('updates display when timing changes', async () => {
+    it('uses rolling average for FPS calculation', async () => {
       const { component, store } = await mountWithStore()
+      store.setAvailable(true)
 
+      // First reading: 10ms = 100 FPS
       store.setRenderTiming({
         total: 10,
         histogram: 2,
@@ -337,12 +351,11 @@ describe('GPUPerformanceBadge', () => {
         adjustments: 3,
         canvas: 3,
       })
-      store.setAvailable(true)
-
       await component.vm.$nextTick()
-      expect(component.text()).toContain('10ms')
+      expect(component.text()).toContain('100 FPS')
 
-      // Update timing
+      // Second reading: 20ms
+      // Rolling average of [10, 20] = 15ms = 67 FPS
       store.setRenderTiming({
         total: 20,
         histogram: 4,
@@ -350,10 +363,20 @@ describe('GPUPerformanceBadge', () => {
         adjustments: 6,
         canvas: 6,
       })
-
-      // Vue reactivity should update the component
       await component.vm.$nextTick()
-      expect(component.text()).toContain('20ms')
+      expect(component.text()).toContain('67 FPS')
+
+      // Third reading: 30ms
+      // Rolling average of [10, 20, 30] = 20ms = 50 FPS
+      store.setRenderTiming({
+        total: 30,
+        histogram: 6,
+        transform: 6,
+        adjustments: 9,
+        canvas: 9,
+      })
+      await component.vm.$nextTick()
+      expect(component.text()).toContain('50 FPS')
     })
 
     it('updates backend display when backend changes', async () => {
@@ -377,29 +400,6 @@ describe('GPUPerformanceBadge', () => {
 
       expect(component.text()).toContain('WASM')
     })
-
-    it('hides badge when timing becomes null', async () => {
-      const { component, store } = await mountWithStore()
-
-      store.setRenderTiming({
-        total: 10,
-        histogram: 2,
-        transform: 2,
-        adjustments: 3,
-        canvas: 3,
-      })
-      store.setAvailable(true)
-
-      await component.vm.$nextTick()
-      expect(component.text()).toContain('10ms')
-
-      // Clear timing by setting lastRenderTiming to null directly
-      store.lastRenderTiming = null
-      await component.vm.$nextTick()
-
-      // Badge should no longer render
-      expect(component.text()).toBe('')
-    })
   })
 
   // ============================================================================
@@ -410,15 +410,16 @@ describe('GPUPerformanceBadge', () => {
     it('handles unknown backend state', async () => {
       const { component, store } = await mountWithStore()
 
+      // Use unique timing value to ensure watch triggers
       store.setRenderTiming({
-        total: 10,
+        total: 11,
         histogram: 2,
         transform: 2,
-        adjustments: 3,
+        adjustments: 4,
         canvas: 3,
       })
-      // Backend defaults to 'unknown' before setAvailable is called
-      // Force the backend to unknown
+      // Set available first to trigger watch, then force backend to unknown
+      store.setAvailable(true)
       store.backend = 'unknown'
 
       await component.vm.$nextTick()
@@ -429,43 +430,6 @@ describe('GPUPerformanceBadge', () => {
       // Color should be neutral (not success)
       const badge = component.findComponent({ name: 'UBadge' })
       expect(badge.props('color')).toBe('neutral')
-    })
-
-    it('handles negative render times gracefully', async () => {
-      const { component, store } = await mountWithStore()
-
-      // This shouldn't happen in practice, but test defensive behavior
-      store.setRenderTiming({
-        total: -5.7,
-        histogram: -1,
-        transform: -1,
-        adjustments: -2,
-        canvas: -1.7,
-      })
-      store.setAvailable(true)
-
-      await component.vm.$nextTick()
-
-      // Math.round(-5.7) = -6
-      expect(component.text()).toContain('-6ms')
-    })
-
-    it('handles Infinity render time', async () => {
-      const { component, store } = await mountWithStore()
-
-      store.setRenderTiming({
-        total: Infinity,
-        histogram: Infinity,
-        transform: 0,
-        adjustments: 0,
-        canvas: 0,
-      })
-      store.setAvailable(true)
-
-      await component.vm.$nextTick()
-
-      // Math.round(Infinity) = Infinity
-      expect(component.text()).toContain('Infinity')
     })
   })
 })

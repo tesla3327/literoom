@@ -2,21 +2,21 @@
 /**
  * GPUPerformanceBadge Component
  *
- * Displays render timing and backend info in the edit view.
- * Shows the total render time and whether GPU or WASM backend is being used.
+ * Displays FPS (rolling average) and backend info in the edit view.
+ * Shows the average FPS over recent renders and whether GPU or WASM backend is being used.
  */
 import { useGpuStatusStore } from '~/stores/gpuStatus'
 
 const gpuStatus = useGpuStatusStore()
 
 /**
- * Format totalRenderTime as "Xms" (rounded to integer).
- * Returns null if no timing data is available.
+ * Display rolling average FPS from the store.
+ * Returns "-- FPS" if no timing data is available yet.
  */
-const displayTime = computed(() => {
-  const time = gpuStatus.totalRenderTime
-  if (time === null) return null
-  return `${Math.round(time)}ms`
+const displayFps = computed(() => {
+  const fps = gpuStatus.rollingAverageFps
+  if (fps === null) return '-- FPS'
+  return `${Math.round(fps)} FPS`
 })
 
 /**
@@ -37,11 +37,11 @@ const badgeColor = computed(() => {
 
 <template>
   <UBadge
-    v-if="displayTime"
+    v-if="gpuStatus.isInitialized"
     :color="badgeColor"
     variant="subtle"
     size="xs"
   >
-    {{ displayTime }} {{ displayBackend }}
+    {{ displayFps }} {{ displayBackend }}
   </UBadge>
 </template>

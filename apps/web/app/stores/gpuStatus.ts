@@ -65,6 +65,10 @@ export const useGpuStatusStore = defineStore('gpuStatus', () => {
   /** Current processing backend */
   const backend = ref<'webgpu' | 'wasm' | 'unknown'>('unknown')
 
+  /** Rolling window of recent render times for FPS averaging */
+  const ROLLING_WINDOW_SIZE = 10
+  const recentRenderTimes = ref<number[]>([])
+
   // ============================================================================
   // Getters
   // ============================================================================
@@ -125,6 +129,19 @@ export const useGpuStatusStore = defineStore('gpuStatus', () => {
     return lastRenderTiming.value?.total ?? null
   })
 
+  /**
+   * Rolling average FPS from recent render times.
+   * Returns null if no timing data is available.
+   */
+  const rollingAverageFps = computed(() => {
+    if (recentRenderTimes.value.length === 0) return null
+    const avgTime =
+      recentRenderTimes.value.reduce((sum, t) => sum + t, 0) /
+      recentRenderTimes.value.length
+    if (avgTime === 0) return null
+    return 1000 / avgTime
+  })
+
   // ============================================================================
   // Actions
   // ============================================================================
@@ -164,11 +181,16 @@ export const useGpuStatusStore = defineStore('gpuStatus', () => {
 
   /**
    * Update render timing from the edit pipeline.
+   * Also updates the rolling average for FPS calculation.
    *
    * @param timing - Timing breakdown from EditPipeline
    */
   function setRenderTiming(timing: EditPipelineTiming): void {
     lastRenderTiming.value = timing
+    recentRenderTimes.value.push(timing.total)
+    if (recentRenderTimes.value.length > ROLLING_WINDOW_SIZE) {
+      recentRenderTimes.value.shift()
+    }
   }
 
   return {
@@ -180,12 +202,14 @@ export const useGpuStatusStore = defineStore('gpuStatus', () => {
     lastError,
     lastRenderTiming,
     backend,
+    recentRenderTimes,
 
     // Getters
     statusIcon,
     statusColor,
     statusText,
     totalRenderTime,
+    rollingAverageFps,
 
     // Actions
     setAvailable,
