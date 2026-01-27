@@ -663,8 +663,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   // WebGPU Direct Rendering State
   // ============================================================================
 
-  /** WebGPU canvas binding for direct GPU rendering */
-  const webgpuBinding = ref<WebGPUCanvasBinding | null>(null)
+  /** WebGPU canvas binding for direct GPU rendering
+   *  Use shallowRef to prevent Vue from unwrapping the nested Ref (isWebGPUCanvasMode)
+   */
+  const webgpuBinding = shallowRef<WebGPUCanvasBinding | null>(null)
 
   /** Whether WebGPU direct rendering is currently active */
   const isWebGPURenderingActive = ref(false)
@@ -938,7 +940,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             // When WebGPU canvas is bound, render directly to canvas texture (no CPU readback!)
             // This saves 15-30ms per frame by eliminating mapAsync + pixelsToImageBitmap
             const binding = webgpuBinding.value
-            if (binding && binding.isWebGPUCanvasMode.value) {
+            const isWebGPUMode = binding?.isWebGPUCanvasMode?.value
+            if (binding && isWebGPUMode) {
               const canvasTexture = binding.getCurrentWebGPUTexture()
               if (canvasTexture) {
                 console.log('[useEditPreview] Using WebGPU direct rendering path')

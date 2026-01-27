@@ -333,22 +333,54 @@ function updateWebGPUCanvasDimensions(width: number, height: number): void {
 }
 
 /**
- * On mount, bind the WebGPU canvas to the preview composable.
- * This enables direct GPU rendering without CPU readback.
+ * Track whether WebGPU canvas binding has been attempted.
  */
-onMounted(() => {
-  // Wait for next tick to ensure canvas ref is available
-  nextTick(() => {
-    if (previewCanvasRef.value) {
-      // Bind WebGPU canvas to the preview composable
-      bindWebGPUCanvas({
-        configureWebGPUCanvas,
-        getCurrentWebGPUTexture,
-        isWebGPUCanvasMode,
-        unconfigureWebGPUCanvas,
-        updateWebGPUCanvasDimensions,
+const webgpuBindingAttempted = ref(false)
+
+/**
+ * Attempt to bind WebGPU canvas when the canvas ref becomes available.
+ * The canvas is conditionally rendered (v-else-if="hasPreviewContent"),
+ * so it may not exist when the component first mounts.
+ */
+function attemptWebGPUBinding() {
+  if (webgpuBindingAttempted.value) return
+  if (!previewCanvasRef.value) return
+
+  webgpuBindingAttempted.value = true
+  console.log('[EditPreviewCanvas] Canvas available, attempting WebGPU binding')
+
+  bindWebGPUCanvas({
+    configureWebGPUCanvas,
+    getCurrentWebGPUTexture,
+    isWebGPUCanvasMode,
+    unconfigureWebGPUCanvas,
+    updateWebGPUCanvasDimensions,
+  })
+}
+
+/**
+ * Watch for hasPreviewContent to become true, then bind WebGPU canvas.
+ * This handles the case where the canvas is rendered after the component mounts.
+ */
+watch(
+  hasPreviewContent,
+  (hasContent) => {
+    if (hasContent) {
+      // Canvas should now be in the DOM, wait for next tick to ensure ref is populated
+      nextTick(() => {
+        attemptWebGPUBinding()
       })
     }
+  },
+  { immediate: true },
+)
+
+/**
+ * On mount, also try to bind in case hasPreviewContent is already true.
+ */
+onMounted(() => {
+  nextTick(() => {
+    attemptWebGPUBinding()
   })
 })
 
