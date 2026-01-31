@@ -5,7 +5,6 @@
 ### Open Issues
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
-- [Sort options don't work (High)](#sort-options-dont-work)
 - [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
@@ -21,6 +20,7 @@
 - [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle)
 
 ### Recently Solved
+- [Sort options don't work (High)](#sort-options-dont-work---solved)
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos---solved)
 - [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
 - [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying---solved)
@@ -201,41 +201,21 @@ The filter state is stored in `catalogUI` Pinia store, but the state is not prop
 
 ---
 
-### Sort options don't work
+### Sort options don't work - SOLVED
 
-**Severity**: High | **Type**: Bug | **Found**: 2026-01-25
+**Severity**: High | **Fixed**: 2026-01-31
 
 **Problem**:
 Clicking on sort options in the dropdown (Date oldest, Name A-Z, Name Z-A, Size largest, Size smallest) has no effect. The grid order doesn't change and the dropdown button label always shows "Date (newest)" regardless of which option is selected.
 
-**Steps to Reproduce**:
-1. Open catalog grid view with photos loaded
-2. Click the sort dropdown button (shows "Date (newest)")
-3. Select any other sort option (e.g., "Name (A-Z)")
-4. Observe: Grid order remains unchanged
-5. Observe: Dropdown button still shows "Date (newest)"
+**Root Cause**:
+The sort options in FilterBar.vue used `click` property, but Nuxt UI's `UDropdownMenu` component expects `onSelect` property. The click handlers were never invoked.
 
-**Expected Behavior**:
-- Grid should reorder based on selected sort option
-- Dropdown button label should update to show selected sort
-- Sort selection should persist during session
+**Fix Applied**:
+Changed all sort option handlers from `click` to `onSelect` in FilterBar.vue (6 items).
 
-**Actual Behavior**:
-- Grid order never changes regardless of sort selection
-- Dropdown button always displays "Date (newest)"
-- Sort state doesn't update
-
-**Technical Details**:
-Tested in Demo Mode with 50 photos. Verified by comparing first 10 photo names before and after selecting different sort options - they remained identical.
-
-**Files to Investigate**:
-- `apps/web/app/components/catalog/FilterBar.vue` - Sort dropdown component
-- `apps/web/app/stores/catalogUI.ts` - UI state for sort selection
-- `apps/web/app/stores/catalog.ts` - Computed sortedAssetIds
-
-**Screenshots**:
-- `docs/screenshots/qa-section5-05-sort-dropdown.png` - Sort dropdown showing all 6 options
-- `docs/screenshots/qa-section5-06-sort-bug.png` - Button still shows "Date (newest)" after selecting different option
+**Files Modified**:
+- `apps/web/app/components/catalog/FilterBar.vue` - Changed `click` to `onSelect` for all sort options
 
 ---
 

@@ -37,41 +37,42 @@ const filterModes = computed(() => [
 ])
 
 // Sort options for dropdown menu
+// Note: Nuxt UI's UDropdownMenu expects 'onSelect' handler, not 'click'
 const sortOptions = [
   [
     {
       label: 'Date (newest)',
       icon: 'i-heroicons-calendar',
-      click: () => setSort('captureDate', 'desc'),
+      onSelect: () => setSort('captureDate', 'desc'),
     },
     {
       label: 'Date (oldest)',
       icon: 'i-heroicons-calendar',
-      click: () => setSort('captureDate', 'asc'),
+      onSelect: () => setSort('captureDate', 'asc'),
     },
   ],
   [
     {
       label: 'Name (A-Z)',
       icon: 'i-heroicons-bars-3-bottom-left',
-      click: () => setSort('filename', 'asc'),
+      onSelect: () => setSort('filename', 'asc'),
     },
     {
       label: 'Name (Z-A)',
       icon: 'i-heroicons-bars-3-bottom-right',
-      click: () => setSort('filename', 'desc'),
+      onSelect: () => setSort('filename', 'desc'),
     },
   ],
   [
     {
       label: 'Size (largest)',
       icon: 'i-heroicons-arrow-trending-up',
-      click: () => setSort('fileSize', 'desc'),
+      onSelect: () => setSort('fileSize', 'desc'),
     },
     {
       label: 'Size (smallest)',
       icon: 'i-heroicons-arrow-trending-down',
-      click: () => setSort('fileSize', 'asc'),
+      onSelect: () => setSort('fileSize', 'asc'),
     },
   ],
 ]

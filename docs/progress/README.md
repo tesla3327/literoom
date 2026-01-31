@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 14:14 EST
+**Last Updated**: 2026-01-31 14:17 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 150 - Fix Adjustments Not Persisted When Navigating - Complete (see shard-001.md)
+**Current Iteration**: 151 - Fix Sort Options Not Working - Complete (see shard-001.md)
 
 ## Project Structure
 

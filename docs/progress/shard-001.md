@@ -202,3 +202,52 @@ The `editCache` was defined as `ref<Map<string, EditState>>()`. Vue's reactivity
 - Pre-existing failures: 9 (unrelated GPU mock issues in edit-pipeline-draft.test.ts)
 
 ---
+
+## Iteration 151: Fix Sort Options Not Working
+
+**Time**: 2026-01-31 14:14 EST
+**Status**: Complete
+**Task**: Fix sort dropdown not working in catalog grid view
+
+### Problem
+Clicking on sort options in the dropdown (Date oldest, Name A-Z, Name Z-A, Size largest, Size smallest) has no effect. The grid order doesn't change and the dropdown button label always shows "Date (newest)" regardless of which option is selected.
+
+### Research Phase
+Used 4 parallel subagents to investigate:
+- FilterBar.vue sort dropdown implementation
+- catalogUI store sort state management
+- catalog store sortedAssetIds computed property
+- CatalogGrid component asset display
+
+### Root Cause
+**The sort options used the wrong property name for the click handler.**
+
+The FilterBar.vue component used `click` property:
+```typescript
+{
+  label: 'Date (newest)',
+  icon: 'i-heroicons-calendar',
+  click: () => setSort('captureDate', 'desc'),  // ❌ WRONG
+}
+```
+
+But Nuxt UI's `UDropdownMenu` component expects `onSelect` property:
+```typescript
+{
+  label: 'Date (newest)',
+  icon: 'i-heroicons-calendar',
+  onSelect: () => setSort('captureDate', 'desc'),  // ✅ CORRECT
+}
+```
+
+### Fix Applied
+Changed all sort option handlers from `click` to `onSelect` in FilterBar.vue (6 items).
+
+### Files Modified
+- `apps/web/app/components/catalog/FilterBar.vue` - Changed `click` to `onSelect` for all sort options
+
+### Test Results
+- All 1236 web unit tests pass
+- Sort functionality verified via existing catalogUIStore tests (setSortField, setSortDirection)
+
+---
