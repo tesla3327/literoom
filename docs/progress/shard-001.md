@@ -371,3 +371,62 @@ Also updated `beforeEach` to clear sessionStorage before each test.
 - All 1251 web unit tests pass (9 new tests)
 
 ---
+
+## Iteration 154: Fix Escape Key Navigates Away During Mask Drawing Mode
+
+**Time**: 2026-01-31 14:37 EST
+**Status**: Complete
+**Task**: Fix Escape key behavior to cancel mask drawing mode instead of navigating away from edit view
+
+### Problem
+When in mask drawing mode (after clicking Linear or Radial button in the Masks panel), pressing the Escape key navigates away from the edit view back to the catalog grid instead of canceling the drawing mode.
+
+### Research Phase
+Used 4 parallel subagents to investigate:
+- Edit page Escape key handler (`edit/[id].vue` lines 176-185)
+- Mask drawing mode state management (`editUI.ts` - `maskDrawingMode` ref)
+- Keyboard handler guards pattern (how crop tool handles Escape)
+- Existing test patterns for keyboard handling
+
+### Root Cause
+The Escape key handler in `edit/[id].vue` checked `isCropToolActive` before calling `goBack()`, but did NOT check `maskDrawingMode`. When mask drawing mode was active, the handler fell through to `goBack()` instead of canceling the drawing mode.
+
+**Before:**
+```typescript
+case 'Escape':
+  if (editUIStore.isCropToolActive) {
+    editUIStore.cancelPendingCrop()
+  }
+  else {
+    goBack()  // ❌ Always navigates when crop not active
+  }
+  break
+```
+
+### Fix Applied
+Added a check for `maskDrawingMode` before `isCropToolActive`:
+
+```typescript
+case 'Escape':
+  // If mask drawing mode is active, cancel drawing instead of going back
+  if (editUIStore.maskDrawingMode) {
+    editUIStore.cancelMaskDrawing()
+  }
+  // If crop tool is active, cancel the crop instead of going back
+  else if (editUIStore.isCropToolActive) {
+    editUIStore.cancelPendingCrop()
+  }
+  else {
+    goBack()
+  }
+  break
+```
+
+### Files Modified
+- `apps/web/app/pages/edit/[id].vue` - Added mask drawing mode check in Escape handler
+
+### Test Results
+- editUIStore tests: 120 passed (existing tests cover `cancelMaskDrawing()` behavior)
+- Core tests: 2392 passed (9 pre-existing failures in GPU draft mode tests, unrelated)
+
+---

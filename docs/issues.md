@@ -6,7 +6,6 @@
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
-- [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
@@ -18,6 +17,7 @@
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode---solved)
 - [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation---solved)
 - [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle---solved)
 - [Sort options don't work (High)](#sort-options-dont-work---solved)
@@ -246,38 +246,34 @@ Tested in Demo Mode. The zoom state appears to be stored globally in the editUI 
 
 ---
 
-### Escape key navigates away during mask drawing mode
+### Escape key navigates away during mask drawing mode - SOLVED
 
-**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-25
+**Severity**: Medium | **Fixed**: 2026-01-31
 
 **Problem**:
-When in mask drawing mode (after clicking Linear or Radial button in the Masks panel), pressing the Escape key navigates away from the edit view back to the catalog grid instead of cancelling the drawing mode.
+When in mask drawing mode (after clicking Linear or Radial button in the Masks panel), pressing the Escape key navigated away from the edit view back to the catalog grid instead of cancelling the drawing mode.
 
-**Steps to Reproduce**:
-1. Open a photo in edit view
-2. Expand the Masks accordion panel
-3. Click the "Linear" button to start drawing mode
-4. Verify "Click and drag on the image to create a linear gradient" message appears
-5. Press Escape key
-6. Observe: App navigates to catalog grid (http://localhost:3000/) instead of staying in edit view
+**Root Cause**:
+The Escape key handler in `edit/[id].vue` checked `isCropToolActive` before calling `goBack()`, but did NOT check `maskDrawingMode`. When mask drawing mode was active, the handler fell through to `goBack()` instead of canceling the drawing mode.
 
-**Expected Behavior**:
-Pressing Escape should cancel the mask drawing mode and return to the normal edit view state, similar to clicking the "Cancel" button which works correctly.
+**Fix Applied**:
+Added a check for `maskDrawingMode` before `isCropToolActive` in the Escape key handler:
+```typescript
+case 'Escape':
+  if (editUIStore.maskDrawingMode) {
+    editUIStore.cancelMaskDrawing()
+  }
+  else if (editUIStore.isCropToolActive) {
+    editUIStore.cancelPendingCrop()
+  }
+  else {
+    goBack()
+  }
+  break
+```
 
-**Actual Behavior**:
-Pressing Escape navigates away from the edit view entirely, back to the catalog grid.
-
-**Technical Details**:
-The global keyboard handler for Escape in the edit view is being triggered before the mask drawing mode can intercept it. The Cancel button works correctly, so the logic exists - it's just not connected to the Escape key properly.
-
-**Files to Investigate**:
-- `apps/web/app/pages/edit/[id].vue` - Global keyboard handler
-- `apps/web/app/composables/useMaskOverlay.ts` - Mask drawing mode state
-- `apps/web/app/components/edit/EditMaskPanel.vue` - Mask panel component
-
-**Screenshots**:
-- `docs/screenshots/qa-section10-03-linear-drawing-mode.png` - Drawing mode active
-- `docs/screenshots/qa-section10-10-escape-bug.png` - After pressing Escape, now on home page
+**Files Modified**:
+- `apps/web/app/pages/edit/[id].vue` - Added mask drawing mode check in Escape handler
 
 ---
 

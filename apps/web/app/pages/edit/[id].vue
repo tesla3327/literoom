@@ -175,8 +175,12 @@ function handleKeydown(e: KeyboardEvent) {
 
   switch (e.key) {
     case 'Escape':
+      // If mask drawing mode is active, cancel drawing instead of going back
+      if (editUIStore.maskDrawingMode) {
+        editUIStore.cancelMaskDrawing()
+      }
       // If crop tool is active, cancel the crop instead of going back
-      if (editUIStore.isCropToolActive) {
+      else if (editUIStore.isCropToolActive) {
         editUIStore.cancelPendingCrop()
       }
       else {

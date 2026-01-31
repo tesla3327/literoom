@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 14:45 EST
+**Last Updated**: 2026-01-31 14:48 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 153 - Fix Filter Mode Resets After Edit View Navigation - Complete (see shard-001.md)
+**Current Iteration**: 154 - Fix Escape Key Navigates Away During Mask Drawing Mode - Complete (see shard-001.md)
 
 ## Project Structure
 
