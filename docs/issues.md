@@ -5,7 +5,6 @@
 ### Open Issues
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
-- [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos)
 - [Sort options don't work (High)](#sort-options-dont-work)
 - [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
@@ -22,6 +21,7 @@
 - [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle)
 
 ### Recently Solved
+- [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos---solved)
 - [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
 - [Crop tool should confirm before applying (Medium)](#crop-tool-should-confirm-before-applying---solved)
 - [Zoom sensitivity too high (Medium)](#zoom-sensitivity-too-high---solved)
@@ -144,48 +144,26 @@ debouncedFullRender.cancel is not a function (x37)
 
 ---
 
-### Adjustments not persisted when navigating between photos
+### Adjustments not persisted when navigating between photos - SOLVED
 
-**Severity**: High | **Type**: Bug | **Found**: 2026-01-25
+**Severity**: High | **Fixed**: 2026-01-31
 
 **Problem**:
-When editing a photo and making adjustments (Exposure, Contrast, etc.), the adjustments are lost when navigating to another photo in the filmstrip and then returning to the original photo. All slider values reset to 0/default.
+When editing a photo and making adjustments (Exposure, Contrast, etc.), the adjustments were lost when navigating to another photo in the filmstrip and then returning to the original photo. All slider values reset to 0/default.
 
-**Steps to Reproduce**:
-1. Open catalog in Demo Mode
-2. Double-click a photo to enter Edit view
-3. Adjust Exposure slider to +0.50 (or any non-zero value)
-4. Wait a few seconds for any potential auto-save
-5. Click a different photo in the filmstrip to navigate away
-6. Click back to the original photo
-7. Observe: Exposure slider shows 0 instead of +0.50
+**Root Cause**:
+The `editCache` in the edit store was defined as `ref<Map<string, EditState>>()`. Vue's reactivity system doesn't track Map mutations when using `ref<Map>` - the `.set()` method mutates the Map in place, but Vue's reactivity proxy doesn't intercept this. While the Map was being updated correctly, the reactive system wasn't aware of the changes.
 
-**Expected Behavior**:
-Adjustments should persist when navigating between photos. The documentation in issues.md states "Edits now persist to IndexedDB and survive page refresh."
+**Fix Applied**:
+1. Changed `editCache` from `ref<Map>` to `shallowRef<Map>`
+2. Updated `saveToCache()` to create a new Map when updating (triggers Vue reactivity)
+3. Updated `initializeFromDb()` to create a new Map when populating from database
 
-**Actual Behavior**:
-Adjustments are lost immediately when navigating away from the photo. The Reset button becomes disabled (indicating no changes), confirming the adjustments were not saved.
+**Files Modified**:
+- `apps/web/app/stores/edit.ts` - shallowRef and new Map pattern
 
-**Technical Details**:
-Tested in Demo Mode (`LITEROOM_DEMO_MODE=true`). The issue may be specific to Demo Mode since the mock services may not have full persistence implemented.
-
-**Observed Pattern**:
-- Adjustments visible in preview in real-time (working)
-- Histogram updates with adjustments (working)
-- Reset button enables when changes are made (working)
-- After navigation: Reset button disabled, all sliders at 0 (BUG)
-
-**Affects Multiple Features**:
-- Basic Adjustments (Exposure, Contrast, etc.)
-- Tone Curve (custom control points reset to linear diagonal)
-
-**Files to Investigate**:
-- `apps/web/app/stores/edit.ts` - Edit state management and persistence
-- `packages/core/src/catalog/mock-catalog-service.ts` - Demo mode persistence
-
-**Screenshots**:
-- `docs/screenshots/qa-section7-08-exposure-050-before-nav.png` - Exposure at +0.50 before navigation
-- `docs/screenshots/qa-section7-09-exposure-lost-after-nav.png` - Exposure at 0 after returning
+**Tests Added**:
+5 new tests for navigation persistence scenarios in `apps/web/test/editStore.test.ts`
 
 ---
 

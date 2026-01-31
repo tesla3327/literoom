@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-23 16:30 EST
+**Last Updated**: 2026-01-31 14:14 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 149 - Fix Zoom Fit Centering and Fill - Complete (see shard-001.md)
+**Current Iteration**: 150 - Fix Adjustments Not Persisted When Navigating - Complete (see shard-001.md)
 
 ## Project Structure
 

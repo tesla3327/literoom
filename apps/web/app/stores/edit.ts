@@ -132,8 +132,12 @@ export const useEditStore = defineStore('edit', () => {
    * In-memory cache of edit states per asset.
    * This allows edits to persist within a session when switching between images.
    * Backed by IndexedDB for persistence across page refreshes.
+   *
+   * NOTE: We use shallowRef<Map> instead of ref<Map> because Vue's reactivity
+   * system doesn't track Map.set() mutations. To trigger updates, we create
+   * a new Map when modifying the cache.
    */
-  const editCache = ref<Map<string, EditState>>(new Map())
+  const editCache = shallowRef<Map<string, EditState>>(new Map())
 
   /**
    * Whether the edit cache has been initialized from IndexedDB.
@@ -274,10 +278,13 @@ export const useEditStore = defineStore('edit', () => {
       console.log('[EditStore] Loaded', allEditStates.size, 'edit states from IndexedDB')
       let loadedCount = 0
 
+      // Create a new Map for Vue reactivity (shallowRef doesn't track Map mutations)
+      const newCache = new Map(editCache.value)
+
       for (const [assetUuid, rawState] of allEditStates) {
         try {
           const migrated = migrateEditState(rawState)
-          editCache.value.set(assetUuid, migrated)
+          newCache.set(assetUuid, migrated)
           loadedCount++
         }
         catch (err) {
@@ -285,6 +292,8 @@ export const useEditStore = defineStore('edit', () => {
         }
       }
 
+      // Assign new Map to trigger reactivity
+      editCache.value = newCache
       isInitialized.value = true
       return loadedCount
     }
@@ -307,7 +316,11 @@ export const useEditStore = defineStore('edit', () => {
     const state = buildEditState(adjustments.value, cropTransform.value, masks.value)
 
     // Update in-memory cache immediately
-    editCache.value.set(assetId, state)
+    // Create a new Map to trigger Vue reactivity (shallowRef doesn't track Map mutations)
+    const newCache = new Map(editCache.value)
+    newCache.set(assetId, state)
+    editCache.value = newCache
+    console.log('[EditStore] saveToCache:', assetId, 'exposure:', state.adjustments?.exposure, 'cacheSize:', newCache.size)
 
     // Persist to IndexedDB asynchronously (don't block the UI)
     saveEditStateToDb(assetId, state, EDIT_SCHEMA_VERSION).catch((err) => {

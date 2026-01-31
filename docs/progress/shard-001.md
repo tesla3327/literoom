@@ -163,3 +163,42 @@ When `restoreZoomForAsset()` is called during asset navigation (before the new i
 - 1 pre-existing failure (unrelated to zoom)
 
 ---
+
+## Iteration 150: Fix Adjustments Not Persisted When Navigating
+
+**Time**: 2026-01-31 14:04 EST
+**Status**: Complete
+**Task**: Fix adjustments not being persisted when navigating between photos in edit view
+
+### Problem
+When editing a photo and making adjustments (Exposure, Contrast, etc.), the adjustments are lost when navigating to another photo in the filmstrip and then returning to the original photo. All slider values reset to 0/default.
+
+### Root Cause
+The `editCache` was defined as `ref<Map<string, EditState>>()`. Vue's reactivity system doesn't track Map mutations when using `ref<Map>` - the `.set()` method mutates the Map in place, but Vue's reactivity proxy doesn't intercept this. While the Map was being updated correctly, the reactive system wasn't aware of the changes.
+
+### Fix Applied
+1. Changed `editCache` from `ref<Map>` to `shallowRef<Map>`
+2. Updated `saveToCache()` to create a new Map when updating (triggers Vue reactivity)
+3. Updated `initializeFromDb()` to create a new Map when populating from database
+4. Added diagnostic logging to trace cache operations
+
+### Files Modified
+- `apps/web/app/stores/edit.ts` - shallowRef and new Map pattern
+
+### Tests Added
+5 new tests in `apps/web/test/editStore.test.ts`:
+- `persists adjustments when navigating away and back`
+- `preserves multiple photos in cache during navigation`
+- `saves edits to cache immediately on markDirty`
+- `retrieves edit state from cache via getEditStateForAsset`
+- `returns current state for currently active asset`
+
+### Research Document
+- `docs/research/2026-01-31-edit-persistence-navigation-synthesis.md`
+
+### Test Results
+- Web unit tests: 1236 passed
+- Edit store tests: 88 passed (including 5 new tests)
+- Pre-existing failures: 9 (unrelated GPU mock issues in edit-pipeline-draft.test.ts)
+
+---
