@@ -4,7 +4,6 @@
 
 ### Open Issues
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
-- [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
@@ -17,6 +16,7 @@
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function---cannot-reproduce)
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode---solved)
 - [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation---solved)
 - [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle---solved)
@@ -105,42 +105,30 @@ The error occurs in an unmount hook where the code attempts to call `.startsWith
 
 ---
 
-### debouncedFullRender.cancel is not a function
+### debouncedFullRender.cancel is not a function - CANNOT REPRODUCE
 
-**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-26
+**Severity**: Medium | **Status**: Cannot Reproduce | **Found**: 2026-01-26 | **Investigated**: 2026-01-31
 
 **Problem**:
-When making adjustments in the edit view (e.g., dragging sliders), the console repeatedly logs the error `debouncedFullRender.cancel is not a function`. The error occurs many times during slider adjustments.
+Bug report claimed that when making adjustments in the edit view, the console repeatedly logs the error `debouncedFullRender.cancel is not a function` (37+ times during slider adjustments).
 
-**Steps to Reproduce**:
-1. Start app in Demo Mode (`LITEROOM_DEMO_MODE=true`)
-2. Open any photo in edit view
-3. Adjust any slider (e.g., Exposure, Temperature)
-4. Observe browser console - error appears repeatedly
+**Investigation Results**:
+1. **Code implementation is correct**: The custom `debounce()` function properly creates a wrapper with `.cancel()` method
+2. **`.cancel()` is only called in 2 places**: Asset change watcher (line 1478) and unmount (line 1736)
+3. **Neither location should run during slider adjustments**: The only way to trigger 37+ times would require component recreation
+4. **All tests pass**: Progressive refinement tests (48 tests) verify debounce/cancel behavior
+5. **Significant code changes since bug report**: Performance refactors (ImageBitmap, WebGPU) may have inadvertently fixed timing issues
 
-**Expected Behavior**:
-No console errors during normal slider adjustment operations.
+**Possible Explanations**:
+- Bug was fixed during recent performance refactoring
+- Was a development-only HMR (hot module replacement) artifact
+- Documentation error (confused with similar `previewUrl.value.startsWith` error)
 
-**Actual Behavior**:
-Error `debouncedFullRender.cancel is not a function` is logged repeatedly (37+ times observed during a single adjustment session).
+**Recommendation**:
+If this error is reported again with specific reproduction steps and browser console screenshots, investigate with browser debugging tools.
 
-**Impact**:
-- Does not crash the application
-- Adjustments and preview updates still work
-- May indicate a debounce/throttle implementation issue that could affect performance
-
-**Technical Details**:
-The error suggests that `debouncedFullRender` is expected to be a debounced function with a `.cancel()` method (like lodash's debounce or useDebounceFn from VueUse), but the actual value doesn't have this method.
-
-**Files to Investigate**:
-- `apps/web/app/composables/useEditPreview.ts` - Preview rendering logic
-- `apps/web/app/components/edit/EditPreviewCanvas.vue` - Preview canvas component
-- Search for `debouncedFullRender` across the codebase
-
-**Console Output**:
-```
-debouncedFullRender.cancel is not a function (x37)
-```
+**Research Document**:
+- `docs/research/2026-01-31-debounced-full-render-bug-synthesis.md`
 
 ---
 

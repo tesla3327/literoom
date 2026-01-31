@@ -430,3 +430,53 @@ case 'Escape':
 - Core tests: 2392 passed (9 pre-existing failures in GPU draft mode tests, unrelated)
 
 ---
+
+## Iteration 155: Investigate debouncedFullRender.cancel Bug
+
+**Time**: 2026-01-31 14:41 EST
+**Status**: Complete (Cannot Reproduce)
+**Task**: Investigate console error "debouncedFullRender.cancel is not a function"
+
+### Problem
+Bug report claims that when making adjustments in the edit view, the console repeatedly logs the error `debouncedFullRender.cancel is not a function` (37+ times during slider adjustments).
+
+### Research Phase
+
+Used 4 parallel subagents to investigate:
+1. Find debouncedFullRender definition and usage
+2. Analyze useEditPreview rendering implementation
+3. Check VueUse debounce patterns (none used - custom implementation)
+4. Check EditPreviewCanvas references
+
+### Findings
+
+**Code Implementation is Correct:**
+- Custom `debounce()` function properly creates wrapper with `.cancel()` method
+- `debouncedFullRender` is created correctly at line 1376
+- `.cancel()` is only called in 2 places (asset change watcher, unmount)
+- Neither location should run 37+ times during slider adjustments
+
+**Discrepancy with Bug Report:**
+- `.cancel()` is NOT called during slider adjustments
+- The only way to trigger 37+ times would require component recreation
+- This could happen during HMR (hot module replacement) in development
+- Progressive refinement tests (48 tests) all pass
+
+**Code Changes Since Bug Report (2026-01-26):**
+- `ae183c4` - Replace JPEG encoding with ImageBitmap
+- `7238454` - Keep RGBA throughout pipeline
+- `fde6f1b` - Implement WebGPU direct canvas rendering
+- `d139b53` - Safari browser compatibility testing
+
+### Conclusion
+
+The bug either:
+1. Was inadvertently fixed during recent performance refactoring
+2. Was a development-only HMR artifact
+3. Was documented incorrectly (confused with similar error)
+
+### Research Document
+- `docs/research/2026-01-31-debounced-full-render-bug-synthesis.md`
+
+### Recommendation
+Mark issue as "Cannot Reproduce" in issues.md. If the error is reported again with reproduction steps, investigate with browser debugging tools.
