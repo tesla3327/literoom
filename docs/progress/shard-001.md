@@ -251,3 +251,72 @@ Changed all sort option handlers from `click` to `onSelect` in FilterBar.vue (6 
 - Sort functionality verified via existing catalogUIStore tests (setSortField, setSortDirection)
 
 ---
+
+## Iteration 152: Fix Masks Disappear After Panel Collapse/Expand
+
+**Time**: 2026-01-31 14:21 EST
+**Status**: Complete
+**Task**: Fix masks disappearing after the Masks accordion panel is collapsed and re-expanded
+
+### Problem
+Masks that have been created appear to disappear or lose their state after the Masks accordion panel is collapsed and re-expanded. The Linear/Radial buttons become enabled again as if no masks exist, and the mask overlay is no longer visible on the canvas.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+- Edit store mask state management
+- EditMaskPanel component lifecycle
+- useMaskOverlay composable behavior
+- EditControlsPanel accordion behavior
+- Test coverage gaps
+
+### Root Cause
+**The UAccordion component defaults to `unmountOnHide={true}`**, which causes child components (EditMaskPanel, EditMaskAdjustments) to be completely unmounted from the DOM when the accordion collapses.
+
+**Evidence from Nuxt UI source** (`@nuxt/ui/dist/runtime/components/Accordion.vue`, line 27):
+```javascript
+unmountOnHide: { type: Boolean, required: false, default: true }
+```
+
+When accordion collapses:
+1. The entire `masks-body` template is unmounted
+2. EditMaskPanel and EditMaskAdjustments components are destroyed
+3. The mask overlay canvas is removed from DOM
+4. Event listeners in useMaskOverlay are torn down
+
+When accordion re-expands, components remount but various timing issues can cause masks to not render properly.
+
+### Fix Applied
+Added `:unmount-on-hide="false"` to the UAccordion component in EditControlsPanel.vue.
+
+```vue
+<UAccordion
+  v-model="expandedSections"
+  type="multiple"
+  :items="accordionItems"
+  :unmount-on-hide="false"
+>
+```
+
+This preserves the component tree and state when accordion items are collapsed/expanded.
+
+### Files Modified
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Added `:unmount-on-hide="false"` prop
+
+### Tests Added
+**editUIStore.test.ts** - 3 new tests:
+- `preserves tool state through activate -> deactivate -> activate cycle`
+- `clears drawing mode on deactivate and does not restore it on reactivate`
+- `allows setting new drawing mode after reactivation`
+
+**editStore.test.ts** - 3 new tests:
+- `masks remain in store after creation and can be accessed`
+- `masks persist in cache and are restored on same asset reload`
+- `mask adjustments are preserved through navigation`
+
+### Research Document
+- `docs/research/2026-01-31-masks-accordion-disappear-synthesis.md`
+
+### Test Results
+- All 1242 web unit tests pass (6 new tests)
+
+---

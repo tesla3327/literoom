@@ -226,10 +226,13 @@ function handleReset() {
     </div>
 
     <!-- Accordion for grouped controls -->
+    <!-- unmount-on-hide=false keeps child components mounted when collapsed,
+         preserving mask state and preventing re-initialization -->
     <UAccordion
       v-model="expandedSections"
       type="multiple"
       :items="accordionItems"
+      :unmount-on-hide="false"
     >
       <!-- Basic Adjustments Section -->
       <template #basic-body>

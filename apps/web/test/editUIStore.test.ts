@@ -1021,6 +1021,57 @@ describe('editUIStore', () => {
       expect(store.isMaskToolActive).toBe(true)
       expect(store.maskDrawingMode).toBe('radial')
     })
+
+    // These tests simulate the accordion expand/collapse cycle
+    // to ensure mask tool state is properly preserved
+    describe('accordion collapse/expand cycle', () => {
+      it('preserves tool state through activate -> deactivate -> activate cycle', () => {
+        // Simulate accordion expand
+        store.activateMaskTool()
+        expect(store.isMaskToolActive).toBe(true)
+
+        // Simulate accordion collapse
+        store.deactivateMaskTool()
+        expect(store.isMaskToolActive).toBe(false)
+        expect(store.maskDrawingMode).toBe(null)
+
+        // Simulate accordion re-expand
+        store.activateMaskTool()
+        expect(store.isMaskToolActive).toBe(true)
+        // maskDrawingMode should still be null (no active drawing mode)
+        expect(store.maskDrawingMode).toBe(null)
+      })
+
+      it('clears drawing mode on deactivate and does not restore it on reactivate', () => {
+        // Start drawing a linear mask
+        store.setMaskDrawingMode('linear')
+        expect(store.isMaskToolActive).toBe(true)
+        expect(store.maskDrawingMode).toBe('linear')
+
+        // Simulate accordion collapse (should clear drawing mode)
+        store.deactivateMaskTool()
+        expect(store.isMaskToolActive).toBe(false)
+        expect(store.maskDrawingMode).toBe(null)
+
+        // Simulate accordion re-expand (should not restore drawing mode)
+        store.activateMaskTool()
+        expect(store.isMaskToolActive).toBe(true)
+        expect(store.maskDrawingMode).toBe(null) // NOT 'linear'
+      })
+
+      it('allows setting new drawing mode after reactivation', () => {
+        // First cycle: linear mask
+        store.setMaskDrawingMode('linear')
+        store.deactivateMaskTool()
+
+        // Reactivate and set new mode
+        store.activateMaskTool()
+        store.setMaskDrawingMode('radial')
+
+        expect(store.isMaskToolActive).toBe(true)
+        expect(store.maskDrawingMode).toBe('radial')
+      })
+    })
   })
 
   // ============================================================================

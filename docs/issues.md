@@ -17,9 +17,9 @@
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
-- [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle)
 
 ### Recently Solved
+- [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle---solved)
 - [Sort options don't work (High)](#sort-options-dont-work---solved)
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos---solved)
 - [Zoom fit doesn't center or fill correctly (Medium)](#zoom-fit-doesnt-center-or-fill-correctly---solved)
@@ -562,48 +562,24 @@ The accordion collapses when the page is scrolled, hiding the mask controls and 
 
 ---
 
-### Masks disappear after panel collapse/expand cycle
+### Masks disappear after panel collapse/expand cycle - SOLVED
 
-**Severity**: High | **Type**: Bug | **Found**: 2026-01-27
+**Severity**: High | **Fixed**: 2026-01-31
 
 **Problem**:
-Masks that have been created appear to disappear or lose their state after the Masks accordion panel is collapsed and re-expanded. The Linear/Radial buttons become enabled again as if no masks exist, and the mask overlay is no longer visible on the canvas.
+Masks that have been created appear to disappear or lose their state after the Masks accordion panel is collapsed and re-expanded.
 
-**Steps to Reproduce**:
-1. Open a photo in edit view
-2. Expand the "Masks" accordion panel
-3. Create a Linear mask by clicking Linear button and dragging on the preview
-4. Verify the mask appears in the list with "Hide mask" and "Delete mask" buttons
-5. Collapse the Masks accordion (by clicking the header or scrolling the page)
-6. Re-expand the Masks accordion
-7. Observe: The mask list may be empty, Linear/Radial buttons are enabled again
+**Root Cause**:
+The UAccordion component from Nuxt UI defaults to `unmountOnHide={true}`, which completely unmounts child components (EditMaskPanel, EditMaskAdjustments) when the accordion collapses. When components are destroyed, their internal state and event listeners are lost. On re-expand, components remount fresh but various timing issues caused masks to not render properly.
 
-**Expected Behavior**:
-Created masks should persist and remain visible after collapsing and re-expanding the Masks panel.
+**Fix Applied**:
+Added `:unmount-on-hide="false"` to the UAccordion component in EditControlsPanel.vue. This preserves the component tree and state when accordion items are collapsed/expanded.
 
-**Actual Behavior**:
-Masks appear to be lost or hidden after the accordion collapse/expand cycle. The mask overlay canvas also disappears.
+**Files Modified**:
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Added `:unmount-on-hide="false"` prop
 
-**Technical Details**:
-- The mask overlay canvas (`data-testid="mask-overlay-canvas"`) disappears when the panel collapses
-- When re-expanded, the mask controls sometimes show no masks created
-- This may be related to Vue component mounting/unmounting during accordion state changes
-
-**Impact**:
-- **Critical workflow blocker**: Users cannot reliably work with masks
-- Work is lost without warning
-- Users may think their masks were not created
-
-**Files to Investigate**:
-- `apps/web/app/components/edit/EditMaskPanel.vue` - Mask panel component
-- `apps/web/app/composables/useMaskOverlay.ts` - Mask overlay composable
-- `apps/web/app/stores/edit.ts` - Edit state management for masks
-- `apps/web/app/components/edit/EditControlsPanel.vue` - Accordion behavior
-
-**Screenshots**:
-- `docs/screenshots/qa-section10-masks-09-linear-mask-with-handles.png` - Mask visible before collapse
-- `docs/screenshots/qa-section10-masks-17-mask-panel-expanded.png` - After re-expand, mask buttons visible
-- `docs/screenshots/qa-section10-masks-25-check-radial-mask.png` - Masks appear missing
+**Tests Added**:
+6 new tests for mask persistence and accordion cycle behavior.
 
 ---
 

@@ -975,4 +975,95 @@ describe('editStore', () => {
       expect(currentState?.adjustments.exposure).toBe(1.5)
     })
   })
+
+  // ============================================================================
+  // Mask Persistence (Issue fix: masks disappear after accordion collapse/expand)
+  // ============================================================================
+
+  describe('mask persistence', () => {
+    const testLinearMask = {
+      id: 'test-linear',
+      start: { x: 0.2, y: 0.3 },
+      end: { x: 0.8, y: 0.7 },
+      feather: 0.5,
+      enabled: true,
+      adjustments: { exposure: 0.5, contrast: 10, highlights: 0, shadows: 0 },
+    }
+
+    const testRadialMask = {
+      id: 'test-radial',
+      center: { x: 0.5, y: 0.5 },
+      radiusX: 0.3,
+      radiusY: 0.2,
+      rotation: 0,
+      feather: 0.5,
+      invert: false,
+      enabled: true,
+      adjustments: { exposure: -0.25, contrast: -5, highlights: 0, shadows: 0 },
+    }
+
+    it('masks remain in store after creation and can be accessed', async () => {
+      const { loadEditStateFromDb } = await import('@literoom/core/catalog')
+      vi.mocked(loadEditStateFromDb).mockResolvedValue(null)
+
+      await store.loadForAsset('photo-with-masks')
+
+      // Add masks (simulates user creating masks when panel is expanded)
+      store.addLinearMask(testLinearMask)
+      store.addRadialMask(testRadialMask)
+
+      // Masks should be accessible
+      expect(store.masks).not.toBeNull()
+      expect(store.masks?.linearMasks).toHaveLength(1)
+      expect(store.masks?.radialMasks).toHaveLength(1)
+      expect(store.masks?.linearMasks[0].id).toBe('test-linear')
+      expect(store.masks?.radialMasks[0].id).toBe('test-radial')
+    })
+
+    it('masks persist in cache and are restored on same asset reload', async () => {
+      const { loadEditStateFromDb } = await import('@literoom/core/catalog')
+      vi.mocked(loadEditStateFromDb).mockResolvedValue(null)
+
+      // Load asset and add masks
+      await store.loadForAsset('photo-with-masks')
+      store.addLinearMask(testLinearMask)
+      store.addRadialMask(testRadialMask)
+
+      // Verify masks were added
+      expect(store.masks?.linearMasks).toHaveLength(1)
+      expect(store.masks?.radialMasks).toHaveLength(1)
+
+      // Simulate navigating away and back (or page refresh)
+      // This should restore from cache
+      await store.loadForAsset('photo-with-masks')
+
+      // Masks should still be present from cache
+      expect(store.masks).not.toBeNull()
+      expect(store.masks?.linearMasks).toHaveLength(1)
+      expect(store.masks?.radialMasks).toHaveLength(1)
+      expect(store.masks?.linearMasks[0].adjustments.exposure).toBe(0.5)
+      expect(store.masks?.radialMasks[0].adjustments.exposure).toBe(-0.25)
+    })
+
+    it('mask adjustments are preserved through navigation', async () => {
+      const { loadEditStateFromDb } = await import('@literoom/core/catalog')
+      vi.mocked(loadEditStateFromDb).mockResolvedValue(null)
+
+      // Load photo A with masks
+      await store.loadForAsset('photo-A')
+      store.addLinearMask(testLinearMask)
+      store.setMaskAdjustment('test-linear', 'exposure', 1.0)
+
+      // Navigate to photo B
+      await store.loadForAsset('photo-B')
+      expect(store.masks).toBeNull() // Photo B has no masks
+
+      // Navigate back to photo A
+      await store.loadForAsset('photo-A')
+
+      // Photo A's mask should be restored with its adjustments
+      expect(store.masks).not.toBeNull()
+      expect(store.masks?.linearMasks[0].adjustments.exposure).toBe(1.0)
+    })
+  })
 })

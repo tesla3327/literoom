@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 14:17 EST
+**Last Updated**: 2026-01-31 14:27 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 151 - Fix Sort Options Not Working - Complete (see shard-001.md)
+**Current Iteration**: 152 - Fix Masks Disappear After Panel Collapse/Expand - Complete (see shard-001.md)
 
 ## Project Structure
 
