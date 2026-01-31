@@ -320,3 +320,54 @@ This preserves the component tree and state when accordion items are collapsed/e
 - All 1242 web unit tests pass (6 new tests)
 
 ---
+
+## Iteration 153: Fix Filter Mode Resets After Edit View Navigation
+
+**Time**: 2026-01-31 14:29 EST
+**Status**: Complete
+**Task**: Fix filter mode resetting to "All" after navigating to edit view and back
+
+### Problem
+When a user selects a filter (e.g., "Picks") and then navigates to the edit view and back to the catalog grid, the filter resets to "All" instead of preserving the selected filter.
+
+### Research Phase
+Used parallel subagents to investigate:
+- catalogUI store filter state management (purely in-memory `ref<FilterMode>('all')`)
+- Grid page initialization behavior (no filter reset on mount)
+- FilterBar component filter state (uses `catalogUIStore.filterMode` directly)
+- Navigation lifecycle and route changes (no reset calls found)
+
+### Root Cause
+The filter state was stored only in memory with no persistence. While Pinia stores should persist during client-side navigation, various factors (SSR hydration, HMR in development, component remounting) could cause the state to reset.
+
+### Solution
+Added **sessionStorage persistence** to the catalogUIStore for filter mode and sort settings:
+1. State is restored from sessionStorage on store creation
+2. Changes are persisted to sessionStorage on each setter call
+3. `resetToDefaults()` clears sessionStorage values
+4. Invalid/tampered sessionStorage values fall back to defaults
+
+### Files Modified
+- `apps/web/app/stores/catalogUI.ts` - Added session storage persistence for filterMode, sortField, sortDirection
+
+### Tests Added
+9 new tests in `apps/web/test/catalogUIStore.test.ts`:
+- `persists filter mode to sessionStorage`
+- `persists sort field to sessionStorage`
+- `persists sort direction to sessionStorage`
+- `toggleSortDirection persists to sessionStorage`
+- `restores filter mode from sessionStorage on store creation`
+- `restores sort field from sessionStorage on store creation`
+- `restores sort direction from sessionStorage on store creation`
+- `uses defaults for invalid sessionStorage values`
+- `resetToDefaults clears sessionStorage values`
+
+Also updated `beforeEach` to clear sessionStorage before each test.
+
+### Research Document
+- `docs/research/2026-01-31-filter-mode-persistence-synthesis.md`
+
+### Test Results
+- All 1251 web unit tests pass (9 new tests)
+
+---

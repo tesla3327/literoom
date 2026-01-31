@@ -5,7 +5,6 @@
 ### Open Issues
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function)
-- [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
@@ -19,6 +18,7 @@
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation---solved)
 - [Masks disappear after panel collapse/expand cycle (High)](#masks-disappear-after-panel-collapseexpand-cycle---solved)
 - [Sort options don't work (High)](#sort-options-dont-work---solved)
 - [Adjustments not persisted when navigating between photos (High)](#adjustments-not-persisted-when-navigating-between-photos---solved)
@@ -167,37 +167,28 @@ The `editCache` in the edit store was defined as `ref<Map<string, EditState>>()`
 
 ---
 
-### Filter mode resets after edit view navigation
+### Filter mode resets after edit view navigation - SOLVED
 
-**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-26
+**Severity**: Medium | **Fixed**: 2026-01-31
 
 **Problem**:
 When a user selects a filter (e.g., "Picks") and then navigates to the edit view and back to the catalog grid, the filter resets to "All" instead of preserving the selected filter.
 
-**Steps to Reproduce**:
-1. Open catalog grid view in Demo Mode
-2. Click on "Picks" filter button (shows 23 photos)
-3. Double-click a photo to enter edit view
-4. Press G or click back button to return to grid
-5. Observe: Filter is back to "All" (50 photos), not "Picks"
+**Root Cause**:
+The filter state was stored only in memory with no persistence. While Pinia stores should persist during client-side navigation, various factors (SSR hydration, HMR in development, component remounting) could cause the state to reset.
 
-**Expected Behavior**:
-The filter selection should persist during the session. When returning from edit view, the user should still see only their filtered photos.
+**Fix Applied**:
+Added sessionStorage persistence to the catalogUIStore for filter mode and sort settings:
+1. State is restored from sessionStorage on store creation
+2. Changes are persisted to sessionStorage on each setter call
+3. `resetToDefaults()` clears sessionStorage values
+4. Invalid/tampered sessionStorage values fall back to defaults
 
-**Actual Behavior**:
-Filter resets to "All" after navigating away from the grid view.
+**Files Modified**:
+- `apps/web/app/stores/catalogUI.ts` - Added session storage persistence for filterMode, sortField, sortDirection
 
-**Technical Details**:
-The filter state is stored in `catalogUI` Pinia store, but the state is not properly maintained during page navigation. The button styling shows "All" is selected (has `bg-primary` class) after returning.
-
-**Files to Investigate**:
-- `apps/web/app/stores/catalogUI.ts` - Filter state management
-- `apps/web/app/pages/index.vue` - Grid page initialization
-- `apps/web/app/components/catalog/FilterBar.vue` - Filter buttons
-
-**Screenshots**:
-- `docs/screenshots/qa-section21-10-picks-filter.png` - Picks filter selected
-- `docs/screenshots/qa-section21-11-filter-persisted.png` - Filter reset to All after navigation
+**Tests Added**:
+9 new tests for session storage persistence in `apps/web/test/catalogUIStore.test.ts`
 
 ---
 

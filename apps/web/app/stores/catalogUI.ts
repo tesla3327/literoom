@@ -7,29 +7,107 @@
  * - View mode (grid, loupe)
  *
  * Provides computed filtered/sorted asset IDs for display.
+ *
+ * Filter and sort settings are persisted to sessionStorage to survive
+ * page navigation within the session.
  */
 import type { FilterMode, SortField, SortDirection, ViewMode, Asset } from '@literoom/core/catalog'
 import { useCatalogStore } from './catalog'
 
+// ============================================================================
+// Session Storage Keys
+// ============================================================================
+
+const STORAGE_KEY_FILTER = 'literoom_filter_mode'
+const STORAGE_KEY_SORT_FIELD = 'literoom_sort_field'
+const STORAGE_KEY_SORT_DIRECTION = 'literoom_sort_direction'
+
+// ============================================================================
+// Type Guards
+// ============================================================================
+
+const VALID_FILTER_MODES: FilterMode[] = ['all', 'picks', 'rejects', 'unflagged']
+const VALID_SORT_FIELDS: SortField[] = ['captureDate', 'filename', 'fileSize']
+const VALID_SORT_DIRECTIONS: SortDirection[] = ['asc', 'desc']
+
+function isValidFilterMode(value: string): value is FilterMode {
+  return VALID_FILTER_MODES.includes(value as FilterMode)
+}
+
+function isValidSortField(value: string): value is SortField {
+  return VALID_SORT_FIELDS.includes(value as SortField)
+}
+
+function isValidSortDirection(value: string): value is SortDirection {
+  return VALID_SORT_DIRECTIONS.includes(value as SortDirection)
+}
+
+// ============================================================================
+// Session Storage Helpers
+// ============================================================================
+
+function getStorageValue<T>(key: string, validator: (v: string) => v is T, defaultValue: T): T {
+  if (import.meta.server) return defaultValue
+  try {
+    const stored = sessionStorage.getItem(key)
+    if (stored && validator(stored)) {
+      return stored
+    }
+  }
+  catch {
+    // sessionStorage not available or error reading
+  }
+  return defaultValue
+}
+
+function setStorageValue(key: string, value: string): void {
+  if (import.meta.server) return
+  try {
+    sessionStorage.setItem(key, value)
+  }
+  catch {
+    // sessionStorage not available or quota exceeded
+  }
+}
+
+function clearStorageValue(key: string): void {
+  if (import.meta.server) return
+  try {
+    sessionStorage.removeItem(key)
+  }
+  catch {
+    // sessionStorage not available
+  }
+}
+
 export const useCatalogUIStore = defineStore('catalogUI', () => {
   // ============================================================================
-  // State
+  // State (with session storage restoration)
   // ============================================================================
 
   /**
    * Current filter mode.
+   * Persisted to sessionStorage.
    */
-  const filterMode = ref<FilterMode>('all')
+  const filterMode = ref<FilterMode>(
+    getStorageValue(STORAGE_KEY_FILTER, isValidFilterMode, 'all'),
+  )
 
   /**
    * Current sort field.
+   * Persisted to sessionStorage.
    */
-  const sortField = ref<SortField>('captureDate')
+  const sortField = ref<SortField>(
+    getStorageValue(STORAGE_KEY_SORT_FIELD, isValidSortField, 'captureDate'),
+  )
 
   /**
    * Current sort direction.
+   * Persisted to sessionStorage.
    */
-  const sortDirection = ref<SortDirection>('desc')
+  const sortDirection = ref<SortDirection>(
+    getStorageValue(STORAGE_KEY_SORT_DIRECTION, isValidSortDirection, 'desc'),
+  )
 
   /**
    * Current view mode.
@@ -134,30 +212,39 @@ export const useCatalogUIStore = defineStore('catalogUI', () => {
 
   /**
    * Set the filter mode.
+   * Persists to sessionStorage.
    */
   function setFilterMode(mode: FilterMode): void {
     filterMode.value = mode
+    setStorageValue(STORAGE_KEY_FILTER, mode)
   }
 
   /**
    * Set the sort field.
+   * Persists to sessionStorage.
    */
   function setSortField(field: SortField): void {
     sortField.value = field
+    setStorageValue(STORAGE_KEY_SORT_FIELD, field)
   }
 
   /**
    * Set the sort direction.
+   * Persists to sessionStorage.
    */
   function setSortDirection(direction: SortDirection): void {
     sortDirection.value = direction
+    setStorageValue(STORAGE_KEY_SORT_DIRECTION, direction)
   }
 
   /**
    * Toggle sort direction.
+   * Persists to sessionStorage.
    */
   function toggleSortDirection(): void {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+    const newDirection = sortDirection.value === 'asc' ? 'desc' : 'asc'
+    sortDirection.value = newDirection
+    setStorageValue(STORAGE_KEY_SORT_DIRECTION, newDirection)
   }
 
   /**
@@ -190,6 +277,7 @@ export const useCatalogUIStore = defineStore('catalogUI', () => {
 
   /**
    * Reset to default settings.
+   * Clears sessionStorage values.
    */
   function resetToDefaults(): void {
     filterMode.value = 'all'
@@ -198,6 +286,11 @@ export const useCatalogUIStore = defineStore('catalogUI', () => {
     viewMode.value = 'grid'
     gridColumns.value = 4
     thumbnailSize.value = 200
+
+    // Clear persisted values
+    clearStorageValue(STORAGE_KEY_FILTER)
+    clearStorageValue(STORAGE_KEY_SORT_FIELD)
+    clearStorageValue(STORAGE_KEY_SORT_DIRECTION)
   }
 
   return {

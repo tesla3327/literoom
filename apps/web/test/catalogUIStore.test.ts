@@ -65,6 +65,10 @@ describe('catalogUIStore', () => {
   let catalogStore: ReturnType<typeof useCatalogStore>
 
   beforeEach(() => {
+    // Clear sessionStorage before each test to ensure clean state
+    // The store persists filter/sort settings to sessionStorage
+    sessionStorage.clear()
+
     setActivePinia(createPinia())
     uiStore = useCatalogUIStore()
     catalogStore = useCatalogStore()
@@ -582,6 +586,121 @@ describe('catalogUIStore', () => {
 
       catalogStore.clear()
       expect(uiStore.filteredCount).toBe(0)
+    })
+  })
+
+  // ============================================================================
+  // Session Storage Persistence
+  // ============================================================================
+
+  describe('session storage persistence', () => {
+    it('persists filter mode to sessionStorage', () => {
+      uiStore.setFilterMode('picks')
+      expect(sessionStorage.getItem('literoom_filter_mode')).toBe('picks')
+
+      uiStore.setFilterMode('rejects')
+      expect(sessionStorage.getItem('literoom_filter_mode')).toBe('rejects')
+
+      uiStore.setFilterMode('unflagged')
+      expect(sessionStorage.getItem('literoom_filter_mode')).toBe('unflagged')
+
+      uiStore.setFilterMode('all')
+      expect(sessionStorage.getItem('literoom_filter_mode')).toBe('all')
+    })
+
+    it('persists sort field to sessionStorage', () => {
+      uiStore.setSortField('filename')
+      expect(sessionStorage.getItem('literoom_sort_field')).toBe('filename')
+
+      uiStore.setSortField('fileSize')
+      expect(sessionStorage.getItem('literoom_sort_field')).toBe('fileSize')
+
+      uiStore.setSortField('captureDate')
+      expect(sessionStorage.getItem('literoom_sort_field')).toBe('captureDate')
+    })
+
+    it('persists sort direction to sessionStorage', () => {
+      uiStore.setSortDirection('asc')
+      expect(sessionStorage.getItem('literoom_sort_direction')).toBe('asc')
+
+      uiStore.setSortDirection('desc')
+      expect(sessionStorage.getItem('literoom_sort_direction')).toBe('desc')
+    })
+
+    it('toggleSortDirection persists to sessionStorage', () => {
+      // Default is 'desc'
+      expect(uiStore.sortDirection).toBe('desc')
+
+      uiStore.toggleSortDirection()
+      expect(uiStore.sortDirection).toBe('asc')
+      expect(sessionStorage.getItem('literoom_sort_direction')).toBe('asc')
+
+      uiStore.toggleSortDirection()
+      expect(uiStore.sortDirection).toBe('desc')
+      expect(sessionStorage.getItem('literoom_sort_direction')).toBe('desc')
+    })
+
+    it('restores filter mode from sessionStorage on store creation', () => {
+      // Set value in sessionStorage before creating a new store
+      sessionStorage.setItem('literoom_filter_mode', 'picks')
+
+      // Create a new Pinia instance and store
+      setActivePinia(createPinia())
+      const newStore = useCatalogUIStore()
+
+      expect(newStore.filterMode).toBe('picks')
+    })
+
+    it('restores sort field from sessionStorage on store creation', () => {
+      sessionStorage.setItem('literoom_sort_field', 'filename')
+
+      setActivePinia(createPinia())
+      const newStore = useCatalogUIStore()
+
+      expect(newStore.sortField).toBe('filename')
+    })
+
+    it('restores sort direction from sessionStorage on store creation', () => {
+      sessionStorage.setItem('literoom_sort_direction', 'asc')
+
+      setActivePinia(createPinia())
+      const newStore = useCatalogUIStore()
+
+      expect(newStore.sortDirection).toBe('asc')
+    })
+
+    it('uses defaults for invalid sessionStorage values', () => {
+      // Set invalid values
+      sessionStorage.setItem('literoom_filter_mode', 'invalid')
+      sessionStorage.setItem('literoom_sort_field', 'badfield')
+      sessionStorage.setItem('literoom_sort_direction', 'sideways')
+
+      setActivePinia(createPinia())
+      const newStore = useCatalogUIStore()
+
+      // Should fall back to defaults
+      expect(newStore.filterMode).toBe('all')
+      expect(newStore.sortField).toBe('captureDate')
+      expect(newStore.sortDirection).toBe('desc')
+    })
+
+    it('resetToDefaults clears sessionStorage values', () => {
+      // Set some values
+      uiStore.setFilterMode('picks')
+      uiStore.setSortField('filename')
+      uiStore.setSortDirection('asc')
+
+      expect(sessionStorage.getItem('literoom_filter_mode')).toBe('picks')
+      expect(sessionStorage.getItem('literoom_sort_field')).toBe('filename')
+      expect(sessionStorage.getItem('literoom_sort_direction')).toBe('asc')
+
+      // Reset to defaults
+      uiStore.resetToDefaults()
+
+      // sessionStorage should be cleared
+      expect(sessionStorage.getItem('literoom_filter_mode')).toBeNull()
+      expect(sessionStorage.getItem('literoom_sort_field')).toBeNull()
+      expect(sessionStorage.getItem('literoom_sort_direction')).toBeNull()
     })
   })
 })
