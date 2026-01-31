@@ -5,7 +5,6 @@
 ### Open Issues
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
-- [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
 - [No help modal exists (Low)](#no-help-modal-exists)
@@ -16,6 +15,7 @@
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected---solved)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function---cannot-reproduce)
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode---solved)
 - [Filter mode resets after edit view navigation (Medium)](#filter-mode-resets-after-edit-view-navigation---solved)
@@ -265,40 +265,38 @@ case 'Escape':
 
 ---
 
-### Keyboard flagging only affects current photo, not all selected
+### Keyboard flagging only affects current photo, not all selected - SOLVED
 
-**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-25
+**Severity**: Medium | **Fixed**: 2026-01-31
 
 **Problem**:
 When multiple photos are selected in the grid view and a flag shortcut is pressed (P, X, or U), only the currently focused photo is flagged - the other selected photos remain unchanged.
 
-**Steps to Reproduce**:
-1. Open catalog grid view with multiple photos
-2. Click on a photo to select it
-3. Cmd/Ctrl+Click on 2 more photos to add to selection (header shows "3 selected")
-4. Press P to mark as Pick
-5. Observe: Only the current photo gets the green checkmark badge
-6. The other 2 selected photos remain unchanged
+**Root Cause**:
+`CatalogGrid.vue` was calling `catalogStore.setFlag(currentId, flag)` directly instead of using the `useCatalog().setFlag()` composable method, which properly handles multi-selection by calling `setFlagBatch([...selectedIds], flag)` when multiple items are selected.
 
-**Expected Behavior**:
-All 3 selected photos should be marked as Pick when P is pressed.
+**Fix Applied**:
+Updated `CatalogGrid.vue` to use the composable's `setFlag` method instead of calling the store directly:
+```typescript
+// Before (broken)
+onFlag: (flag: FlagStatus) => {
+  const currentId = selectionStore.currentId
+  if (currentId) {
+    catalogStore.setFlag(currentId, flag)  // Only flags currentId
+  }
+}
 
-**Actual Behavior**:
-Only the current/focused photo is affected by the flag shortcut.
+// After (fixed)
+onFlag: (flag: FlagStatus) => {
+  setFlag(flag)  // Uses composable which handles multi-selection
+}
+```
 
-**Technical Details**:
-Verified by checking `data-flag` attribute on grid cells:
-- After selecting 3 unflagged photos and pressing P, only 1 has `data-flag="pick"`
-- The other 2 still have `data-flag="none"` despite showing selection indicators
+**Files Modified**:
+- `apps/web/app/components/catalog/CatalogGrid.vue` - Use composable's setFlag method
 
-**Files to Investigate**:
-- `apps/web/app/components/catalog/CatalogGrid.vue` - keyboard event handlers
-- `apps/web/app/stores/selection.ts` - selection state
-- `apps/web/app/composables/useCatalogKeyboard.ts` - keyboard shortcut handling
-
-**Screenshots**:
-- `docs/screenshots/qa-flagging-10-multi-select.png` - 3 photos selected
-- `docs/screenshots/qa-flagging-11-multi-flag-bug.png` - After P pressed, only 1 flagged
+**Tests Added**:
+17 new tests in `apps/web/test/multiSelectFlagging.test.ts` covering batch flagging, selection store integration, and edge cases.
 
 ---
 

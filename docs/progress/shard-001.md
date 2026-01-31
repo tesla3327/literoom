@@ -480,3 +480,92 @@ The bug either:
 
 ### Recommendation
 Mark issue as "Cannot Reproduce" in issues.md. If the error is reported again with reproduction steps, investigate with browser debugging tools.
+
+---
+
+## Iteration 156: Fix Keyboard Flagging for Multi-Selected Photos
+
+**Time**: 2026-01-31 14:49 EST
+**Status**: Complete
+**Task**: Fix keyboard flagging (P/X/U) to apply to all selected photos, not just the current one
+
+### Problem
+When multiple photos are selected in the grid view and a flag shortcut is pressed (P, X, or U), only the currently focused photo is flagged - the other selected photos remain unchanged.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+- CatalogGrid.vue keyboard event handlers
+- Selection store state (selectedIds vs currentId)
+- useGridKeyboard.ts shortcut handling
+- Catalog store flagging logic
+- Test coverage for multi-select flagging
+
+### Root Cause
+**CatalogGrid.vue used `catalogStore.setFlag(currentId, flag)` instead of the composable's `setFlag()` method.**
+
+In `CatalogGrid.vue` (line 225-230):
+```typescript
+onFlag: (flag: FlagStatus) => {
+  const currentId = selectionStore.currentId
+  if (currentId) {
+    catalogStore.setFlag(currentId, flag)  // ❌ Only flags currentId
+  }
+}
+```
+
+The `useCatalog.ts` composable already had the correct implementation at lines 213-224:
+```typescript
+async function setFlag(flag: FlagStatus): Promise<void> {
+  const selectedIds = selectionStore.selectedIds
+  const currentId = selectionStore.currentId
+
+  if (selectedIds.size > 0) {
+    await service.setFlagBatch([...selectedIds], flag)  // ✅ Flags all selected
+  }
+  else if (currentId) {
+    await service.setFlag(currentId, flag)
+  }
+}
+```
+
+### Fix Applied
+Updated `CatalogGrid.vue` to use the composable's `setFlag` method instead of calling the store directly.
+
+**Changes:**
+1. Added `setFlag` to the destructured imports from `useCatalog()`
+2. Replaced the `onFlag` callback body to call `setFlag(flag)`
+
+### Files Modified
+- `apps/web/app/components/catalog/CatalogGrid.vue` - Use composable's setFlag method
+
+### Tests Added
+Created new test file `apps/web/test/multiSelectFlagging.test.ts` with 17 tests:
+
+**catalogStore.setFlagBatch (5 tests):**
+- flags multiple assets with a single call
+- handles empty array gracefully
+- ignores non-existent asset IDs
+- updates flag counts correctly after batch operation
+- can clear flags from multiple assets
+
+**selectionStore multi-selection (4 tests):**
+- tracks multiple selected IDs
+- distinguishes between currentId and selectedIds
+- hasMultipleSelected is true when multiple items selected
+- provides selectedIdsArray for iteration
+
+**Integration tests (5 tests):**
+- flags all selected items when using batch
+- rejects all selected items when using batch
+- clears flags from all selected items when using batch
+- falls back to single flag when only currentId is set
+- handles range selection + batch flagging
+
+**Edge cases (3 tests):**
+- handles flagging when selection is cleared
+- preserves selection after flagging
+- can toggle flag state on selected items
+
+### Test Results
+- All 1268 web unit tests pass (17 new tests)
+- New tests verify both store-level batch operations and selection+flagging integration

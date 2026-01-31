@@ -25,7 +25,7 @@ import { ThumbnailPriority } from '@literoom/core/catalog'
 const catalogStore = useCatalogStore()
 const catalogUIStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
-const { requestPreview } = useCatalog()
+const { requestPreview, setFlag } = useCatalog()
 
 // ============================================================================
 // Refs
@@ -223,10 +223,9 @@ const { handleKeydown } = useGridKeyboard({
     scrollToCurrentItem(id, index)
   },
   onFlag: (flag: FlagStatus) => {
-    const currentId = selectionStore.currentId
-    if (currentId) {
-      catalogStore.setFlag(currentId, flag)
-    }
+    // Use composable setFlag which handles multi-selection
+    // If selectedIds has items, it flags all of them; otherwise flags currentId
+    setFlag(flag)
   },
   onViewChange: (mode) => {
     if (mode === 'edit') {
