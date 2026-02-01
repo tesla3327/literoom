@@ -27,6 +27,7 @@ import {
   applyAdjustmentsAdaptive,
   applyToneCurveFromPointsAdaptive,
   getGPUEditPipeline,
+  RotationPipeline,
   type EditPipelineParams,
   type EditPipelineTiming,
   type EditPipelineTextureResult,
@@ -942,9 +943,34 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             const binding = webgpuBinding.value
             const isWebGPUMode = binding?.isWebGPUCanvasMode?.value
             if (binding && isWebGPUMode) {
+              // Compute expected output dimensions BEFORE getting the canvas texture.
+              // The canvas texture size must match the output size for copyTextureToTexture to succeed.
+              let expectedWidth = width
+              let expectedHeight = height
+
+              // Apply targetResolution (downsampling)
+              if (targetResolution < 1.0) {
+                expectedWidth = Math.max(1, Math.floor(width * targetResolution))
+                expectedHeight = Math.max(1, Math.floor(height * targetResolution))
+              }
+
+              // Apply rotation (if any) - rotation happens AFTER downsampling in the pipeline
+              if (hasRotation) {
+                const rotatedDims = RotationPipeline.computeRotatedDimensions(
+                  expectedWidth,
+                  expectedHeight,
+                  totalRotation,
+                )
+                expectedWidth = rotatedDims.width
+                expectedHeight = rotatedDims.height
+              }
+
+              // Resize the canvas BEFORE getting the texture so it has the correct dimensions
+              binding.updateWebGPUCanvasDimensions(expectedWidth, expectedHeight)
+
               const canvasTexture = binding.getCurrentWebGPUTexture()
               if (canvasTexture) {
-                console.log('[useEditPreview] Using WebGPU direct rendering path')
+                console.log(`[useEditPreview] Using WebGPU direct rendering path (canvas: ${expectedWidth}x${expectedHeight})`)
 
                 // Render directly to canvas texture
                 const textureResult = await gpuPipeline.processToTexture(
@@ -959,8 +985,14 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
                 const gpuStatus = useGpuStatusStore()
                 gpuStatus.setRenderTiming(textureResult.timing)
 
-                // Update canvas dimensions
-                binding.updateWebGPUCanvasDimensions(textureResult.outputWidth, textureResult.outputHeight)
+                // Verify output dimensions match expected (they should, since we pre-computed them)
+                if (textureResult.outputWidth !== expectedWidth || textureResult.outputHeight !== expectedHeight) {
+                  console.warn(`[useEditPreview] Output dimensions mismatch: expected ${expectedWidth}x${expectedHeight}, got ${textureResult.outputWidth}x${textureResult.outputHeight}`)
+                }
+
+                // NOTE: Do NOT call updateWebGPUCanvasDimensions here!
+                // We already set the canvas size BEFORE rendering. Changing it now would
+                // invalidate the rendered texture and cause a blank display.
 
                 // Update preview dimensions for overlays
                 currentWidth = textureResult.outputWidth
@@ -1287,7 +1319,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
         // Also update previewUrl to null since we're using bitmap now
         // (keep this for backward compatibility checks)
-        if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
+        if (typeof previewUrl.value === 'string' && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
           URL.revokeObjectURL(previewUrl.value)
         }
         previewUrl.value = null
@@ -1316,7 +1348,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         previewBitmap.value = bitmapResult.bitmap
 
         // Clear any old blob URL
-        if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
+        if (typeof previewUrl.value === 'string' && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
           URL.revokeObjectURL(previewUrl.value)
         }
         previewUrl.value = null
@@ -1503,15 +1535,10 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           return
         }
 
-        // Render with current adjustments if any
-        if (sourceCache.value && editStore.hasModifications) {
+        // Always render preview to create the bitmap for display
+        // The canvas component expects previewBitmap, not previewUrl
+        if (sourceCache.value) {
           await renderPreview('full')
-        }
-        else {
-          // No modifications - safe to show the unedited preview
-          console.log('[useEditPreview] No modifications, showing unedited preview')
-          previewUrl.value = cachedPreviewUrl
-          isPreviewUrlOwned.value = false
         }
       }
       catch (err) {
@@ -1558,14 +1585,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             return
           }
 
-          // Render with current adjustments after loading
-          if (sourceCache.value && editStore.hasModifications) {
+          // Always render preview to create the bitmap for display
+          if (sourceCache.value) {
             await renderPreview('full')
-          }
-          else {
-            // No modifications - safe to show the unedited preview
-            previewUrl.value = newUrl
-            isPreviewUrlOwned.value = false
           }
         }
         catch (err) {
@@ -1613,14 +1635,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
               return
             }
 
-            // Render with current adjustments after loading
-            if (sourceCache.value && editStore.hasModifications) {
+            // Always render preview to create the bitmap for display
+            if (sourceCache.value) {
               await renderPreview('full')
-            }
-            else {
-              // No modifications - safe to show the unedited thumbnail
-              previewUrl.value = asset.thumbnailUrl
-              isPreviewUrlOwned.value = false
             }
           }
           catch (err) {
@@ -1711,6 +1728,34 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   }
 
   // ============================================================================
+  // Adjacent Photo Preloading
+  // ============================================================================
+
+  /**
+   * Watch for idle render state to trigger adjacent photo preloading.
+   * When the edit pipeline is idle (no user interaction, full render complete),
+   * proactively preload previews for adjacent photos so navigation feels instant.
+   */
+  watch(
+    renderState,
+    (newState, oldState) => {
+      // When transitioning from complete to idle, preload adjacent photos
+      if (oldState === 'complete' && newState === 'idle') {
+        if (assetId.value && catalog) {
+          console.log('[useEditPreview] Idle state - preloading adjacent previews')
+          catalog.preloadAdjacentPreviews(assetId.value, 2)
+        }
+      }
+
+      // When starting to interact, could cancel background preloads
+      // (currently a no-op until cancellation is implemented)
+      if (newState === 'interacting' && catalog) {
+        catalog.cancelBackgroundPreloads()
+      }
+    }
+  )
+
+  // ============================================================================
   // Cleanup
   // ============================================================================
 
@@ -1718,7 +1763,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     throttledRender.cancel()
     debouncedFullRender.cancel()
     // Only revoke blob URL if we created it (owned), not if it's borrowed from the store
-    if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
+    if (typeof previewUrl.value === 'string' && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
       URL.revokeObjectURL(previewUrl.value)
     }
     // Close old ImageBitmap if exists

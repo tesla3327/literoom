@@ -681,3 +681,53 @@ Research identified that the primary improvement would be **automatic adjacent p
 6. When user starts interacting (slider drag, etc.), `cancelBackgroundPreloads()` cancels pending BACKGROUND requests
 7. When user navigates to adjacent photo, preview may already be cached → instant display
 
+---
+
+## Iteration 159: Fix previewUrl.value.startsWith Console Error
+
+**Time**: 2026-01-31 21:09 EST
+**Status**: Complete
+**Task**: Fix console error "previewUrl.value.startsWith is not a function" during navigation
+
+### Problem
+During component unmount (when navigating between photos in edit view), the console logged an error `previewUrl.value.startsWith is not a function`. This occurred in the `useEditPreview.ts` composable during cleanup.
+
+### Research Phase
+Used 3 parallel subagents to investigate:
+- The exact code causing the error and its context
+- Type definition and all assignments to previewUrl.value
+- Component lifecycle and cleanup order
+
+### Root Cause
+The guard `previewUrl.value &&` checked for truthiness but didn't verify the value was actually a string. While TypeScript types declared it as `Ref<string | null>`, in race conditions between async renders and unmount, `previewUrl.value` could theoretically be a non-string truthy value.
+
+**Problematic Code Pattern**:
+```typescript
+if (previewUrl.value && previewUrl.value.startsWith('blob:') && ...) {
+  URL.revokeObjectURL(previewUrl.value)
+}
+```
+
+### Fix Applied
+Changed all three `.startsWith()` call sites to use explicit type guards:
+
+**Lines 1322, 1351, 1766**:
+```typescript
+// Before (fragile)
+if (previewUrl.value && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
+
+// After (safe)
+if (typeof previewUrl.value === 'string' && previewUrl.value.startsWith('blob:') && isPreviewUrlOwned.value) {
+```
+
+### Files Modified
+- `apps/web/app/composables/useEditPreview.ts` - Added type guards at lines 1322, 1351, 1766
+
+### Research Document
+- `docs/research/2026-01-31-preview-url-startswith-bug-synthesis.md`
+
+### Test Results
+- All 1284 web unit tests pass
+- Fix is defensive (doesn't change behavior for correct string values)
+- Existing progressive refinement and unmount tests verify correct behavior
+
