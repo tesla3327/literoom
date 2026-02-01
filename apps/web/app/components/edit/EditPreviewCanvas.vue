@@ -46,6 +46,7 @@ const {
   error,
   clippingMap,
   previewDimensions,
+  displayDimensions,
   adjustedPixels,
   adjustedDimensions,
   isWaitingForPreview,
@@ -232,7 +233,7 @@ watch(
  */
 const hasPreviewContent = computed(() => {
   // In WebGPU mode, content is ready if WebGPU is active and canvas has dimensions
-  if (isWebGPURenderingActive.value && previewDimensions.value) {
+  if (isWebGPURenderingActive.value && displayDimensions.value) {
     return true
   }
   // In bitmap mode, content is ready if bitmap exists
@@ -428,22 +429,36 @@ watch(
     if (!bitmap || !previewCanvasRef.value) return
 
     const canvas = previewCanvasRef.value
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
+
+    // Use display dimensions for canvas buffer size (allows proper scaling of draft images)
+    // Fall back to bitmap dimensions if displayDimensions not yet available
+    const displayW = displayDimensions.value?.width ?? bitmap.width
+    const displayH = displayDimensions.value?.height ?? bitmap.height
+
+    canvas.width = displayW
+    canvas.height = displayH
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    ctx.drawImage(bitmap, 0, 0)
+    // Scale bitmap to fill canvas (handles draft upscaling when bitmap is smaller)
+    console.log(`[EditPreviewCanvas] Drawing bitmap: bitmap=${bitmap.width}x${bitmap.height}, canvas=${displayW}x${displayH}, displayDimensions=${displayDimensions.value?.width}x${displayDimensions.value?.height}`)
+    ctx.drawImage(bitmap, 0, 0, displayW, displayH)
 
     // Update rendered dimensions for overlays
     renderedDimensions.value = {
       width: canvas.clientWidth,
       height: canvas.clientHeight,
     }
+    console.log(`[EditPreviewCanvas] After draw: canvas.width=${canvas.width}, canvas.height=${canvas.height}, clientWidth=${canvas.clientWidth}, clientHeight=${canvas.clientHeight}`)
 
-    // Update image dimensions for zoom/pan (useZoomPan needs this)
-    editUIStore.setImageDimensions(bitmap.width, bitmap.height)
+    // Update image dimensions for zoom/pan (useZoomPan needs display dimensions)
+    editUIStore.setImageDimensions(displayW, displayH)
+
+    // Initialize zoom if viewport is ready (canvas path - useZoomPan only handles <img> elements)
+    if (editUIStore.viewportDimensions.width > 0 && editUIStore.viewportDimensions.height > 0) {
+      editUIStore.initializeZoom()
+    }
   },
   { immediate: true },
 )
@@ -576,17 +591,17 @@ const { cursorStyle: maskCursorStyle } = useMaskOverlay({
     >
       <!-- Transform container (applies zoom/pan via CSS transform) -->
       <div
-        class="absolute"
+        class="absolute top-0 left-0"
         :style="transformStyle"
         data-testid="transform-container"
       >
         <div class="relative">
           <canvas
             ref="previewCanvasRef"
-            class="block max-w-full h-auto"
+            class="block"
             :style="{
-              width: previewDimensions?.width ? previewDimensions.width + 'px' : 'auto',
-              height: previewDimensions?.height ? previewDimensions.height + 'px' : 'auto',
+              width: displayDimensions?.width ? displayDimensions.width + 'px' : 'auto',
+              height: displayDimensions?.height ? displayDimensions.height + 'px' : 'auto',
             }"
             data-testid="preview-canvas"
           />

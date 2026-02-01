@@ -124,8 +124,10 @@ export interface UseEditPreviewReturn {
   error: Ref<string | null>
   /** Clipping map for overlay rendering */
   clippingMap: Ref<ClippingMap | null>
-  /** Dimensions of the current preview image */
+  /** Dimensions of the current preview image (may be downsampled during draft) */
   previewDimensions: Ref<{ width: number, height: number } | null>
+  /** Display dimensions for canvas sizing (always full resolution, never downsampled) */
+  displayDimensions: Ref<{ width: number, height: number } | null>
   /** Adjusted pixel data (RGB, 3 bytes per pixel) for histogram computation */
   adjustedPixels: Ref<Uint8Array | null>
   /** Dimensions of the adjusted pixels */
@@ -310,6 +312,7 @@ async function loadImagePixels(
   // Canvas getImageData already returns RGBA (Uint8ClampedArray)
   const rgba = new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.length)
 
+  console.log(`[useEditPreview] loadImagePixels: img.width=${img.width}, img.height=${img.height}, naturalWidth=${img.naturalWidth}, naturalHeight=${img.naturalHeight}`)
   return { pixels: rgba, width: img.width, height: img.height }
 }
 
@@ -511,6 +514,19 @@ function convertToBasicAdjustments(adjustments: Adjustments): BasicAdjustments {
 }
 
 // ============================================================================
+// Configuration
+// ============================================================================
+
+/**
+ * Whether to use reduced resolution (0.5x) during draft mode for performance.
+ * Set to false to use full resolution even during slider drag.
+ *
+ * With modern GPUs achieving 600-1100 FPS, full resolution is often fast enough.
+ * Set to true if you experience sluggish performance during interaction.
+ */
+const USE_DRAFT_RESOLUTION = false
+
+// ============================================================================
 // Composable
 // ============================================================================
 
@@ -547,8 +563,11 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
   /** Clipping map for overlay rendering */
   const clippingMap = ref<ClippingMap | null>(null)
 
-  /** Dimensions of the current preview image */
+  /** Dimensions of the current preview image (may be downsampled during draft) */
   const previewDimensions = ref<{ width: number, height: number } | null>(null)
+
+  /** Display dimensions for canvas sizing (always full resolution, never downsampled) */
+  const displayDimensions = ref<{ width: number, height: number } | null>(null)
 
   /** Adjusted pixel data (RGB, 3 bytes per pixel) for histogram computation */
   const adjustedPixels = shallowRef<Uint8Array | null>(null)
@@ -759,17 +778,52 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         : false
 
       if (!hasAdjustments && !hasTransforms && !hasMasks) {
-        // No adjustments or transforms, use source directly (borrowed URL)
+        // No adjustments or transforms, use source directly
         previewUrl.value = sourceUrl.value!
         isPreviewUrlOwned.value = false
 
         // Still compute clipping from source pixels
         clippingMap.value = detectClippedPixels(pixels, width, height)
         previewDimensions.value = { width, height }
+        displayDimensions.value = { width, height }
+        console.log(`[useEditPreview] No edits path - displayDimensions: ${width}x${height}`)
 
         // Store source pixels as adjusted pixels (no modifications needed)
         adjustedPixels.value = pixels
         adjustedDimensions.value = { width, height }
+
+        // If WebGPU canvas is bound and configured, render directly to it
+        // This handles the case where WebGPU mode is active but there are no edits
+        const binding = webgpuBinding.value
+        const isWebGPUMode = binding?.isWebGPUCanvasMode?.value
+        if (binding && isWebGPUMode) {
+          console.log('[useEditPreview] No edits path - using WebGPU direct rendering')
+
+          // Update canvas dimensions
+          binding.updateWebGPUCanvasDimensions(width, height)
+
+          const canvasTexture = binding.getCurrentWebGPUTexture()
+          if (canvasTexture) {
+            // Get the GPU pipeline to render source pixels to canvas
+            const gpuPipeline = getGPUEditPipeline()
+            if (gpuPipeline.isReady) {
+              try {
+                // Render with no adjustments - just copy pixels to canvas
+                await gpuPipeline.processToTexture(
+                  { pixels, width, height, format: 'rgba' },
+                  { outputFormat: 'rgba' },
+                  canvasTexture,
+                )
+                isWebGPURenderingActive.value = true
+                console.log(`[useEditPreview] No edits - WebGPU rendered ${width}x${height}`)
+                return // Skip bitmap creation since WebGPU rendered
+              }
+              catch (e) {
+                console.warn('[useEditPreview] No edits - WebGPU render failed, falling back to bitmap:', e)
+              }
+            }
+          }
+        }
       }
       else {
         // Apply transforms and adjustments
@@ -808,10 +862,32 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
           }
         }
 
-        // Determine target resolution based on quality mode
-        // Draft mode uses 0.5 for faster rendering during interaction
-        // Full mode uses 1.0 for highest quality output
-        const targetResolution = quality === 'draft' ? 0.5 : 1.0
+        // Determine target resolution based on quality mode and configuration
+        // When USE_DRAFT_RESOLUTION is true: draft=0.5, full=1.0
+        // When USE_DRAFT_RESOLUTION is false: always 1.0 (full resolution)
+        const targetResolution = (quality === 'draft' && USE_DRAFT_RESOLUTION) ? 0.5 : 1.0
+
+        // Compute DISPLAY dimensions at full resolution (for canvas CSS sizing)
+        // This ensures the canvas doesn't change size between draft and full renders
+        // The WebGPU path will override this if it has more accurate info
+        {
+          let dispWidth = width
+          let dispHeight = height
+          // Apply rotation at full resolution
+          if (hasRotation) {
+            const rotatedDims = RotationPipeline.computeRotatedDimensions(width, height, totalRotation)
+            dispWidth = rotatedDims.width
+            dispHeight = rotatedDims.height
+          }
+          // Apply crop at full resolution (if crop will be applied)
+          // CropRectangle uses left/top/width/height (all normalized 0-1)
+          if (shouldApplyCrop && crop) {
+            dispWidth = Math.round(dispWidth * crop.width)
+            dispHeight = Math.round(dispHeight * crop.height)
+          }
+          displayDimensions.value = { width: dispWidth, height: dispHeight }
+          console.log(`[useEditPreview] Display dimensions computed: ${dispWidth}x${dispHeight} (from source ${width}x${height}, rotation=${totalRotation}, crop=${shouldApplyCrop})`)
+        }
 
         if (pipelineReady && !shouldApplyCrop) {
           // ===== PATH A: No crop OR crop tool active - Use unified pipeline for ALL operations =====
@@ -852,7 +928,22 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             const binding = webgpuBinding.value
             const isWebGPUMode = binding?.isWebGPUCanvasMode?.value
             if (binding && isWebGPUMode) {
-              // Compute expected output dimensions BEFORE getting the canvas texture.
+              // Compute DISPLAY dimensions at full resolution (for canvas CSS sizing)
+              // This ensures the canvas doesn't change size between draft and full renders
+              let displayWidth = width
+              let displayHeight = height
+              if (hasRotation) {
+                const fullRotatedDims = RotationPipeline.computeRotatedDimensions(
+                  width,
+                  height,
+                  totalRotation,
+                )
+                displayWidth = fullRotatedDims.width
+                displayHeight = fullRotatedDims.height
+              }
+              displayDimensions.value = { width: displayWidth, height: displayHeight }
+
+              // Compute expected RENDER dimensions (may be downsampled for draft mode)
               // The canvas texture size must match the output size for copyTextureToTexture to succeed.
               let expectedWidth = width
               let expectedHeight = height
@@ -873,6 +964,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
                 expectedWidth = rotatedDims.width
                 expectedHeight = rotatedDims.height
               }
+
+              console.log(`[useEditPreview] WebGPU path - displayDimensions: ${displayWidth}x${displayHeight}, expected render: ${expectedWidth}x${expectedHeight}`)
 
               // Resize the canvas BEFORE getting the texture so it has the correct dimensions
               binding.updateWebGPUCanvasDimensions(expectedWidth, expectedHeight)
@@ -1695,6 +1788,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
     error,
     clippingMap,
     previewDimensions,
+    displayDimensions,
     adjustedPixels,
     adjustedDimensions,
     isWaitingForPreview,

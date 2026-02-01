@@ -138,9 +138,10 @@ export function useZoomPan(options: UseZoomPanOptions): UseZoomPanReturn {
     const canPan = editUIStore.canPanImage || isSpacebarHeld.value
     if (!canPan) return
 
-    // Don't intercept clicks on crop/mask overlays
+    // Don't intercept clicks on crop/mask overlay canvases (let them handle their own events)
+    // But allow clicks on the main preview canvas for panning
     const target = e.target as HTMLElement
-    if (target.tagName === 'CANVAS') return
+    if (target.tagName === 'CANVAS' && target.dataset.testid !== 'preview-canvas') return
 
     isPanning.value = true
     lastPanPos.value = { x: e.clientX, y: e.clientY }
@@ -178,9 +179,10 @@ export function useZoomPan(options: UseZoomPanOptions): UseZoomPanReturn {
   function handleDoubleClick(e: MouseEvent): void {
     if (!enabled.value) return
 
-    // Don't intercept double-clicks on canvas overlays
+    // Don't intercept double-clicks on overlay canvases (let them handle their own events)
+    // But allow double-clicks on the main preview canvas for zoom toggle
     const target = e.target as HTMLElement
-    if (target.tagName === 'CANVAS') return
+    if (target.tagName === 'CANVAS' && target.dataset.testid !== 'preview-canvas') return
 
     e.preventDefault()
     editUIStore.toggleZoom()
