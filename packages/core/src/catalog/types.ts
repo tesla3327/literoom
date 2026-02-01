@@ -565,6 +565,13 @@ export interface ICatalogService {
    */
   loadFolderById(folderId: number): Promise<boolean>
 
+  // Asset removal
+  /**
+   * Remove assets from the catalog.
+   * This removes from database and memory but does NOT delete files from disk.
+   */
+  removeAssets(assetIds: string[]): Promise<void>
+
   // Cleanup
   /**
    * Clean up resources and close the service.

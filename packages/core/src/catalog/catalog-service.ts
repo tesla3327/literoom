@@ -38,7 +38,7 @@ import {
 import { PhotoProcessor, createPhotoProcessor, type ProcessedPhoto } from './photo-processor'
 import { ScanService } from './scan-service'
 import { ThumbnailService } from './thumbnail-service'
-import { db, type AssetRecord, type FolderRecord } from './db'
+import { db, removeAssets as dbRemoveAssets, type AssetRecord, type FolderRecord } from './db'
 
 // ============================================================================
 // Constants
@@ -463,6 +463,28 @@ export class CatalogService implements ICatalogService {
         this._assets.set(assetId, updatedAsset)
         this._onAssetUpdated?.(updatedAsset)
       }
+    }
+  }
+
+  // ==========================================================================
+  // ICatalogService Implementation - Asset Removal
+  // ==========================================================================
+
+  /**
+   * Remove assets from the catalog.
+   * This removes from database and memory but does NOT delete files from disk.
+   */
+  async removeAssets(assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) {
+      return
+    }
+
+    // Remove from database (also removes associated edit states)
+    await dbRemoveAssets(assetIds)
+
+    // Remove from in-memory collection
+    for (const assetId of assetIds) {
+      this._assets.delete(assetId)
     }
   }
 

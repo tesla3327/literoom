@@ -213,3 +213,109 @@ Backend tests already cover the filtering logic:
 - `filterAssetsForExport` with `includeRejected=true` includes rejected in 'all' scope
 - `filterAssetsForExport` with `includeRejected=true` includes rejected in 'selected' scope
 
+---
+
+## Iteration 165: Delete Key to Remove Photos from Grid
+
+**Time**: 2026-01-31 21:46 EST
+**Status**: Complete
+**Task**: Implement Delete key functionality to remove selected photo(s) from the catalog grid
+
+### Problem
+Pressing the Delete key when a photo is selected in the grid view has no effect. The QA plan specifies that Delete should delete the selected photo(s) with a confirmation dialog.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+1. Existing keyboard handling in CatalogGrid.vue and useGridKeyboard.ts
+2. Selection store multi-selection patterns
+3. Catalog store asset removal methods
+4. UI confirmation dialog patterns in Nuxt UI
+5. Edit view mask deletion patterns (working Delete key example)
+
+### Key Findings
+1. **Delete key handler already exists** in `useGridKeyboard.ts` (lines 318-323) but `onDelete` callback was not passed from CatalogGrid
+2. **No asset removal methods existed** - catalog store only had add/update/clear, no remove
+3. **Multi-selection pattern established** - use `selectedIds.size > 0` check then batch operation
+4. **Modal pattern uses Pinia stores** - each modal has its own store for state management
+
+### Implementation
+
+#### Phase 1: Delete Confirmation Store
+Created `apps/web/app/stores/deleteConfirmation.ts`:
+- `isModalOpen`, `pendingAssetIds`, `pendingCount`
+- `requestDelete()`, `confirmDelete()`, `cancelDelete()`, `clearPending()`
+
+#### Phase 2: Database Layer
+Added `removeAssets(uuids)` to `packages/core/src/catalog/db.ts`:
+- Deletes assets by UUID
+- Deletes associated edit states
+- Uses transaction for atomicity
+
+#### Phase 3: CatalogService
+Added `removeAssets()` to:
+- `packages/core/src/catalog/types.ts` - Interface
+- `packages/core/src/catalog/catalog-service.ts` - Implementation
+- `packages/core/src/catalog/mock-catalog-service.ts` - Mock
+
+#### Phase 4: Catalog Store
+Added `removeAssetBatch()` to `apps/web/app/stores/catalog.ts`:
+- Revokes blob URLs before removal
+- Creates new Map/array for reactivity
+- Handles empty array gracefully
+
+#### Phase 5: useCatalog Composable
+Added `deleteAssets()` to `apps/web/app/composables/useCatalog.ts`:
+- Calls service.removeAssets()
+- Calls catalogStore.removeAssetBatch()
+- Clears selection for deleted assets
+
+#### Phase 6: Delete Confirmation Modal
+Created `apps/web/app/components/catalog/DeleteConfirmationModal.vue`:
+- Shows count of photos to remove
+- Displays up to 3 filenames
+- Notes files won't be deleted from disk
+- Cancel and Remove buttons
+
+#### Phase 7: CatalogGrid Integration
+Modified `apps/web/app/components/catalog/CatalogGrid.vue`:
+- Import deleteConfirmation store
+- Add `onDelete` callback to useGridKeyboard options
+- Callback collects selected IDs and calls `requestDelete()`
+
+#### Phase 8: Index Page Integration
+Modified `apps/web/app/pages/index.vue`:
+- Mount DeleteConfirmationModal
+- Handle confirm event with `deleteAssets()`
+- Show toast notification on success
+
+### Files Created (4)
+- `apps/web/app/stores/deleteConfirmation.ts`
+- `apps/web/app/components/catalog/DeleteConfirmationModal.vue`
+- `apps/web/test/deleteConfirmationStore.test.ts` - 24 tests
+- `apps/web/test/deletePhotos.test.ts` - 28 tests
+
+### Files Modified (10)
+- `packages/core/src/catalog/db.ts` - Added `removeAssets()`
+- `packages/core/src/catalog/types.ts` - Added interface method
+- `packages/core/src/catalog/catalog-service.ts` - Added implementation
+- `packages/core/src/catalog/mock-catalog-service.ts` - Added mock
+- `packages/core/src/catalog/index.ts` - Export new function
+- `apps/web/app/stores/catalog.ts` - Added `removeAssetBatch()`
+- `apps/web/app/composables/useCatalog.ts` - Added `deleteAssets()`
+- `apps/web/app/components/catalog/CatalogGrid.vue` - Wired `onDelete`
+- `apps/web/app/pages/index.vue` - Mounted modal and handler
+- `apps/web/test/catalogStore.test.ts` - Added 28 tests for removeAssetBatch
+
+### Tests Added
+- 24 tests for deleteConfirmation store
+- 28 tests for removeAssetBatch in catalog store
+- 28 tests for delete integration
+
+### Test Results
+- All 1397 web unit tests pass (80 new tests)
+- All 2395 core tests pass (except 9 pre-existing GPU mock failures)
+
+### Research Documents
+- `docs/research/2026-01-31-delete-photos-synthesis.md`
+- `docs/plans/2026-01-31-delete-photos-plan.md`
+

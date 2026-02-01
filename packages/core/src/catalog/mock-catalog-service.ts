@@ -400,6 +400,26 @@ export class MockCatalogService implements ICatalogService {
   }
 
   // ==========================================================================
+  // ICatalogService Implementation - Asset Removal
+  // ==========================================================================
+
+  /**
+   * Remove assets from the catalog.
+   * This removes from memory but does NOT delete files from disk.
+   * In mock mode, this simply removes assets from the in-memory map.
+   */
+  async removeAssets(assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) {
+      return
+    }
+
+    // Remove from in-memory collection
+    for (const assetId of assetIds) {
+      this._assets.delete(assetId)
+    }
+  }
+
+  // ==========================================================================
   // ICatalogService Implementation - Thumbnail Requests
   // ==========================================================================
 

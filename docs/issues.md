@@ -3,11 +3,11 @@
 ## Table of Contents
 
 ### Open Issues
-- [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid---solved)
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option---solved)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste---solved)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image---solved)
@@ -341,34 +341,51 @@ Added "Include rejected photos" checkbox to the Export modal. The backend logic 
 
 ---
 
-### Delete key doesn't delete photos from grid
+### Delete key doesn't delete photos from grid - SOLVED
 
-**Severity**: Low | **Type**: Missing Feature | **Found**: 2026-01-25
+**Severity**: Low | **Fixed**: 2026-01-31
 
 **Problem**:
-Pressing the Delete key when a photo is selected in the grid view has no effect. The QA plan specifies that Delete should delete the selected photo (with confirmation dialog).
+Pressing the Delete key when a photo is selected in the grid view had no effect.
 
-**Steps to Reproduce**:
-1. Open catalog grid view
-2. Click on a photo to select it
-3. Press the Delete key
-4. Observe: Nothing happens
+**Solution Implemented**:
+Complete delete functionality with confirmation dialog:
 
-**Expected Behavior**:
-A confirmation dialog should appear asking if the user wants to delete the selected photo(s).
+1. **Delete Confirmation Store** (`stores/deleteConfirmation.ts`):
+   - Manages modal state and pending asset IDs
+   - `requestDelete()`, `confirmDelete()`, `cancelDelete()`
 
-**Actual Behavior**:
-The Delete key has no effect. The photo remains in the grid.
+2. **Delete Confirmation Modal** (`components/catalog/DeleteConfirmationModal.vue`):
+   - Shows count of photos to remove
+   - Displays up to 3 filenames
+   - Notes files won't be deleted from disk
+   - Cancel and Remove buttons
 
-**Technical Details**:
-Tested in Demo Mode. The Delete key works correctly in the Edit view for deleting selected masks, but has no handler in the Grid view.
+3. **Database and Service Layer**:
+   - Added `removeAssets()` to db.ts (removes assets and edit states atomically)
+   - Added `removeAssets()` to CatalogService interface and implementations
 
-**Files to Investigate**:
-- `apps/web/app/components/catalog/CatalogGrid.vue` - Grid keyboard handler
-- `apps/web/app/composables/useCatalogKeyboard.ts` - Keyboard shortcut handling
+4. **Catalog Store**:
+   - Added `removeAssetBatch()` that revokes blob URLs and updates state
 
-**Screenshots**:
-- `docs/screenshots/qa-section15-29-delete-key-no-action.png` - Delete key has no effect
+5. **useCatalog Composable**:
+   - Added `deleteAssets()` that coordinates service, store, and selection cleanup
+
+6. **CatalogGrid Integration**:
+   - Wired `onDelete` callback to useGridKeyboard
+   - Delete/Backspace keys trigger confirmation modal
+   - Works with multi-selection
+
+**Files Modified**:
+- 4 new files created (store, component, 2 test files)
+- 10 files modified (db, service, types, store, composable, CatalogGrid, index.vue, etc.)
+
+**Tests Added**:
+- 80 new tests covering store, removeAssetBatch, and delete integration
+
+**Research Document**:
+- `docs/research/2026-01-31-delete-photos-synthesis.md`
+- `docs/plans/2026-01-31-delete-photos-plan.md`
 
 ---
 

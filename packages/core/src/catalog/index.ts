@@ -104,6 +104,7 @@ export {
   createMockCatalogService,
   type MockCatalogServiceOptions,
 } from './mock-catalog-service'
+export * from './photo-processor'
 
 // Demo assets
 export {
@@ -132,4 +133,6 @@ export {
   loadAllEditStatesFromDb,
   deleteEditStateFromDb,
   deleteEditStatesFromDb,
+  // Asset removal
+  removeAssets,
 } from './db'

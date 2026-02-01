@@ -137,6 +137,19 @@ export const useCatalogStore = defineStore('catalog', () => {
   })
 
   /**
+   * Number of photos that are fully ready (both thumbnail and preview done).
+   */
+  const readyCount = computed(() => {
+    let count = 0
+    for (const asset of assets.value.values()) {
+      if (asset.thumbnailStatus === 'ready' && asset.preview1xStatus === 'ready') {
+        count++
+      }
+    }
+    return count
+  })
+
+  /**
    * Percentage of thumbnails that are ready (0-100).
    */
   const thumbnailPercent = computed(() => {
@@ -243,6 +256,22 @@ export const useCatalogStore = defineStore('catalog', () => {
   }
 
   /**
+   * Mark a photo as fully ready with both thumbnail and preview URLs.
+   */
+  function markPhotoReady(
+    assetId: string,
+    thumbnailUrl: string,
+    previewUrl: string
+  ): void {
+    updateAsset(assetId, {
+      thumbnailStatus: 'ready',
+      thumbnailUrl,
+      preview1xStatus: 'ready',
+      preview1xUrl: previewUrl,
+    })
+  }
+
+  /**
    * Set the flag status for a single asset.
    */
   function setFlag(assetId: string, flag: FlagStatus): void {
@@ -263,6 +292,41 @@ export const useCatalogStore = defineStore('catalog', () => {
       }
     }
     assets.value = newMap
+  }
+
+  /**
+   * Remove a batch of assets from the catalog.
+   * Revokes blob URLs to prevent memory leaks.
+   */
+  function removeAssetBatch(idsToRemove: string[]): void {
+    if (idsToRemove.length === 0) return
+
+    // Revoke blob URLs before removal to prevent memory leaks
+    for (const id of idsToRemove) {
+      const asset = assets.value.get(id)
+      if (asset?.thumbnailUrl) {
+        URL.revokeObjectURL(asset.thumbnailUrl)
+      }
+      if (asset?.preview1xUrl) {
+        URL.revokeObjectURL(asset.preview1xUrl)
+      }
+    }
+
+    // Create a Set for O(1) lookup during filtering
+    const removeSet = new Set(idsToRemove)
+
+    // Create new Map without the removed assets
+    const newMap = new Map(assets.value)
+    for (const id of idsToRemove) {
+      newMap.delete(id)
+    }
+
+    // Filter the assetIds array to remove deleted IDs
+    const newIds = assetIds.value.filter(id => !removeSet.has(id))
+
+    // Trigger reactivity by replacing refs
+    assets.value = newMap
+    assetIds.value = newIds
   }
 
   /**
@@ -363,11 +427,14 @@ export const useCatalogStore = defineStore('catalog', () => {
     unflaggedCount,
     flagCounts,
     thumbnailProgress,
+    readyCount,
     thumbnailPercent,
     isProcessingThumbnails,
 
     // Actions
     addAssetBatch,
+    removeAssetBatch,
+    markPhotoReady,
     updateAsset,
     updateThumbnail,
     updatePreviewStatus,

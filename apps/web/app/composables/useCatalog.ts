@@ -410,6 +410,27 @@ export function useCatalog() {
     }
   }
 
+  /**
+   * Delete assets from the catalog.
+   * Removes from database, updates UI state, and clears selection.
+   */
+  async function deleteAssets(assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) return
+
+    const service = requireCatalogService()
+
+    // Remove from database
+    await service.removeAssets(assetIds)
+
+    // Update UI state (revokes blob URLs and removes from store)
+    catalogStore.removeAssetBatch(assetIds)
+
+    // Clear selection for deleted assets
+    for (const assetId of assetIds) {
+      selectionStore.removeFromSelection(assetId)
+    }
+  }
+
   return {
     // Services (may be undefined until plugin initializes)
     catalogService,
@@ -434,5 +455,6 @@ export function useCatalog() {
     regenerateThumbnail,
     preloadAdjacentPreviews,
     cancelBackgroundPreloads,
+    deleteAssets,
   }
 }

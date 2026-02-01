@@ -366,3 +366,21 @@ export async function deleteEditStateFromDb(assetUuid: string): Promise<void> {
 export async function deleteEditStatesFromDb(assetUuids: string[]): Promise<void> {
   await db.editStates.bulkDelete(assetUuids)
 }
+
+/**
+ * Remove assets and their associated edit states from the database.
+ * Uses a transaction to ensure atomicity.
+ */
+export async function removeAssets(uuids: string[]): Promise<void> {
+  if (uuids.length === 0) {
+    return
+  }
+
+  await db.transaction('rw', [db.assets, db.editStates], async () => {
+    // Delete assets by UUID
+    await db.assets.where('uuid').anyOf(uuids).delete()
+
+    // Delete associated edit states by assetUuid
+    await db.editStates.where('assetUuid').anyOf(uuids).delete()
+  })
+}

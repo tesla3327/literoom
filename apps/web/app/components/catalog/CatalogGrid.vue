@@ -22,9 +22,12 @@ import { ThumbnailPriority } from '@literoom/core/catalog'
 // Stores
 // ============================================================================
 
+import { useDeleteConfirmationStore } from '~/stores/deleteConfirmation'
+
 const catalogStore = useCatalogStore()
 const catalogUIStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
+const deleteConfirmationStore = useDeleteConfirmationStore()
 const { requestPreview, setFlag } = useCatalog()
 
 // ============================================================================
@@ -226,6 +229,17 @@ const { handleKeydown } = useGridKeyboard({
     // Use composable setFlag which handles multi-selection
     // If selectedIds has items, it flags all of them; otherwise flags currentId
     setFlag(flag)
+  },
+  onDelete: () => {
+    // Get asset IDs to delete: selected items, or current item if no selection
+    const toDelete = selectionStore.selectedIds.size > 0
+      ? [...selectionStore.selectedIds]
+      : selectionStore.currentId
+        ? [selectionStore.currentId]
+        : []
+    if (toDelete.length > 0) {
+      deleteConfirmationStore.requestDelete(toDelete)
+    }
   },
   onViewChange: (mode) => {
     if (mode === 'edit') {
