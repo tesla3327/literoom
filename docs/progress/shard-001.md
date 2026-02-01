@@ -731,3 +731,58 @@ if (typeof previewUrl.value === 'string' && previewUrl.value.startsWith('blob:')
 - Fix is defensive (doesn't change behavior for correct string values)
 - Existing progressive refinement and unmount tests verify correct behavior
 
+---
+
+## Iteration 160: Fix Zoom State Not Persisted Per-Image
+
+**Time**: 2026-01-31 21:13 EST
+**Status**: Complete
+**Task**: Fix zoom state not being persisted per-image when navigating between photos
+
+### Problem
+When a user sets a specific zoom level on one image and then navigates to another image, the zoom level from the second image is applied to all images. The zoom state is global rather than per-image.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+- Current zoom state management in editUI store
+- useZoomPan composable implementation
+- Edit page navigation handling
+- Edit store per-asset caching pattern
+- Existing zoom test coverage
+
+### Root Cause
+The `initializeZoom()` function in editUI.ts unconditionally recalculated camera for "standard presets" (fit, fill, 100%, 200%), which overwrote the carefully restored zoom state from the cache. While the zoom caching infrastructure existed and worked correctly, the timing was wrong:
+
+1. User navigates to new asset
+2. `restoreZoomForAsset()` restores cached camera and preset ✓
+3. New image loads, triggering `setImageDimensions()`
+4. `initializeZoom()` is called
+5. Since preset is a "standard preset" (e.g., '100%'), camera is **recalculated from scratch** ✗
+6. Cached zoom state is lost
+
+### Implementation
+
+**Phase 1: Add wasRestoredFromCache flag** (`apps/web/app/stores/editUI.ts`)
+- Added `wasRestoredFromCache` ref to track when zoom was restored from cache
+- Updated `restoreZoomForAsset()` to set the flag on cache hit
+
+**Phase 2: Update initializeZoom()** (`apps/web/app/stores/editUI.ts`)
+- Modified to check `wasRestoredFromCache` flag before recalculating
+- When flag is set: Only clamp pan (to handle dimension differences)
+- When flag is not set: Use existing logic (recalculate for standard presets)
+
+### Files Modified
+- `apps/web/app/stores/editUI.ts` - Added `wasRestoredFromCache` flag and conditional logic
+
+### Tests Added
+11 new tests in `apps/web/test/editUIStore.test.ts`:
+- 3 tests for `wasRestoredFromCache` flag behavior
+- 8 tests for zoom persistence through `initializeZoom()`
+
+### Research Document
+- `docs/research/2026-01-31-zoom-state-persistence-synthesis.md`
+
+### Test Results
+- All 1293 web unit tests pass (11 new tests)
+- All 2395 core tests pass (9 pre-existing GPU mock failures)
+

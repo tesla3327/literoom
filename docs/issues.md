@@ -3,7 +3,6 @@
 ## Table of Contents
 
 ### Open Issues
-- [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
@@ -13,6 +12,7 @@
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image---solved)
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function---solved)
 - [No help modal exists (Low)](#no-help-modal-exists---solved)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected---solved)
@@ -158,39 +158,36 @@ Changed all sort option handlers from `click` to `onSelect` in FilterBar.vue (6 
 
 ---
 
-### Zoom state not persisted per-image
+### Zoom state not persisted per-image - SOLVED
 
-**Severity**: Medium | **Type**: Bug | **Found**: 2026-01-25
+**Severity**: Medium | **Fixed**: 2026-01-31
 
 **Problem**:
 When a user sets a specific zoom level on one image and then navigates to another image, the zoom level from the second image is applied to all images. The zoom state is global rather than per-image.
 
-**Steps to Reproduce**:
-1. Open a photo in edit view (e.g., IMG_0008)
-2. Set zoom to 100% using the 1:1 button
-3. Navigate to the next image using arrow key or filmstrip
-4. Set zoom to Fit (183%) on the second image
-5. Navigate back to the first image (IMG_0008)
-6. Observe: Zoom shows 183% instead of the previously set 100%
+**Root Cause**:
+The `initializeZoom()` function in editUI.ts unconditionally recalculated camera for "standard presets" (fit, fill, 100%, 200%), which overwrote the carefully restored zoom state from the cache. While the zoom caching infrastructure existed and worked correctly, the timing was wrong:
 
-**Expected Behavior**:
-Each image should remember its own zoom level. When returning to IMG_0008, it should still show 100% zoom as originally set.
+1. User navigates to new asset
+2. `restoreZoomForAsset()` restores cached camera and preset ✓
+3. New image loads, triggering `setImageDimensions()`
+4. `initializeZoom()` is called
+5. Since preset is a "standard preset" (e.g., '100%'), camera is **recalculated from scratch** ✗
+6. Cached zoom state is lost
 
-**Actual Behavior**:
-The zoom level from the most recently viewed image is applied globally. All images share the same zoom state.
+**Fix Applied**:
+Added a `wasRestoredFromCache` flag to track when zoom was restored from cache. When this flag is set, `initializeZoom()` only clamps pan (to handle dimension differences) instead of recalculating the camera. This preserves the user's per-image zoom preference.
 
-**Technical Details**:
-Tested in Demo Mode. The zoom state appears to be stored globally in the editUI store without per-asset tracking.
+**Files Modified**:
+- `apps/web/app/stores/editUI.ts` - Added `wasRestoredFromCache` flag and updated `restoreZoomForAsset()` and `initializeZoom()`
 
-**Files to Investigate**:
-- `apps/web/app/stores/editUI.ts` - Zoom state management
-- `apps/web/app/composables/useZoomPan.ts` - Zoom/pan composable
-- `apps/web/app/utils/zoomCalculations.ts` - Zoom calculation utilities
+**Tests Added**:
+11 new tests in `apps/web/test/editUIStore.test.ts`:
+- `wasRestoredFromCache` flag tests (3 tests)
+- `zoom persistence through initializeZoom` tests (8 tests)
 
-**Screenshots**:
-- `docs/screenshots/qa-section13-10-img9-100percent.png` - IMG_0009 at 100%
-- `docs/screenshots/qa-section13-11-img8-zoom-not-persisted.png` - IMG_0008 showing wrong zoom after navigation
-- `docs/screenshots/qa-section13-12-zoom-not-persisted-bug.png` - Confirmed bug
+**Research Document**:
+- `docs/research/2026-01-31-zoom-state-persistence-synthesis.md`
 
 ---
 

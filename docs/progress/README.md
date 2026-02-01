@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 21:14 EST
+**Last Updated**: 2026-01-31 21:24 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 159 - Fix previewUrl.value.startsWith console error - Complete (see shard-001.md)
+**Current Iteration**: 160 - Fix zoom state not persisted per-image - Complete (see shard-001.md)
 
 ## Project Structure
 

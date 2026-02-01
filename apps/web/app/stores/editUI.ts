@@ -51,6 +51,13 @@ export const useEditUIStore = defineStore('editUI', () => {
   /** Per-image zoom cache (LRU) */
   const zoomCache = ref<Map<string, CachedZoomState>>(new Map())
 
+  /**
+   * Flag to indicate that zoom was restored from cache.
+   * When true, initializeZoom() will only clamp pan instead of recalculating camera.
+   * This preserves the user's per-image zoom preferences.
+   */
+  const wasRestoredFromCache = ref(false)
+
   /** Current image dimensions (needed for calculations) */
   const imageDimensions = ref({ width: 0, height: 0 })
 
@@ -246,6 +253,8 @@ export const useEditUIStore = defineStore('editUI', () => {
 
   /**
    * Restore zoom state for an asset, or reset to fit if not cached.
+   * When zoom is restored from cache, wasRestoredFromCache is set to true
+   * so that initializeZoom() knows to only clamp pan instead of recalculating.
    */
   function restoreZoomForAsset(assetId: string): void {
     const cached = zoomCache.value.get(assetId)
@@ -257,9 +266,11 @@ export const useEditUIStore = defineStore('editUI', () => {
 
       camera.value = { ...cached.camera }
       zoomPreset.value = cached.preset
+      wasRestoredFromCache.value = true
     }
     else {
-      // Reset to fit
+      // Reset to fit - this is not a restore, so don't set the flag
+      wasRestoredFromCache.value = false
       resetZoom()
     }
   }
@@ -268,15 +279,24 @@ export const useEditUIStore = defineStore('editUI', () => {
    * Initialize zoom state when image/viewport dimensions change.
    * Called after both dimensions are set.
    *
-   * This handles two scenarios:
-   * 1. Re-fitting when dimensions change while at a preset (e.g., viewport resize)
-   * 2. Initial calculation when setZoomPreset() was called before dimensions were ready
+   * This handles three scenarios:
+   * 1. Restored from cache: Only clamp pan to preserve user's zoom preference
+   * 2. Re-fitting when dimensions change while at a preset (e.g., viewport resize)
+   * 3. Initial calculation when setZoomPreset() was called before dimensions were ready
    */
   function initializeZoom(): void {
     const d = getDimensions()
     const preset = zoomPreset.value
 
-    // For standard presets, always recalculate camera
+    // If zoom was restored from cache, just clamp pan to handle dimension differences
+    // This preserves the user's per-image zoom preference
+    if (wasRestoredFromCache.value) {
+      wasRestoredFromCache.value = false
+      camera.value = clampPan(camera.value, d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
+      return
+    }
+
+    // For standard presets, recalculate camera
     // This handles both viewport resize and deferred preset calculations
     if (STANDARD_PRESETS.has(preset)) {
       camera.value = createCameraForPreset(preset, d.imageWidth, d.imageHeight, d.viewportWidth, d.viewportHeight)
@@ -505,6 +525,7 @@ export const useEditUIStore = defineStore('editUI', () => {
     isZoomInteracting,
     imageDimensions,
     viewportDimensions,
+    wasRestoredFromCache, // For testing - indicates if last restore was from cache
     // Zoom/Pan Computed
     zoomPercentage,
     fitScale,

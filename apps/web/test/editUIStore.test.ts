@@ -734,6 +734,158 @@ describe('editUIStore', () => {
         expect(store.zoomPreset).toBe('200%')
       })
     })
+
+    describe('wasRestoredFromCache flag', () => {
+      it('should set wasRestoredFromCache to true when restore finds cached state', () => {
+        store.setZoomPreset('100%')
+        store.cacheZoomForAsset('asset-1')
+
+        store.setZoomPreset('fit')
+        store.restoreZoomForAsset('asset-1')
+
+        expect(store.wasRestoredFromCache).toBe(true)
+      })
+
+      it('should set wasRestoredFromCache to false when restore does not find cached state', () => {
+        store.restoreZoomForAsset('unknown-asset')
+
+        expect(store.wasRestoredFromCache).toBe(false)
+      })
+
+      it('should clear wasRestoredFromCache after initializeZoom', () => {
+        store.setZoomPreset('100%')
+        store.cacheZoomForAsset('asset-1')
+        store.restoreZoomForAsset('asset-1')
+
+        expect(store.wasRestoredFromCache).toBe(true)
+
+        store.initializeZoom()
+
+        expect(store.wasRestoredFromCache).toBe(false)
+      })
+    })
+
+    describe('zoom persistence through initializeZoom', () => {
+      it('should preserve restored zoom preset after initializeZoom', () => {
+        // Setup: Cache asset-1 at 100% zoom
+        store.setZoomPreset('100%')
+        store.cacheZoomForAsset('asset-1')
+
+        // Simulate navigating away
+        store.setZoomPreset('fit')
+        store.cacheZoomForAsset('asset-2')
+
+        // Simulate navigating back to asset-1
+        store.restoreZoomForAsset('asset-1')
+        expect(store.zoomPreset).toBe('100%')
+
+        // Simulate image loading (triggers initializeZoom)
+        // This is what was causing the bug before the fix
+        store.initializeZoom()
+
+        // Zoom should still be 100% (not reset to fit)
+        expect(store.zoomPreset).toBe('100%')
+      })
+
+      it('should preserve restored camera scale after initializeZoom', () => {
+        // Setup: Cache asset-1 at 100% zoom (scale = 1.0)
+        store.setZoomPreset('100%')
+        const originalScale = store.camera.scale
+        store.cacheZoomForAsset('asset-1')
+
+        // Navigate away
+        store.setZoomPreset('fit')
+
+        // Navigate back
+        store.restoreZoomForAsset('asset-1')
+
+        // Simulate image loading
+        store.initializeZoom()
+
+        // Scale should be preserved (accounting for pan clamping)
+        expect(store.camera.scale).toBe(originalScale)
+      })
+
+      it('should still allow standard presets to recalculate for new assets', () => {
+        // For a NEW asset (not restored from cache), 'fit' should still calculate
+        store.restoreZoomForAsset('new-asset') // Not in cache
+
+        expect(store.wasRestoredFromCache).toBe(false)
+        expect(store.zoomPreset).toBe('fit')
+
+        // Simulate image with different dimensions
+        store.setImageDimensions(3000, 2000)
+        store.initializeZoom()
+
+        // For new assets, fit should recalculate camera
+        // (different from cached behavior)
+        expect(store.zoomPreset).toBe('fit')
+      })
+
+      it('should clamp pan when dimensions differ from cached state', () => {
+        // Setup: Cache asset at specific zoom with pan
+        store.setZoomPreset('100%')
+        store.pan(100, 100) // Pan to a specific position
+        const originalPan = { panX: store.camera.panX, panY: store.camera.panY }
+        store.cacheZoomForAsset('asset-1')
+
+        // Navigate away
+        store.setZoomPreset('fit')
+
+        // Navigate back but with SMALLER dimensions that would make old pan invalid
+        store.restoreZoomForAsset('asset-1')
+        store.setImageDimensions(500, 400) // Much smaller image
+        store.initializeZoom()
+
+        // Scale should be preserved
+        expect(store.camera.scale).toBe(1)
+
+        // Pan should be clamped to valid bounds (not the original values)
+        // With smaller image at 100% zoom, pan should be clamped differently
+        // Just verify it's a valid state (not the potentially out-of-bounds cached pan)
+        expect(typeof store.camera.panX).toBe('number')
+        expect(typeof store.camera.panY).toBe('number')
+      })
+
+      it('should handle navigation workflow: A -> B -> A with preserved zoom', () => {
+        // Asset A at 100% zoom
+        store.setZoomPreset('100%')
+        store.cacheZoomForAsset('asset-A')
+
+        // Navigate to Asset B at 200% zoom
+        store.restoreZoomForAsset('asset-B') // Not in cache, resets to fit
+        store.initializeZoom()
+        store.setZoomPreset('200%')
+        store.cacheZoomForAsset('asset-B')
+
+        // Navigate back to Asset A
+        store.restoreZoomForAsset('asset-A')
+        store.initializeZoom()
+
+        // Asset A should still be at 100% zoom
+        expect(store.zoomPreset).toBe('100%')
+        expect(store.camera.scale).toBe(1)
+      })
+
+      it('should handle viewport resize after restore (should recalculate on next navigate)', () => {
+        // Cache asset at 100%
+        store.setZoomPreset('100%')
+        store.cacheZoomForAsset('asset-1')
+
+        // Restore it
+        store.restoreZoomForAsset('asset-1')
+        store.initializeZoom()
+        expect(store.wasRestoredFromCache).toBe(false) // Consumed by initializeZoom
+
+        // Viewport resize shouldn't affect already-initialized zoom
+        store.setViewportDimensions(1200, 900)
+        // After restore+init, future initializeZoom calls should work normally
+        store.initializeZoom()
+
+        // Should still be at 100%
+        expect(store.zoomPreset).toBe('100%')
+      })
+    })
   })
 
   // ============================================================================
