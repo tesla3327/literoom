@@ -3,7 +3,6 @@
 ## Table of Contents
 
 ### Open Issues
-- [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
@@ -11,6 +10,7 @@
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image---solved)
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page---solved)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image---solved)
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function---solved)
@@ -257,27 +257,36 @@ onFlag: (flag: FlagStatus) => {
 
 ---
 
-### Crop re-edit should show full uncropped image
+### Crop re-edit should show full uncropped image - SOLVED
 
-**Severity**: Medium | **Type**: UX Enhancement
+**Severity**: Medium | **Fixed**: 2026-01-31
 
 **Problem**:
-When re-entering the crop tool on an already-cropped image, the view only shows the currently cropped region. Users cannot see the parts of the image that were previously cropped out.
+When re-entering the crop tool on an already-cropped image, the view only showed the currently cropped region. Users could not see the parts of the image that were previously cropped out.
 
-**Expected Behavior**:
-When opening the crop tool on an image that already has a crop applied:
-1. Show the full original uncropped image
-2. Display the current crop region as an overlay on the full image
-3. Allow users to see and potentially include areas that were previously excluded
-4. This matches Lightroom's behavior where you can always see the full image when adjusting crop
+**Root Cause**:
+In `useEditPreview.ts`, the render pipeline checked `hasCrop` (whether crop exists in store) to decide whether to apply crop, but did NOT check `isCropToolActive` (whether user is actively editing the crop). This meant crop was always applied to the preview, even when the user wanted to see the full uncropped image for re-editing.
 
-**Current Behavior**:
-The crop overlay only shows within the already-cropped boundaries, making it impossible to expand the crop to include previously excluded areas.
+**Fix Applied**:
+Added `shouldApplyCrop` logic that checks both conditions:
+```typescript
+const shouldApplyCrop = hasCrop && !editUIStore.isCropToolActive
+```
 
-**Files to Investigate**:
-- `apps/web/app/composables/useCropOverlay.ts`
-- `apps/web/app/composables/useEditPreview.ts`
-- `apps/web/app/stores/editUI.ts`
+When the crop tool is active, the preview now shows the full uncropped image with the crop overlay on top, allowing users to expand the crop to include previously excluded areas.
+
+**Files Modified**:
+- `apps/web/app/composables/useEditPreview.ts` - Added shouldApplyCrop logic to PATH A, B, and C
+
+**Tests Added**:
+14 new tests in `apps/web/test/cropReeditFullImage.test.ts` covering:
+- shouldApplyCrop logic (no crop, crop with tool active, crop with tool inactive)
+- Crop tool activation/deactivation
+- Pending crop initialization, apply, cancel, reset
+- Edge cases (rapid activation, with adjustments, with rotation)
+
+**Research Document**:
+- `docs/research/2026-01-31-crop-reedit-fullimage-synthesis.md`
 
 ---
 

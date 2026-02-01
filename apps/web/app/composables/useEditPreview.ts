@@ -35,6 +35,7 @@ import {
   type BasicAdjustments,
 } from '@literoom/core/gpu'
 import { useGpuStatusStore } from '~/stores/gpuStatus'
+import { useEditUIStore } from '~/stores/editUI'
 
 // ============================================================================
 // Types
@@ -882,6 +883,11 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         const hasRotation = Math.abs(totalRotation) > 0.001
         const hasToneCurve = isModifiedToneCurve(adjustments.toneCurve)
 
+        // When crop tool is active, skip crop application to show full uncropped image
+        // This allows users to see and adjust previously cropped areas
+        const editUIStore = useEditUIStore()
+        const shouldApplyCrop = hasCrop && !editUIStore.isCropToolActive
+
         // Try to use the unified GPU pipeline for better performance
         let usedUnifiedPipeline = false
 
@@ -905,10 +911,11 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         // Full mode uses 1.0 for highest quality output
         const targetResolution = quality === 'draft' ? 0.5 : 1.0
 
-        if (pipelineReady && !hasCrop) {
-          // ===== PATH A: No crop - Use unified pipeline for ALL operations =====
+        if (pipelineReady && !shouldApplyCrop) {
+          // ===== PATH A: No crop OR crop tool active - Use unified pipeline for ALL operations =====
           // This gives us 1 GPU round-trip instead of 4
           // When WebGPU canvas is bound, we eliminate readback entirely!
+          // Note: When crop tool is active, we show full uncropped image so user can adjust crop
           try {
             const pipelineParams: EditPipelineParams = {
               // Set target resolution for progressive refinement
@@ -1062,8 +1069,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             isWebGPURenderingActive.value = false
           }
         }
-        else if (pipelineReady && hasCrop) {
-          // ===== PATH B: Crop IS needed - Split into stages =====
+        else if (pipelineReady && shouldApplyCrop) {
+          // ===== PATH B: Crop IS needed AND crop tool not active - Split into stages =====
           // Stage 1: Rotation via unified pipeline (if needed)
           // Stage 2: Crop via WASM (must happen on CPU)
           // Stage 3: Adjustments + Tone Curve + Masks via unified pipeline (without rotation)
@@ -1193,8 +1200,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
             currentHeight = rotated.height
           }
 
-          // ===== STEP 2: Apply crop (if needed) =====
-          if (crop) {
+          // ===== STEP 2: Apply crop (if needed, but not when crop tool is active) =====
+          if (shouldApplyCrop && crop) {
             console.log('[useEditPreview] Applying crop:', crop)
             const cropped = await $decodeService.applyCrop(
               currentPixels,

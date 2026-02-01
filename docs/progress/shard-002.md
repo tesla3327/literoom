@@ -66,3 +66,62 @@ Added scroll protection to the masks accordion in `EditControlsPanel.vue`:
 ### Test Results
 - All 1303 web unit tests pass (10 new tests)
 
+---
+
+## Iteration 162: Crop Re-edit Shows Full Uncropped Image
+
+**Time**: 2026-01-31 21:31 EST
+**Status**: Complete
+**Task**: Fix the crop tool to show full uncropped image when re-editing a previously cropped photo
+
+### Problem
+When re-entering the crop tool on an already-cropped image, the view only shows the currently cropped region. Users cannot see the parts of the image that were previously cropped out, making it impossible to expand the crop to include previously excluded areas. This doesn't match Lightroom's behavior where you can always see the full image when adjusting crop.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+1. Crop state storage in editUI.ts and edit.ts
+2. Preview crop handling in EditPreviewCanvas.vue and useEditPreview.ts
+3. Edit pipeline crop application in GPU and WASM paths
+4. Crop editor UI components and their relationships
+5. Expected Lightroom-style crop re-edit UX
+
+### Root Cause Analysis
+In `useEditPreview.ts`, the render pipeline checked `hasCrop` (whether crop exists in store) to decide which rendering path to use:
+- **PATH A**: No crop → unified GPU pipeline (shows full image)
+- **PATH B**: Has crop → crop applied via WASM (shows cropped image)
+
+The problem was that the code did NOT check `isCropToolActive` before applying crop. When the crop tool was active (user re-editing), the crop was still applied, preventing users from seeing the full uncropped image.
+
+### Solution Implemented
+Added `shouldApplyCrop` logic that checks both conditions:
+```typescript
+const editUIStore = useEditUIStore()
+const shouldApplyCrop = hasCrop && !editUIStore.isCropToolActive
+```
+
+Updated all three rendering paths:
+1. **PATH A condition**: Changed from `!hasCrop` to `!shouldApplyCrop`
+2. **PATH B condition**: Changed from `hasCrop` to `shouldApplyCrop`
+3. **PATH C fallback**: Changed from `if (crop)` to `if (shouldApplyCrop && crop)`
+
+Now when the crop tool is active, the preview shows the full uncropped image with the crop overlay on top, allowing users to expand the crop to include previously excluded areas.
+
+### Files Modified
+- `apps/web/app/composables/useEditPreview.ts` - Added import for editUIStore, added shouldApplyCrop logic
+
+### Files Created
+- `apps/web/test/cropReeditFullImage.test.ts` - 14 tests for crop re-edit behavior
+- `docs/research/2026-01-31-crop-reedit-fullimage-synthesis.md` - Research synthesis
+- `docs/plans/2026-01-31-crop-reedit-fullimage-plan.md` - Implementation plan
+
+### Tests Added
+14 new tests covering:
+- shouldApplyCrop logic (no crop, crop with tool active, crop with tool inactive)
+- Crop tool activation/deactivation
+- Pending crop initialization, apply, cancel, reset
+- Edge cases (rapid activation, with adjustments, with rotation)
+
+### Test Results
+- All 1317 web unit tests pass (14 new tests)
+- All 2395 core tests pass (except 9 pre-existing GPU mock failures)
+
