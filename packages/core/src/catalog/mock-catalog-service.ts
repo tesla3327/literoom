@@ -515,6 +515,38 @@ export class MockCatalogService implements ICatalogService {
     }
   }
 
+  /**
+   * Cancel all BACKGROUND priority preview requests.
+   * Returns the total number of cancelled requests.
+   */
+  cancelBackgroundRequests(): number {
+    let cancelled = 0
+
+    // Cancel background thumbnail requests
+    for (const [assetId, queued] of this._thumbnailQueue) {
+      if (queued.priority === ThumbnailPriority.BACKGROUND) {
+        if (queued.timeoutId) {
+          clearTimeout(queued.timeoutId)
+        }
+        this._thumbnailQueue.delete(assetId)
+        cancelled++
+      }
+    }
+
+    // Cancel background preview requests
+    for (const [assetId, queued] of this._previewQueue) {
+      if (queued.priority === ThumbnailPriority.BACKGROUND) {
+        if (queued.timeoutId) {
+          clearTimeout(queued.timeoutId)
+        }
+        this._previewQueue.delete(assetId)
+        cancelled++
+      }
+    }
+
+    return cancelled
+  }
+
   // ==========================================================================
   // ICatalogService Implementation - Thumbnail Regeneration
   // ==========================================================================

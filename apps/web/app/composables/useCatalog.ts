@@ -9,6 +9,7 @@
  * to guarantee $catalogService is available.
  */
 import type { ICatalogService, FlagStatus, EditState, MaskStack } from '@literoom/core/catalog'
+import { ThumbnailPriority } from '@literoom/core/catalog'
 import type { EditedThumbnailEditState, MaskStackData } from '@literoom/core/decode'
 
 // Loading state for import process
@@ -78,6 +79,7 @@ export function useCatalog() {
 
   // Access stores
   const catalogStore = useCatalogStore()
+  const catalogUIStore = useCatalogUIStore()
   const selectionStore = useSelectionStore()
 
   /**
@@ -90,10 +92,10 @@ export function useCatalog() {
   }
 
   /**
-   * Wait for first page of thumbnails to be ready.
-   * Returns a promise that resolves when enough thumbnails are loaded.
+   * Wait for first page of photos to be fully ready (thumbnail + preview).
+   * Returns a promise that resolves when enough photos are ready.
    */
-  async function waitForFirstPageThumbnails(): Promise<void> {
+  async function waitForReadyPhotos(): Promise<void> {
     const targetCount = Math.min(getFirstPageCount(), catalogStore.assetIds.length)
 
     // Nothing to wait for
@@ -101,7 +103,7 @@ export function useCatalog() {
 
     return new Promise((resolve) => {
       const unwatch = watch(
-        () => catalogStore.thumbnailProgress.ready,
+        () => catalogStore.readyCount,
         (ready) => {
           if (ready >= targetCount) {
             unwatch()
@@ -111,11 +113,11 @@ export function useCatalog() {
         { immediate: true },
       )
 
-      // Timeout fallback after 10 seconds to avoid blocking forever
+      // Timeout fallback after 15 seconds (increased from 10 since we're doing more work)
       setTimeout(() => {
         unwatch()
         resolve()
-      }, 10000)
+      }, 15000)
     })
   }
 
@@ -156,9 +158,9 @@ export function useCatalog() {
       // Scan the folder (callbacks wire to stores via plugin)
       await service.scanFolder()
 
-      // Wait for first page of thumbnails so gallery isn't empty
-      loadingMessage.value = 'Preparing gallery...'
-      await waitForFirstPageThumbnails()
+      // Wait for first page of photos to be fully ready
+      loadingMessage.value = 'Preparing photos...'
+      await waitForReadyPhotos()
     }
     finally {
       catalogStore.setScanning(false)
@@ -353,6 +355,61 @@ export function useCatalog() {
     await service.regenerateThumbnail(assetId, workerEditState)
   }
 
+  /**
+   * Preload previews for adjacent assets in the sorted/filtered list.
+   * This helps with smoother navigation in the edit view.
+   */
+  function preloadAdjacentPreviews(currentAssetId: string, range: number = 2): void {
+    console.log('[useCatalog] Preloading adjacent previews...')
+
+    const service = requireCatalogService()
+    const sortedIds = catalogUIStore.sortedAssetIds
+    const currentIndex = sortedIds.indexOf(currentAssetId)
+
+    if (currentIndex === -1) {
+      console.log('[useCatalog] Current asset not found in sorted list')
+      return
+    }
+
+    // Collect asset IDs to preload (N±1 to N±range, excluding N±0 which is the current asset)
+    const idsToPreload: string[] = []
+
+    for (let offset = 1; offset <= range; offset++) {
+      // Previous assets
+      const prevIndex = currentIndex - offset
+      if (prevIndex >= 0) {
+        idsToPreload.push(sortedIds[prevIndex])
+      }
+
+      // Next assets
+      const nextIndex = currentIndex + offset
+      if (nextIndex < sortedIds.length) {
+        idsToPreload.push(sortedIds[nextIndex])
+      }
+    }
+
+    // Request previews for assets that are not already ready
+    for (const assetId of idsToPreload) {
+      const asset = catalogStore.getAsset(assetId)
+      if (asset && asset.preview1xStatus !== 'ready') {
+        console.log(`[useCatalog] Requesting preview for adjacent asset: ${assetId}`)
+        service.requestPreview(assetId, ThumbnailPriority.BACKGROUND)
+      }
+    }
+  }
+
+  /**
+   * Cancel background preview preloads.
+   * Stops all BACKGROUND priority requests to prioritize active work.
+   */
+  function cancelBackgroundPreloads(): void {
+    const service = requireCatalogService()
+    const cancelled = service.cancelBackgroundRequests()
+    if (cancelled > 0) {
+      console.log(`[useCatalog] Cancelled ${cancelled} background preload(s)`)
+    }
+  }
+
   return {
     // Services (may be undefined until plugin initializes)
     catalogService,
@@ -375,5 +432,7 @@ export function useCatalog() {
     updatePreviewPriority,
     rescanFolder,
     regenerateThumbnail,
+    preloadAdjacentPreviews,
+    cancelBackgroundPreloads,
   }
 }

@@ -460,23 +460,28 @@ Created a complete help modal system with keyboard shortcuts documentation.
 
 ---
 
-### Preview generation is slow
+### Preview generation is slow - PARTIALLY SOLVED
 
-**Severity**: Medium | **Type**: Performance
+**Severity**: Medium | **Type**: Performance | **Addressed**: 2026-01-31
 
 **Problem**:
 Preview generation takes a long time, creating UX issues. Users often have to wait for previews to load when navigating between photos.
 
-**Potential Optimizations**:
-1. **Background preview generation**: When the edit pipeline is idle, proactively generate previews for adjacent photos in the filmstrip
-2. **Priority queue tuning**: Ensure visible/near-visible photos get priority
-3. **Lower-resolution intermediate previews**: Show a lower-res preview quickly while generating the full preview
-4. **Preview caching**: Ensure previews are properly cached and reused
+**Implemented Solution - Adjacent Preview Preloading**:
+When the edit pipeline is idle (no user interaction, full render complete), the system now automatically preloads previews for adjacent photos (N±2) at BACKGROUND priority. When the user starts interacting, background preloads are cancelled to prioritize active work.
 
-**Research Questions**:
-- What is the current bottleneck (decode, GPU processing, encoding)?
-- How many previews can be generated per second?
-- Would generating previews in parallel help?
+**Implementation**:
+- `useEditPreview.ts` watches render state and triggers `preloadAdjacentPreviews()` on idle
+- `useCatalog.ts` implements `preloadAdjacentPreviews()` and `cancelBackgroundPreloads()`
+- `ThumbnailService` supports `cancelBackgroundRequests()` for BACKGROUND priority items
+- Adjacent previews are pre-generated while user is viewing current photo
+- Navigation to adjacent photos may show preview instantly if already cached
+
+**Remaining Optimizations** (not yet implemented):
+1. ~~**Background preview generation**~~ ✅ Done
+2. **Priority queue tuning**: Could be further tuned for filmstrip visibility
+3. **Lower-resolution intermediate previews**: Could show lower-res first
+4. **Preview caching improvements**: Could increase memory cache size from 20 to 50 items
 
 ---
 

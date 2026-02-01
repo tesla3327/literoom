@@ -612,3 +612,72 @@ The spec requires keyboard shortcuts to be documented in-app (help modal). Curre
 - All 1268 web unit tests pass (including 19 new help modal tests)
 - Pre-existing 9 GPU mock failures in core package (unrelated)
 
+---
+
+## Iteration 158: Preview Generation Performance Optimization
+
+**Time**: 2026-01-31 20:49 EST → 21:07 EST
+**Status**: Complete
+**Task**: Implement adjacent preview preloading to optimize UX when navigating between photos
+
+### Problem
+Preview generation takes a long time, creating UX issues. Users often have to wait for previews to load when navigating between photos in edit view.
+
+### Research Phase
+Research identified that the primary improvement would be **automatic adjacent photo preloading when the edit pipeline is idle**. The infrastructure (priority queue, BACKGROUND priority level) already existed.
+
+### Implementation
+
+**Phase 1: Add cancelBackgroundRequests to ThumbnailService**
+- Added `cancelBackgroundRequests()` method to `QueueProcessor` class
+- Added `cancelBackgroundRequests()` method to `ThumbnailService` (cancels from both thumbnail and preview queues)
+- Returns count of cancelled requests
+
+**Phase 2: Add to Service Interfaces**
+- Added `cancelBackgroundRequests(): number` to `IThumbnailService` interface
+- Added `cancelBackgroundRequests(): number` to `ICatalogService` interface
+
+**Phase 3: Implement in Services**
+- Added `cancelBackgroundRequests()` to `CatalogService` (delegates to ThumbnailService)
+- Added `cancelBackgroundRequests()` to `MockCatalogService` (clears background timeout requests)
+
+**Phase 4: Wire up useCatalog.ts**
+- Updated `cancelBackgroundPreloads()` to call `service.cancelBackgroundRequests()`
+- The `preloadAdjacentPreviews()` function was already implemented
+
+**Phase 5: Integration (Pre-existing)**
+- `useEditPreview.ts` already had a watcher for render state transitions
+- When state becomes 'idle' after 'complete', triggers `preloadAdjacentPreviews(assetId, 2)`
+- When state becomes 'interacting', calls `cancelBackgroundPreloads()`
+
+### Files Modified
+- `packages/core/src/catalog/thumbnail-service.ts` - Added cancelBackgroundRequests methods
+- `packages/core/src/catalog/types.ts` - Added interface methods
+- `packages/core/src/catalog/catalog-service.ts` - Added implementation
+- `packages/core/src/catalog/mock-catalog-service.ts` - Added mock implementation
+- `apps/web/app/composables/useCatalog.ts` - Updated to call service method
+- `packages/core/src/catalog/thumbnail-service.test.ts` - Added 3 tests
+
+### Tests Added
+3 new tests in `thumbnail-service.test.ts`:
+- `cancels only BACKGROUND priority requests`
+- `returns 0 when no BACKGROUND requests exist`
+- `works on empty queues`
+
+### Existing Tests Verified
+- 16 tests in `apps/web/test/adjacentPreloading.test.ts` (all passing)
+- Tests cover: adjacent ID calculation, boundary conditions, filtering logic
+
+### Test Results
+- Core package: 2401 passed (9 pre-existing GPU mock failures)
+- Web package: 1284 passed
+
+### How It Works
+1. User views photo N in edit view
+2. Edit pipeline renders the photo, transitions to 'complete' then 'idle'
+3. When idle, `preloadAdjacentPreviews(N, 2)` is called
+4. Previews for photos N-2, N-1, N+1, N+2 are queued at BACKGROUND priority
+5. Only assets without ready previews are queued (filtered)
+6. When user starts interacting (slider drag, etc.), `cancelBackgroundPreloads()` cancels pending BACKGROUND requests
+7. When user navigates to adjacent photo, preview may already be cached → instant display
+

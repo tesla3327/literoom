@@ -30,9 +30,12 @@ import {
   type ThumbnailReadyCallback,
   type PreviewReadyCallback,
   type FolderInfo,
+  type ReadyPhoto,
+  type PhotoReadyCallback,
   ThumbnailPriority,
   CatalogError,
 } from './types'
+import { PhotoProcessor, createPhotoProcessor, type ProcessedPhoto } from './photo-processor'
 import { ScanService } from './scan-service'
 import { ThumbnailService } from './thumbnail-service'
 import { db, type AssetRecord, type FolderRecord } from './db'
@@ -113,6 +116,7 @@ export class CatalogService implements ICatalogService {
   // Services
   private readonly scanService: IScanService
   private readonly thumbnailService: IThumbnailService
+  private readonly photoProcessor: PhotoProcessor
 
   // State
   private _state: CatalogServiceState = { status: 'initializing' }
@@ -128,16 +132,19 @@ export class CatalogService implements ICatalogService {
   private _onAssetUpdated: AssetUpdatedCallback | null = null
   private _onThumbnailReady: ThumbnailReadyCallback | null = null
   private _onPreviewReady: PreviewReadyCallback | null = null
+  private _onPhotoReady: PhotoReadyCallback | null = null
 
   /**
    * Private constructor - use CatalogService.create() instead.
    */
   private constructor(
     scanService: IScanService,
-    thumbnailService: IThumbnailService
+    thumbnailService: IThumbnailService,
+    photoProcessor: PhotoProcessor
   ) {
     this.scanService = scanService
     this.thumbnailService = thumbnailService
+    this.photoProcessor = photoProcessor
 
     // Wire up thumbnail callbacks
     this.thumbnailService.onThumbnailReady = this.handleThumbnailReady.bind(this)
@@ -154,8 +161,14 @@ export class CatalogService implements ICatalogService {
   static async create(decodeService: IDecodeService): Promise<CatalogService> {
     const scanService = new ScanService()
     const thumbnailService = await ThumbnailService.create(decodeService)
+    const photoProcessor = createPhotoProcessor(decodeService)
 
-    const service = new CatalogService(scanService, thumbnailService)
+    const service = new CatalogService(scanService, thumbnailService, photoProcessor)
+
+    // Wire up photo processor callbacks
+    photoProcessor.onPhotoProcessed = service.handlePhotoProcessed.bind(service)
+    photoProcessor.onPhotoError = service.handlePhotoError.bind(service)
+
     service._state = { status: 'ready' }
 
     return service
@@ -283,57 +296,59 @@ export class CatalogService implements ICatalogService {
     }
 
     try {
-      const newAssets: Asset[] = []
-
-      // Scan folder using async generator
-      for await (const batch of this.scanService.scan(this._currentFolder, {
+      // Scan folder and queue each file for processing
+      for await (const scannedFile of this.scanService.scan(this._currentFolder, {
         ...options,
         signal,
       })) {
-        // Process each batch
-        for (const scannedFile of batch) {
-          // Check if asset already exists
-          const existingAsset = await db.assets
-            .where({ folderId: this._currentFolderId!, path: scannedFile.path })
-            .first()
+        // Check if asset already exists
+        const existingAsset = await db.assets
+          .where({ folderId: this._currentFolderId!, path: scannedFile.path })
+          .first()
 
-          if (existingAsset) {
-            // Asset already exists - check if modified
-            if (existingAsset.modifiedDate.getTime() !== scannedFile.modifiedDate.getTime()) {
-              // File was modified - update record
-              await db.assets.update(existingAsset.id!, {
-                fileSize: scannedFile.fileSize,
-                modifiedDate: scannedFile.modifiedDate,
-              })
-            }
+        let asset: Asset
 
-            // Load existing asset into memory
-            const asset = this.assetRecordToAsset(existingAsset)
-            this._assets.set(asset.id, asset)
-            newAssets.push(asset)
-          } else {
-            // New asset - create record
-            const uuid = crypto.randomUUID()
-            const assetRecord: AssetRecord = {
-              uuid,
-              folderId: this._currentFolderId!,
-              path: scannedFile.path,
-              filename: scannedFile.filename,
-              extension: scannedFile.extension,
-              flag: 'none',
-              captureDate: null, // Would extract from EXIF in a full implementation
-              modifiedDate: scannedFile.modifiedDate,
+        if (existingAsset) {
+          // Asset already exists - check if modified
+          if (existingAsset.modifiedDate.getTime() !== scannedFile.modifiedDate.getTime()) {
+            await db.assets.update(existingAsset.id!, {
               fileSize: scannedFile.fileSize,
-            }
-
-            const assetId = await db.assets.add(assetRecord)
-            assetRecord.id = assetId
-
-            const asset = this.assetRecordToAsset(assetRecord, scannedFile.getFile)
-            this._assets.set(asset.id, asset)
-            newAssets.push(asset)
+              modifiedDate: scannedFile.modifiedDate,
+            })
           }
+          asset = this.assetRecordToAsset(existingAsset)
+        } else {
+          // New asset - create record
+          const uuid = crypto.randomUUID()
+          const assetRecord: AssetRecord = {
+            uuid,
+            folderId: this._currentFolderId!,
+            path: scannedFile.path,
+            filename: scannedFile.filename,
+            extension: scannedFile.extension,
+            flag: 'none',
+            captureDate: null,
+            modifiedDate: scannedFile.modifiedDate,
+            fileSize: scannedFile.fileSize,
+          }
+
+          const assetId = await db.assets.add(assetRecord)
+          assetRecord.id = assetId
+          asset = this.assetRecordToAsset(assetRecord, scannedFile.getFile)
         }
+
+        // Add to in-memory collection
+        this._assets.set(asset.id, asset)
+
+        // Notify listeners of new asset
+        this._onAssetsAdded?.([asset])
+
+        // Queue for photo processing immediately
+        const getBytes = this.createGetBytesFunction(asset)
+        this.photoProcessor.enqueue({
+          assetId: asset.id,
+          getBytes,
+        })
 
         // Update progress
         const progress: ScanProgress = {
@@ -341,12 +356,6 @@ export class CatalogService implements ICatalogService {
           processed: this._assets.size,
         }
         this._state = { status: 'scanning', scanProgress: progress }
-
-        // Notify listeners of new assets
-        if (newAssets.length > 0) {
-          this._onAssetsAdded?.(newAssets)
-          newAssets.length = 0
-        }
       }
 
       // Update folder scan date
@@ -524,6 +533,15 @@ export class CatalogService implements ICatalogService {
     this.thumbnailService.updatePreviewPriority(assetId, priority)
   }
 
+  /**
+   * Cancel all BACKGROUND priority preview requests.
+   * Used to prioritize active work when user starts interacting.
+   * Returns the total number of cancelled requests.
+   */
+  cancelBackgroundRequests(): number {
+    return this.thumbnailService.cancelBackgroundRequests()
+  }
+
   // ==========================================================================
   // ICatalogService Implementation - Thumbnail Regeneration
   // ==========================================================================
@@ -642,6 +660,14 @@ export class CatalogService implements ICatalogService {
     return this._onPreviewReady
   }
 
+  set onPhotoReady(callback: PhotoReadyCallback | null) {
+    this._onPhotoReady = callback
+  }
+
+  get onPhotoReady(): PhotoReadyCallback | null {
+    return this._onPhotoReady
+  }
+
   // ==========================================================================
   // ICatalogService Implementation - Cleanup
   // ==========================================================================
@@ -653,6 +679,7 @@ export class CatalogService implements ICatalogService {
     this.cancelScan()
     this.thumbnailService.cancelAll()
     this.thumbnailService.cancelAllPreviews()
+    this.photoProcessor.cancelAll()
     this._assets.clear()
     this._currentFolder = null
     this._currentFolderId = null
@@ -735,6 +762,56 @@ export class CatalogService implements ICatalogService {
 
     // Log error (could add error callback later)
     console.error(`Preview error for ${assetId}:`, error)
+  }
+
+  /**
+   * Handle photo processed callback from PhotoProcessor.
+   */
+  private handlePhotoProcessed(result: ProcessedPhoto): void {
+    const asset = this._assets.get(result.assetId)
+    if (!asset) return
+
+    // Create object URLs for both blobs
+    const thumbnailUrl = URL.createObjectURL(result.thumbnailBlob)
+    const previewUrl = URL.createObjectURL(result.previewBlob)
+
+    // Update asset with both URLs
+    const updatedAsset: Asset = {
+      ...asset,
+      thumbnailStatus: 'ready',
+      thumbnailUrl,
+      preview1xStatus: 'ready',
+      preview1xUrl: previewUrl,
+    }
+    this._assets.set(result.assetId, updatedAsset)
+
+    // Notify listeners
+    this._onPhotoReady?.({
+      asset: updatedAsset,
+      thumbnailUrl,
+      previewUrl,
+    })
+
+    // Also fire the individual callbacks for backwards compatibility
+    this._onThumbnailReady?.(result.assetId, thumbnailUrl)
+    this._onPreviewReady?.(result.assetId, previewUrl)
+  }
+
+  /**
+   * Handle photo processing error.
+   */
+  private handlePhotoError(assetId: string, error: Error): void {
+    const asset = this._assets.get(assetId)
+    if (asset) {
+      const updatedAsset: Asset = {
+        ...asset,
+        thumbnailStatus: 'error',
+        preview1xStatus: 'error',
+      }
+      this._assets.set(assetId, updatedAsset)
+      this._onAssetUpdated?.(updatedAsset)
+    }
+    console.error(`Photo processing error for ${assetId}:`, error)
   }
 
   /**

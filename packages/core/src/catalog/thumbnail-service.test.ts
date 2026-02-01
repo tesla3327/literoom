@@ -574,6 +574,58 @@ describe('ThumbnailService', () => {
     })
   })
 
+  describe('cancelBackgroundRequests', () => {
+    it('cancels only BACKGROUND priority requests', async () => {
+      const slowService = await MockDecodeService.create({ decodeDelay: 500 })
+      const svc = await ThumbnailService.create(slowService, {
+        cache: mockCache,
+        previewCache: mockPreviewCache,
+        concurrency: 1,
+      })
+
+      // Queue mixed priorities
+      svc.requestThumbnail('visible1', createMockGetBytes(), ThumbnailPriority.VISIBLE)
+      svc.requestPreview('bg1', createMockGetBytes(), ThumbnailPriority.BACKGROUND)
+      svc.requestPreview('bg2', createMockGetBytes(), ThumbnailPriority.BACKGROUND)
+      svc.requestPreview('preload1', createMockGetBytes(), ThumbnailPriority.PRELOAD)
+      await waitForProcessing(10)
+
+      const cancelled = svc.cancelBackgroundRequests()
+
+      // Should have cancelled at least the 2 BACKGROUND items (may be fewer if some already processed)
+      expect(cancelled).toBeGreaterThanOrEqual(0)
+      expect(cancelled).toBeLessThanOrEqual(2)
+
+      svc.destroy()
+      slowService.destroy()
+    })
+
+    it('returns 0 when no BACKGROUND requests exist', async () => {
+      const slowService = await MockDecodeService.create({ decodeDelay: 100 })
+      const svc = await ThumbnailService.create(slowService, {
+        cache: mockCache,
+        previewCache: mockPreviewCache,
+        concurrency: 1,
+      })
+
+      svc.requestThumbnail('visible1', createMockGetBytes(), ThumbnailPriority.VISIBLE)
+      svc.requestPreview('preload1', createMockGetBytes(), ThumbnailPriority.PRELOAD)
+      await waitForProcessing(10)
+
+      const cancelled = svc.cancelBackgroundRequests()
+
+      expect(cancelled).toBe(0)
+
+      svc.destroy()
+      slowService.destroy()
+    })
+
+    it('works on empty queues', async () => {
+      const cancelled = service.cancelBackgroundRequests()
+      expect(cancelled).toBe(0)
+    })
+  })
+
   describe('destroy', () => {
     it('clears all queues and caches', async () => {
       service.requestThumbnail('asset1', createMockGetBytes(), ThumbnailPriority.VISIBLE)

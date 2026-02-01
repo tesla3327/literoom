@@ -31,10 +31,10 @@ import { ThumbnailCache, PreviewCache, type IThumbnailCache, type IPreviewCache 
 // ============================================================================
 
 /** Default thumbnail size (longest edge in pixels) */
-const DEFAULT_THUMBNAIL_SIZE = 512
+const DEFAULT_THUMBNAIL_SIZE = 256
 
 /** Default preview size (longest edge in pixels) */
-const DEFAULT_PREVIEW_SIZE = 2560
+const DEFAULT_PREVIEW_SIZE = 1280
 
 /** Maximum queue size to prevent memory issues */
 const MAX_QUEUE_SIZE = 200
@@ -154,6 +154,25 @@ class QueueProcessor<T extends ThumbnailQueueItem = ThumbnailQueueItem> {
   cancelAll(): void {
     this.queue.clear()
     this.activeRequests.clear()
+  }
+
+  /**
+   * Cancel all requests with BACKGROUND priority.
+   * Returns the number of cancelled requests.
+   */
+  cancelBackgroundRequests(): number {
+    const allItems = this.queue.getAll()
+    let cancelled = 0
+
+    for (const item of allItems) {
+      if (item.priority === ThumbnailPriority.BACKGROUND) {
+        this.queue.remove(item.assetId)
+        this.activeRequests.delete(item.assetId)
+        cancelled++
+      }
+    }
+
+    return cancelled
   }
 }
 
@@ -464,6 +483,17 @@ export class ThumbnailService implements IThumbnailService {
    */
   cancelAllPreviews(): void {
     this.previewProcessor.cancelAll()
+  }
+
+  /**
+   * Cancel all BACKGROUND priority requests from both queues.
+   * Used to prioritize active work when user starts interacting.
+   * Returns the total number of cancelled requests.
+   */
+  cancelBackgroundRequests(): number {
+    const thumbnailCancelled = this.thumbnailProcessor.cancelBackgroundRequests()
+    const previewCancelled = this.previewProcessor.cancelBackgroundRequests()
+    return thumbnailCancelled + previewCancelled
   }
 
   /**

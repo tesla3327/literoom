@@ -233,13 +233,28 @@ export class CatalogError extends Error {
 export interface IScanService {
   /**
    * Scan a directory for supported image files.
-   * Yields batches of files for progressive UI updates.
+   * Yields single files for progressive UI updates.
    */
   scan(
     directory: FileSystemDirectoryHandle,
     options?: ScanOptions
-  ): AsyncGenerator<ScannedFile[], void, unknown>
+  ): AsyncGenerator<ScannedFile, void, unknown>
 }
+
+/**
+ * A photo that is fully ready for display and editing.
+ * Both thumbnail and preview have been generated.
+ */
+export interface ReadyPhoto {
+  asset: Asset
+  thumbnailUrl: string
+  previewUrl: string
+}
+
+/**
+ * Callback for when a photo is fully ready (thumbnail + preview generated).
+ */
+export type PhotoReadyCallback = (photo: ReadyPhoto) => void
 
 /**
  * Callback for thumbnail ready events.
@@ -358,6 +373,15 @@ export interface IThumbnailService {
   /** Whether the service is currently processing previews */
   readonly isProcessingPreviews: boolean
 
+  // Background request management
+
+  /**
+   * Cancel all BACKGROUND priority requests from both queues.
+   * Used to prioritize active work when user starts interacting.
+   * Returns the total number of cancelled requests.
+   */
+  cancelBackgroundRequests(): number
+
   // Thumbnail regeneration methods
 
   /**
@@ -474,6 +498,14 @@ export interface ICatalogService {
    */
   updatePreviewPriority(assetId: string, priority: ThumbnailPriority): void
 
+  // Background request management
+  /**
+   * Cancel all BACKGROUND priority preview requests.
+   * Used to prioritize active work when user starts interacting.
+   * Returns the total number of cancelled requests.
+   */
+  cancelBackgroundRequests(): number
+
   // Thumbnail regeneration
   /**
    * Regenerate a thumbnail with edits applied.
@@ -508,6 +540,11 @@ export interface ICatalogService {
    * Set callback for when a preview is ready.
    */
   onPreviewReady: PreviewReadyCallback | null
+
+  /**
+   * Set callback for when a photo is fully ready (thumbnail + preview).
+   */
+  onPhotoReady: PhotoReadyCallback | null
 
   // Session restoration
   /**
