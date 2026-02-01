@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 21:37 EST
+**Last Updated**: 2026-01-31 21:45 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 162 - Crop re-edit shows full uncropped image - Complete (see shard-002.md)
+**Current Iteration**: 164 - Export "Include Rejected" option - Complete (see shard-002.md)
 
 ## Project Structure
 

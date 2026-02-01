@@ -4,12 +4,12 @@
 
 ### Open Issues
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
-- [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
-- [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option---solved)
+- [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste---solved)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image---solved)
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page---solved)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image---solved)
@@ -290,65 +290,54 @@ When the crop tool is active, the preview now shows the full uncropped image wit
 
 ---
 
-### No clipboard summary shown for copy/paste
+### No clipboard summary shown for copy/paste - SOLVED
 
-**Severity**: Low | **Type**: UX Enhancement | **Found**: 2026-01-25
+**Severity**: Low | **Fixed**: 2026-01-31 (verified as already implemented)
 
 **Problem**:
-After copying edit settings, there is no visible feedback showing what settings are in the clipboard. Users can only tell that something is copied because the Paste button becomes enabled.
+After copying edit settings, there was reportedly no visible feedback showing what settings are in the clipboard.
 
-**Expected Behavior**:
-A summary should be shown somewhere (tooltip, badge, or text) indicating:
-- What settings were copied (e.g., "Basic Adjustments, Tone Curve")
-- Or at minimum, a toast notification confirming the copy action
+**Investigation Results**:
+Upon investigation, this functionality was already implemented:
 
-**Current Behavior**:
-- Copy modal closes without any visible feedback
-- Paste button becomes enabled (only indicator)
-- No tooltip on Paste button showing clipboard contents
-- No toast notification for copy action
+1. **Toast notification on copy success** - Shows "Settings copied" with description containing clipboard summary (e.g., "Basic Adjustments, Tone Curve")
+   - Location: `apps/web/app/composables/useCopyPasteSettings.ts` lines 88-92
 
-**Suggested Implementation**:
-1. Add tooltip to Paste button showing what's in clipboard (e.g., "Paste: Basic Adjustments, Tone Curve")
-2. Or show toast notification on successful copy (e.g., "Copied: Basic Adjustments, Tone Curve")
+2. **Tooltip on Paste button** - Shows "Paste: Basic Adjustments, Tone Curve" (or "Nothing to paste" when empty)
+   - Location: `apps/web/app/components/edit/EditControlsPanel.vue` line 310
 
-**Files to Investigate**:
-- `apps/web/app/composables/useCopyPasteSettings.ts`
-- `apps/web/app/stores/editClipboard.ts`
-- `apps/web/app/components/edit/EditControlsPanel.vue`
+3. **Clipboard summary computed property** - `clipboardStore.clipboardSummary` generates human-readable summary
+   - Location: `apps/web/app/stores/editClipboard.ts` lines 117-129
 
-**Screenshots**:
-- `docs/screenshots/qa-section11-07-after-copy-paste-enabled.png` - After copy, only Paste button enablement indicates success
+**Conclusion**: This issue was filed before the implementation was complete or the reporter missed the toast notification. The feature is working as expected.
 
 ---
 
-### Export missing "Include rejected" option
+### Export missing "Include rejected" option - SOLVED
 
-**Severity**: Low | **Type**: UX Enhancement | **Found**: 2026-01-25
+**Severity**: Low | **Fixed**: 2026-01-31
 
 **Problem**:
-The Export modal has no option to include rejected photos. The "All" scope automatically excludes rejected photos (shows 40 instead of 50 when 10 photos are marked as rejected).
+The Export modal had no option to include rejected photos. The "All" scope automatically excluded rejected photos.
 
-**Current Behavior**:
-- "Picks" scope: Only photos flagged as Pick (23 images)
-- "Selected" scope: Only selected photos (filtered to exclude rejects)
-- "All" scope: All photos EXCEPT rejected ones (40 = 50 total - 10 rejects)
+**Solution Implemented**:
+Added "Include rejected photos" checkbox to the Export modal. The backend logic already existed (`includeRejected` parameter in `filterAssetsForExport()` and `exportStore.includeRejected` state) - only the UI checkbox was missing.
 
-**Expected Behavior**:
-Add an "Include rejected" checkbox that, when checked:
-1. Makes "All" scope export all 50 images
-2. Makes "Selected" scope include selected rejected photos
+**Implementation**:
+1. Added checkbox with `v-model="exportStore.includeRejected"` in Export Scope section
+2. Checkbox is disabled during export to prevent changes
+3. When checked:
+   - "All" scope includes rejected photos
+   - "Selected" scope includes selected rejected photos
+4. "Picks" scope is unaffected (always shows only picks)
 
-**Use Case**:
-Users may want to export rejected photos for backup purposes or to share them for a second opinion before final deletion.
+**Files Modified**:
+- `apps/web/app/components/export/ExportModal.vue` - Added checkbox UI
 
-**Screenshots**:
-- `docs/screenshots/qa-section14-04-export-scope-all.png` - "All" shows 40, not 50
-- `docs/screenshots/qa-section14-12-all-excludes-rejects.png` - Confirms rejects excluded
-
-**Files to Investigate**:
-- `apps/web/app/components/export/ExportModal.vue` - Export modal UI
-- `apps/web/app/composables/useExport.ts` - Export logic
+**Pre-existing Implementation**:
+- `packages/core/src/export/export-service.ts` - `filterAssetsForExport()` already supported `includeRejected`
+- `apps/web/app/stores/export.ts` - `includeRejected` state already existed
+- `apps/web/app/composables/useExport.ts` - Already passed `includeRejected` to filter function
 
 ---
 

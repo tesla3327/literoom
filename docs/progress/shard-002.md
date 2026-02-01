@@ -125,3 +125,91 @@ Now when the crop tool is active, the preview shows the full uncropped image wit
 - All 1317 web unit tests pass (14 new tests)
 - All 2395 core tests pass (except 9 pre-existing GPU mock failures)
 
+---
+
+## Iteration 163: Verify Clipboard Summary for Copy/Paste Settings
+
+**Time**: 2026-01-31 21:38 EST
+**Status**: Complete
+**Task**: Investigate reported lack of clipboard summary feedback
+
+### Problem
+Issue reported that after copying edit settings, there was no visible feedback showing what settings are in the clipboard.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+1. editClipboard store state and clipboardSummary computed
+2. useCopyPasteSettings composable copy/paste logic
+3. EditControlsPanel paste button implementation
+4. EditCopySettingsModal component
+5. Toast notification patterns in codebase
+
+### Investigation Results
+**The functionality was already fully implemented:**
+
+1. **Toast notification exists** - `useCopyPasteSettings.ts` lines 88-92:
+   ```typescript
+   toast.add({
+     title: 'Settings copied',
+     description: clipboardStore.clipboardSummary ?? 'Edit settings copied to clipboard',
+     color: 'success',
+   })
+   ```
+
+2. **Paste button tooltip exists** - `EditControlsPanel.vue` line 310:
+   ```vue
+   :title="canPaste ? `Paste: ${clipboardSummary}` : 'Nothing to paste'"
+   ```
+
+3. **Clipboard summary computed property** - `editClipboard.ts` lines 117-129:
+   - Returns human-readable summary like "Basic Adjustments, Tone Curve"
+   - Shows "Nothing" if no groups selected
+
+### Resolution
+Issue was already solved. The reporter likely filed the issue before the implementation was complete, or missed the toast notification. Updated `docs/issues.md` to mark as solved.
+
+### Files Modified
+- `docs/issues.md` - Moved issue to "Recently Solved" section with investigation results
+
+---
+
+## Iteration 164: Export "Include Rejected" Option
+
+**Time**: 2026-01-31 21:42 EST
+**Status**: Complete
+**Task**: Add checkbox to Export modal to optionally include rejected photos
+
+### Problem
+The Export modal has no option to include rejected photos. The "All" scope automatically excludes rejected photos. Users may want to export rejected photos for backup or second opinion purposes.
+
+### Research Phase
+Used 3 parallel subagents to investigate:
+1. ExportModal.vue - UI layout and existing options
+2. useExport.ts - Export logic and filtering
+3. Export types and store
+
+### Findings
+The backend logic was already fully implemented:
+- `filterAssetsForExport()` in export-service.ts supports `includeRejected` parameter (lines 381-404)
+- `exportStore.includeRejected` state exists (export.ts line 96)
+- `useExport()` composable passes `includeRejected` to filter function (line 45)
+- Unit tests for `includeRejected` filtering already exist (export-service.test.ts lines 433-451)
+
+Only the UI checkbox was missing!
+
+### Implementation
+Added "Include rejected photos" checkbox to ExportModal.vue:
+- Positioned below the Export Scope count text
+- Bound to `exportStore.includeRejected` with v-model
+- Disabled during export operations
+- Styled consistently with existing UI elements (gray-300 text, proper spacing)
+
+### Files Modified
+- `apps/web/app/components/export/ExportModal.vue` - Added checkbox UI, removed unused `getAssetsToExport` import
+- `docs/issues.md` - Moved issue to "Recently Solved" section
+
+### Tests
+Backend tests already cover the filtering logic:
+- `filterAssetsForExport` with `includeRejected=true` includes rejected in 'all' scope
+- `filterAssetsForExport` with `includeRejected=true` includes rejected in 'selected' scope
+

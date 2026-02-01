@@ -17,7 +17,7 @@ import { RESIZE_PRESETS } from '~/stores/export'
 import type { ExportScope } from '@literoom/core/export'
 
 const exportStore = useExportStore()
-const { getAssetsToExport, selectDestination, runExport, exportCount } = useExport()
+const { selectDestination, runExport, exportCount } = useExport()
 
 // ============================================================================
 // Computed
@@ -189,6 +189,21 @@ function handleCancel() {
           >
             {{ exportCount }} image{{ exportCount === 1 ? '' : 's' }} will be exported
           </p>
+
+          <!-- Include Rejected Option -->
+          <label
+            class="mt-3 flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none"
+            :class="{ 'opacity-50 pointer-events-none': exportStore.isExporting }"
+          >
+            <input
+              v-model="exportStore.includeRejected"
+              type="checkbox"
+              :disabled="exportStore.isExporting"
+              class="w-4 h-4 rounded border-gray-700 bg-gray-900 text-primary-500 focus:ring-primary-500 focus:ring-offset-0"
+              data-testid="export-include-rejected"
+            >
+            Include rejected photos
+          </label>
         </div>
 
         <!-- JPEG Quality -->
