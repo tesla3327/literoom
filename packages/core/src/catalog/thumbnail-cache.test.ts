@@ -327,19 +327,19 @@ describe('createPreviewCache', () => {
     expect(cache).toBeInstanceOf(PreviewCache)
   })
 
-  it('should use default size of 20 when not specified', () => {
+  it('should use default size of 50 when not specified', () => {
     const cache = createPreviewCache()
     expect(cache).toBeInstanceOf(PreviewCache)
 
-    // Fill up to 20 items to test default size
-    for (let i = 0; i < 20; i++) {
+    // Fill up to 50 items to test default size
+    for (let i = 0; i < 50; i++) {
       cache.set(`asset${i}`, createTestBlob())
     }
-    expect(cache.memoryCacheSize).toBe(20)
+    expect(cache.memoryCacheSize).toBe(50)
 
-    // Adding one more should evict, keeping size at 20
-    cache.set('asset20', createTestBlob())
-    expect(cache.memoryCacheSize).toBe(20)
+    // Adding one more should evict, keeping size at 50
+    cache.set('asset50', createTestBlob())
+    expect(cache.memoryCacheSize).toBe(50)
   })
 
   it('should return a fresh instance each time', () => {
@@ -721,15 +721,15 @@ describe('PreviewCache', () => {
   })
 
   describe('constructor', () => {
-    it('should create with default memory cache size (20)', () => {
+    it('should create with default memory cache size (50)', () => {
       const defaultCache = new PreviewCache()
       // Fill to default capacity and verify LRU eviction
-      for (let i = 0; i < 21; i++) {
+      for (let i = 0; i < 51; i++) {
         // @ts-expect-error - accessing private property for testing
         defaultCache.memoryCache.set(`asset${i}`, createTestBlob())
       }
       // @ts-expect-error - accessing private property for testing
-      expect(defaultCache.memoryCache.size).toBe(20)
+      expect(defaultCache.memoryCache.size).toBe(50)
     })
 
     it('should create with custom memory cache size', () => {

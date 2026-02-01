@@ -42,8 +42,8 @@ const MAX_QUEUE_SIZE = 200
 /** Maximum memory cache entries for thumbnails */
 const MAX_MEMORY_CACHE_SIZE = 150
 
-/** Maximum memory cache entries for previews (smaller due to larger size) */
-const MAX_PREVIEW_MEMORY_CACHE_SIZE = 20
+/** Maximum memory cache entries for previews - increased from 20 to 50 for better hit rates */
+const MAX_PREVIEW_MEMORY_CACHE_SIZE = 50
 
 /** Default concurrent thumbnail processing limit */
 const DEFAULT_CONCURRENCY = 4
@@ -678,7 +678,7 @@ export interface ThumbnailServiceOptions {
   maxQueueSize?: number
   /** Maximum memory cache size for thumbnails (default: 150) */
   maxMemoryCacheSize?: number
-  /** Maximum memory cache size for previews (default: 20) */
+  /** Maximum memory cache size for previews (default: 50) */
   maxPreviewMemoryCacheSize?: number
   /** Custom thumbnail cache implementation (for testing) */
   cache?: IThumbnailCache
