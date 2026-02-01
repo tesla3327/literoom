@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 21:24 EST
+**Last Updated**: 2026-01-31 21:29 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 160 - Fix zoom state not persisted per-image - Complete (see shard-001.md)
+**Current Iteration**: 161 - Fix masks panel collapses unexpectedly when scrolling - Complete (see shard-002.md)
 
 ## Project Structure
 

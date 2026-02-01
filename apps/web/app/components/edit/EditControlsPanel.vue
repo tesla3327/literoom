@@ -114,6 +114,32 @@ const accordionItems = [
 const expandedSections = ref<string[]>(['basic'])
 
 /**
+ * Flag to track if user is currently scrolling within the panel.
+ * Used to prevent spurious accordion collapses during scroll events.
+ */
+const isScrolling = ref(false)
+let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Handle scroll events on the controls panel.
+ * Sets a flag while scrolling and clears it after a short delay.
+ * This helps identify if accordion changes are scroll-related.
+ */
+function handleScroll() {
+  isScrolling.value = true
+
+  // Clear existing timeout
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+  }
+
+  // Reset scrolling flag after scroll ends
+  scrollTimeout = setTimeout(() => {
+    isScrolling.value = false
+  }, 150)
+}
+
+/**
  * Watch crop accordion expansion to toggle crop tool overlay.
  * When crop section is expanded, show the crop overlay on the main preview.
  * Note: We don't deactivate on collapse - let Apply/Cancel handle that.
@@ -143,13 +169,40 @@ watch(
 )
 
 /**
+ * Previous masks expanded state for detecting spurious changes.
+ */
+let prevMasksExpanded = false
+
+/**
  * Watch masks accordion expansion to toggle mask tool overlay.
  * When masks section is expanded, show the mask overlay on the main preview.
  * When collapsed, hide the mask overlay and exit drawing mode.
+ *
+ * Includes protection against spurious collapses during scroll events:
+ * If the masks panel collapses while scrolling is active and the user
+ * is actively working with masks (drawing mode or mask selected),
+ * restore the expanded state.
  */
 watch(
   () => expandedSections.value.includes('masks'),
   (isMasksExpanded) => {
+    // Detect unexpected collapse during scroll
+    if (prevMasksExpanded && !isMasksExpanded && isScrolling.value) {
+      // Check if user is actively working with masks
+      const isWorkingWithMasks = editUIStore.maskDrawingMode || editStore.selectedMaskId
+
+      if (isWorkingWithMasks) {
+        // This is likely a spurious collapse - restore the state
+        nextTick(() => {
+          expandedSections.value = [...expandedSections.value, 'masks']
+        })
+        return
+      }
+    }
+
+    // Update previous state
+    prevMasksExpanded = isMasksExpanded
+
     if (isMasksExpanded) {
       editUIStore.activateMaskTool()
     }
@@ -159,6 +212,54 @@ watch(
   },
   { immediate: true },
 )
+
+/**
+ * Reference to the component's root element.
+ */
+const rootRef = ref<HTMLElement | null>(null)
+
+/**
+ * Reference to the scrollable parent element.
+ */
+let scrollableParent: HTMLElement | null = null
+
+/**
+ * Find the scrollable parent element.
+ */
+function findScrollableParent(el: HTMLElement | null): HTMLElement | null {
+  if (!el) return null
+  let parent = el.parentElement
+  while (parent) {
+    const style = getComputedStyle(parent)
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      return parent
+    }
+    parent = parent.parentElement
+  }
+  return null
+}
+
+/**
+ * Setup scroll listener on parent.
+ */
+onMounted(() => {
+  scrollableParent = findScrollableParent(rootRef.value)
+  if (scrollableParent) {
+    scrollableParent.addEventListener('scroll', handleScroll, { passive: true })
+  }
+})
+
+/**
+ * Cleanup scroll timeout and listener on unmount.
+ */
+onUnmounted(() => {
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+  }
+  if (scrollableParent) {
+    scrollableParent.removeEventListener('scroll', handleScroll)
+  }
+})
 
 // ============================================================================
 // Event Handlers
@@ -181,6 +282,7 @@ function handleReset() {
 
 <template>
   <div
+    ref="rootRef"
     class="p-4 space-y-4"
     data-testid="edit-controls-panel"
   >

@@ -9,9 +9,9 @@
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
-- [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page---solved)
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image---solved)
 - [previewUrl.value.startsWith is not a function (Medium)](#previewurlvaluestartswith-is-not-a-function---solved)
 - [No help modal exists (Low)](#no-help-modal-exists---solved)
@@ -471,38 +471,40 @@ Research whether staged caching would meaningfully improve performance or if it 
 
 ---
 
-### Masks panel collapses unexpectedly when scrolling page
+### Masks panel collapses unexpectedly when scrolling page - SOLVED
 
-**Severity**: Medium | **Type**: UX Bug | **Found**: 2026-01-27
+**Severity**: Medium | **Fixed**: 2026-01-31
 
 **Problem**:
 When the Masks accordion panel is expanded and the user scrolls the page (using mouse wheel or scrollbar), the Masks panel unexpectedly collapses. This forces users to repeatedly re-expand the panel while working with masks.
 
-**Steps to Reproduce**:
-1. Open a photo in edit view
-2. Expand the "Masks" accordion panel
-3. Create a mask (either Linear or Radial)
-4. Scroll the page up or down using the mouse wheel or page scroll
-5. Observe: The Masks accordion collapses automatically
+**Root Cause**:
+During scroll events, some browser/Vue reactivity behaviors could cause spurious accordion state changes. The UAccordion component (wrapping Reka-UI's AccordionRoot) uses `useSingleOrMultipleValue` for state management, which could be affected by reactivity updates during scroll.
 
-**Expected Behavior**:
-The accordion panel should remain in its expanded state regardless of page scrolling.
+**Fix Applied**:
+Added scroll protection to the masks accordion in `EditControlsPanel.vue`:
 
-**Actual Behavior**:
-The accordion collapses when the page is scrolled, hiding the mask controls and requiring the user to click to re-expand it.
+1. **Scroll Detection**: Tracks when user is scrolling the right panel
+   - `isScrolling` ref set to `true` during scroll
+   - Timeout clears flag 150ms after scroll ends
 
-**Impact**:
-- Disrupts mask editing workflow
-- Forces extra clicks to re-expand panel
-- May cause confusion about mask state
+2. **Scrollable Parent Detection**: Finds and attaches listener to parent `<aside>` element
+   - Uses `findScrollableParent()` to locate element with `overflow-y: auto`
+   - Attaches scroll listener on mount, removes on unmount
 
-**Files to Investigate**:
-- `apps/web/app/components/edit/EditControlsPanel.vue` - Accordion component
-- `apps/web/app/components/edit/EditMaskPanel.vue` - Mask panel component
+3. **Spurious Collapse Prevention**: Guards against unintended collapses
+   - If masks accordion collapses during scroll AND user is actively working with masks
+   - (drawing mode active OR mask selected), restore the expanded state
+   - Uses `nextTick()` to restore state after Vue's update cycle
 
-**Screenshots**:
-- `docs/screenshots/qa-section10-masks-14-masks-expanded-again.png` - Panel before scroll
-- `docs/screenshots/qa-section10-masks-16-after-scroll-up.png` - Panel collapsed after scroll
+**Files Modified**:
+- `apps/web/app/components/edit/EditControlsPanel.vue` - Added scroll protection logic
+
+**Tests Added**:
+10 new tests in `apps/web/test/masksScrollProtection.test.ts` covering scroll detection, protection logic, and edge cases
+
+**Research Document**:
+- `docs/research/2026-01-31-masks-scroll-collapse-synthesis.md`
 
 ---
 
