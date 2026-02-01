@@ -155,3 +155,60 @@ Used 5 parallel subagents to investigate:
 
 ---
 
+## Iteration 174: Fix "Rescanning a folder fails" (Critical)
+
+**Time**: 2026-02-01 05:18 EST
+**Status**: Research in progress
+**Task**: Investigate and fix the critical issue where rescanning a folder fails
+
+### Problem
+The issues.md file reports that rescanning a folder fails. This is a critical bug that prevents users from detecting new or removed files after the initial scan.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+1. CatalogService rescanFolder() implementation
+2. ScanService incremental detection logic
+3. useCatalog composable and UI triggers
+4. ThumbnailService/PhotoProcessor during rescan
+5. Dexie database operations
+
+### Key Findings
+
+**Root Cause Identified:** The `rescanFolder()` method is a 1-line delegation to `scanFolder()` that provides NO actual rescan functionality:
+
+1. **No deleted file detection** (CRITICAL)
+   - Files removed from disk remain in database and UI
+   - Users see "ghost" assets that fail when clicked
+   - `scanFolder()` only handles add/modify, not remove
+
+2. **Silent file read failures** (MEDIUM)
+   - Files that fail to read are silently skipped (line 92 in scan-service.ts)
+   - No logging or user notification
+
+3. **Duplicate callbacks fired** (LOW)
+   - `onAssetsAdded` fires for ALL assets during rescan, not just new ones
+   - Causes redundant UI updates
+
+4. **PhotoProcessor limitation** (LOW)
+   - Cannot cancel in-flight tasks, only clears queue
+   - No generation number tracking like ThumbnailService
+
+### Solution Designed
+
+Implement proper removed file detection:
+1. Track scanned paths during scan in a Set
+2. After scan, query DB for assets not in scanned set
+3. Remove orphaned records from database
+4. Remove from in-memory `_assets` map
+5. Fire new `onAssetsRemoved` callback for UI update
+6. Update toast to show accurate add/remove counts
+
+### Documentation Created
+- `docs/research/2026-02-01-rescan-folder-bug-synthesis.md` - Full research findings
+- `docs/plans/2026-02-01-rescan-folder-fix-plan.md` - Implementation plan
+
+### Status
+Research and planning complete. Ready for implementation.
+
+---
+

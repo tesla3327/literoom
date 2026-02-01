@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-02-01 07:39 EST
+**Last Updated**: 2026-02-01 05:35 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 173 - Fix "Load new folder doesn't work" - Complete (see shard-003.md)
+**Current Iteration**: 174 - Fix "Rescanning a folder fails" - Research Complete, Ready to Implement (see shard-003.md)
 
 ## Project Structure
 
