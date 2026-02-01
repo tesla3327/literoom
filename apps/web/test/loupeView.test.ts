@@ -7,7 +7,7 @@
  * - Flagging in loupe view
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useLoupeKeyboard } from '~/composables/useLoupeKeyboard'
 import { useCatalogUIStore } from '~/stores/catalogUI'

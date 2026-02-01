@@ -1986,7 +1986,7 @@ describe('applyToneCurveAdaptive backend selection and fallback', () => {
 
       // LUT should be passed as the lut.lut Uint8Array
       expect(receivedLut).toBe(lut.lut)
-      expect(receivedLut?.length).toBe(256)
+      expect((receivedLut as Uint8Array | null)?.length).toBe(256)
     })
 
     it('returns the value from WASM fallback correctly', async () => {

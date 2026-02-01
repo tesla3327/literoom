@@ -451,12 +451,12 @@ describe('DecodeResponse types', () => {
         id: 'test-id',
         type: 'error',
         message: 'Decode failed',
-        code: 'DECODE_FAILED',
+        code: 'CORRUPTED_FILE',
       }
 
       expect(response.type).toBe('error')
       expect(response.message).toBe('Decode failed')
-      expect(response.code).toBe('DECODE_FAILED')
+      expect(response.code).toBe('CORRUPTED_FILE')
     })
   })
 })
@@ -792,7 +792,7 @@ describe('Discriminated union type checking', () => {
     const responses: DecodeResponse[] = [
       { id: '1', type: 'success', width: 100, height: 100, pixels: new Uint8Array() },
       { id: '2', type: 'file-type', fileType: 'jpeg' },
-      { id: '3', type: 'error', message: 'Failed', code: 'DECODE_FAILED' },
+      { id: '3', type: 'error', message: 'Failed', code: 'CORRUPTED_FILE' },
       {
         id: '4',
         type: 'generate-edited-thumbnail-result',

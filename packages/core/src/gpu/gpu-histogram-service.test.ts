@@ -642,9 +642,9 @@ describe('helper functions', () => {
       const result = await service.computeHistogramRgba(pixels, 1, 1)
 
       expect(result.hasHighlightClipping).toBe(true)
-      expect(result.highlightClipping.r).toBe(true)
-      expect(result.highlightClipping.g).toBe(false)
-      expect(result.highlightClipping.b).toBe(true)
+      expect(result.highlightClipping!.r).toBe(true)
+      expect(result.highlightClipping!.g).toBe(false)
+      expect(result.highlightClipping!.b).toBe(true)
     })
 
     it('detects shadow clipping (value 0)', async () => {
@@ -671,9 +671,9 @@ describe('helper functions', () => {
       const result = await service.computeHistogramRgba(pixels, 1, 1)
 
       expect(result.hasShadowClipping).toBe(true)
-      expect(result.shadowClipping.r).toBe(false)
-      expect(result.shadowClipping.g).toBe(true)
-      expect(result.shadowClipping.b).toBe(false)
+      expect(result.shadowClipping!.r).toBe(false)
+      expect(result.shadowClipping!.g).toBe(true)
+      expect(result.shadowClipping!.b).toBe(false)
     })
 
     it('sets per-channel clipping correctly', async () => {
@@ -711,14 +711,14 @@ describe('helper functions', () => {
       expect(result.hasShadowClipping).toBe(true)
 
       // Per-channel highlight clipping
-      expect(result.highlightClipping.r).toBe(true)
-      expect(result.highlightClipping.g).toBe(false)
-      expect(result.highlightClipping.b).toBe(true)
+      expect(result.highlightClipping!.r).toBe(true)
+      expect(result.highlightClipping!.g).toBe(false)
+      expect(result.highlightClipping!.b).toBe(true)
 
       // Per-channel shadow clipping
-      expect(result.shadowClipping.r).toBe(false)
-      expect(result.shadowClipping.g).toBe(true)
-      expect(result.shadowClipping.b).toBe(true)
+      expect(result.shadowClipping!.r).toBe(false)
+      expect(result.shadowClipping!.g).toBe(true)
+      expect(result.shadowClipping!.b).toBe(true)
     })
   })
 })
@@ -859,13 +859,13 @@ describe('edge cases', () => {
     const result = await service.computeHistogram(pixels, 10, 10)
 
     expect(result.hasShadowClipping).toBe(true)
-    expect(result.shadowClipping.r).toBe(true)
-    expect(result.shadowClipping.g).toBe(true)
-    expect(result.shadowClipping.b).toBe(true)
+    expect(result.shadowClipping!.r).toBe(true)
+    expect(result.shadowClipping!.g).toBe(true)
+    expect(result.shadowClipping!.b).toBe(true)
     expect(result.hasHighlightClipping).toBe(false)
-    expect(result.highlightClipping.r).toBe(false)
-    expect(result.highlightClipping.g).toBe(false)
-    expect(result.highlightClipping.b).toBe(false)
+    expect(result.highlightClipping!.r).toBe(false)
+    expect(result.highlightClipping!.g).toBe(false)
+    expect(result.highlightClipping!.b).toBe(false)
   })
 
   it('all white image - should have highlight clipping, no shadow clipping', async () => {
@@ -890,13 +890,13 @@ describe('edge cases', () => {
     const result = await service.computeHistogram(pixels, 10, 10)
 
     expect(result.hasHighlightClipping).toBe(true)
-    expect(result.highlightClipping.r).toBe(true)
-    expect(result.highlightClipping.g).toBe(true)
-    expect(result.highlightClipping.b).toBe(true)
+    expect(result.highlightClipping!.r).toBe(true)
+    expect(result.highlightClipping!.g).toBe(true)
+    expect(result.highlightClipping!.b).toBe(true)
     expect(result.hasShadowClipping).toBe(false)
-    expect(result.shadowClipping.r).toBe(false)
-    expect(result.shadowClipping.g).toBe(false)
-    expect(result.shadowClipping.b).toBe(false)
+    expect(result.shadowClipping!.r).toBe(false)
+    expect(result.shadowClipping!.g).toBe(false)
+    expect(result.shadowClipping!.b).toBe(false)
   })
 
   it('mixed values - some clipping in specific channels', async () => {
@@ -927,13 +927,13 @@ describe('edge cases', () => {
     expect(result.hasShadowClipping).toBe(true)
 
     // Per-channel highlight clipping
-    expect(result.highlightClipping.r).toBe(true)
-    expect(result.highlightClipping.g).toBe(false)
-    expect(result.highlightClipping.b).toBe(true)
+    expect(result.highlightClipping!.r).toBe(true)
+    expect(result.highlightClipping!.g).toBe(false)
+    expect(result.highlightClipping!.b).toBe(true)
 
     // Per-channel shadow clipping
-    expect(result.shadowClipping.r).toBe(true)
-    expect(result.shadowClipping.g).toBe(true)
-    expect(result.shadowClipping.b).toBe(false)
+    expect(result.shadowClipping!.r).toBe(true)
+    expect(result.shadowClipping!.g).toBe(true)
+    expect(result.shadowClipping!.b).toBe(false)
   })
 })

@@ -207,7 +207,7 @@ function createMockDevice(): MockGPUDevice {
     const buffer: MockGPUBuffer = {
       destroy: vi.fn(),
       mapAsync: vi.fn().mockResolvedValue(undefined),
-      getMappedRange: vi.fn(() => mockStagingBufferData.buffer),
+      getMappedRange: vi.fn(() => mockStagingBufferData.buffer as ArrayBuffer),
       unmap: vi.fn(),
     }
     createdBuffers.push(buffer)
@@ -312,6 +312,7 @@ function createF16Capabilities(): Partial<GPUCapabilities> {
       shaderF16: true,
       float32Filtering: true,
       textureCompressionBC: false,
+      subgroups: false,
     },
     limits: {
       maxTextureSize: 8192,
@@ -334,6 +335,7 @@ function createF32OnlyCapabilities(): Partial<GPUCapabilities> {
       shaderF16: false,
       float32Filtering: true,
       textureCompressionBC: false,
+      subgroups: false,
     },
     limits: {
       maxTextureSize: 8192,
@@ -406,7 +408,7 @@ describe('F16 Feature Detection', () => {
       isReady: true,
       device: mockDevice as unknown as GPUDevice,
       capabilities: null,
-    } as ReturnType<typeof getGPUCapabilityService>)
+    } as unknown as ReturnType<typeof getGPUCapabilityService>)
 
     const pipeline = new UberPipeline(mockDevice as unknown as GPUDevice)
     await pipeline.initialize()

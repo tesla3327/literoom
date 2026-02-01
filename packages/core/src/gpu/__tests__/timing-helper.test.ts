@@ -153,7 +153,7 @@ function createMockDevice(hasTimestampQuery: boolean = true): MockGPUDevice {
       size: descriptor.size,
       destroy: vi.fn(),
       mapAsync: vi.fn().mockResolvedValue(undefined),
-      getMappedRange: vi.fn(() => mockTimestampData.buffer),
+      getMappedRange: vi.fn(() => mockTimestampData.buffer as ArrayBuffer),
       unmap: vi.fn(),
     }
     createdBuffers.push(buffer)

@@ -103,6 +103,7 @@ function createMockThumbnailService(): IThumbnailService {
     isProcessingPreviews: false,
     invalidateThumbnail: vi.fn().mockResolvedValue(undefined),
     regenerateThumbnail: vi.fn().mockResolvedValue(undefined),
+    cancelBackgroundRequests: vi.fn().mockReturnValue(0),
   }
 }
 
@@ -1119,6 +1120,7 @@ describe('internal callback handlers', () => {
       isProcessingPreviews: false,
       invalidateThumbnail: vi.fn().mockResolvedValue(undefined),
       regenerateThumbnail: vi.fn().mockResolvedValue(undefined),
+      cancelBackgroundRequests: vi.fn().mockReturnValue(0),
     }
 
     return mock
@@ -3117,7 +3119,7 @@ describe('listFolders', () => {
     // Mock loadHandle to return a handle with granted permission
     const mockHandle = createMockHandle('granted')
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -3176,10 +3178,10 @@ describe('listFolders', () => {
     const serviceInternal = service as unknown as ServiceInternals
     const loadHandleSpy = vi.spyOn(
       serviceInternal,
-      'loadHandle' as keyof typeof serviceInternal
+      'loadHandle'
     ) as ReturnType<typeof vi.spyOn>
 
-    loadHandleSpy.mockImplementation(async (key: string) => {
+    ;(loadHandleSpy as ReturnType<typeof vi.fn>).mockImplementation(async (key: string) => {
       if (key === 'literoom-folder-1') {
         return createMockHandle('granted')
       } else if (key === 'literoom-folder-2') {
@@ -3219,7 +3221,7 @@ describe('listFolders', () => {
 
     // Mock loadHandle to return null
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(null)
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(null)
 
     const folders = await service.listFolders()
 
@@ -3249,7 +3251,7 @@ describe('listFolders', () => {
 
     // Mock loadHandle to throw an error
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockRejectedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockRejectedValue(
       new Error('IndexedDB error')
     )
 
@@ -3287,7 +3289,7 @@ describe('listFolders', () => {
     } as unknown as FileSystemDirectoryHandle
 
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -3321,7 +3323,7 @@ describe('listFolders', () => {
 
     const mockHandle = createMockHandle('granted')
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -3353,7 +3355,7 @@ describe('listFolders', () => {
 
     const mockHandle = createMockHandle('granted')
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -3704,7 +3706,7 @@ describe('setCurrentFolder', () => {
     const originalAdd = actualDb.folders.add
     const originalGet = actualDb.folders.get
     actualDb.folders.where = mockWhere as typeof actualDb.folders.where
-    actualDb.folders.add = mockAdd as typeof actualDb.folders.add
+    actualDb.folders.add = mockAdd as unknown as typeof actualDb.folders.add
     actualDb.folders.get = mockGet as typeof actualDb.folders.get
 
     try {
@@ -3753,7 +3755,7 @@ describe('setCurrentFolder', () => {
     const originalAdd = actualDb.folders.add
     const originalGet = actualDb.folders.get
     actualDb.folders.where = mockWhere as typeof actualDb.folders.where
-    actualDb.folders.add = mockAdd as typeof actualDb.folders.add
+    actualDb.folders.add = mockAdd as unknown as typeof actualDb.folders.add
     actualDb.folders.get = mockGet as typeof actualDb.folders.get
 
     try {
@@ -4493,7 +4495,7 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock loadHandle to return null
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(null)
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(null)
 
     const result = await service.loadFolderById(1)
 
@@ -4515,7 +4517,7 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock loadHandle to return the mock handle
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -4540,7 +4542,7 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock loadHandle to return the mock handle
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -4564,14 +4566,14 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock loadHandle
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4597,14 +4599,14 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock loadHandle
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4626,14 +4628,14 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock loadHandle
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4668,14 +4670,14 @@ describe('loadFolderById comprehensive tests', () => {
 
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty array (new folder has no assets)
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4696,7 +4698,7 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -4708,7 +4710,7 @@ describe('loadFolderById comprehensive tests', () => {
     ]
     const mockToArray = vi.fn().mockResolvedValue(assetRecords)
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4733,14 +4735,14 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     const updateSpy = vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4762,7 +4764,7 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -4773,7 +4775,7 @@ describe('loadFolderById comprehensive tests', () => {
     ]
     const mockToArray = vi.fn().mockResolvedValue(assetRecords)
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4803,14 +4805,14 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty array
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4834,7 +4836,7 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -4843,7 +4845,7 @@ describe('loadFolderById comprehensive tests', () => {
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
     const whereSpy = vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({
       equals: mockEquals,
-    } as ReturnType<typeof dbModule.db.assets.where>)
+    } as unknown as ReturnType<typeof dbModule.db.assets.where>)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
 
     await service.loadFolderById(123)
@@ -4862,7 +4864,7 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
@@ -4870,7 +4872,7 @@ describe('loadFolderById comprehensive tests', () => {
     const assetRecords = [createMockAssetRecord({ uuid: 'uuid-1' })]
     const mockToArray = vi.fn().mockResolvedValue(assetRecords)
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4889,14 +4891,14 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock handle
     const mockHandle = createMockFolderHandle({ queryPermission: 'granted' })
     const serviceInternal = service as unknown as ServiceInternals
-    vi.spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal).mockResolvedValue(
+    vi.spyOn(serviceInternal, 'loadHandle').mockResolvedValue(
       mockHandle
     )
 
     // Mock assets query to return empty array
     const mockToArray = vi.fn().mockResolvedValue([])
     const mockEquals = vi.fn().mockReturnValue({ toArray: mockToArray })
-    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as ReturnType<
+    vi.spyOn(dbModule.db.assets, 'where').mockReturnValue({ equals: mockEquals } as unknown as ReturnType<
       typeof dbModule.db.assets.where
     >)
     vi.spyOn(dbModule.db.folders, 'update').mockResolvedValue(1)
@@ -4918,7 +4920,7 @@ describe('loadFolderById comprehensive tests', () => {
     // Mock loadHandle to capture the key it receives
     const serviceInternal = service as unknown as ServiceInternals
     const loadHandleSpy = vi
-      .spyOn(serviceInternal, 'loadHandle' as keyof typeof serviceInternal)
+      .spyOn(serviceInternal, 'loadHandle')
       .mockResolvedValue(null)
 
     await service.loadFolderById(1)

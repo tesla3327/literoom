@@ -16,7 +16,7 @@ describe('parseDecodeResponse', () => {
         id: 'test-id',
         type: 'error',
         message: 'Test error',
-        code: 'DECODE_ERROR'
+        code: 'UNKNOWN'
       }
 
       const result = parseDecodeResponse(response)
@@ -25,7 +25,7 @@ describe('parseDecodeResponse', () => {
       if (result.type === 'error') {
         expect(result.error).toBeInstanceOf(DecodeError)
         expect(result.error.message).toBe('Test error')
-        expect(result.error.code).toBe('DECODE_ERROR')
+        expect(result.error.code).toBe('UNKNOWN')
       }
     })
 
@@ -62,18 +62,18 @@ describe('parseDecodeResponse', () => {
       }
     })
 
-    it('returns file type for arw', () => {
+    it('returns file type for raw', () => {
       const response: DecodeResponse = {
         id: 'test-id',
         type: 'file-type',
-        fileType: 'arw'
+        fileType: 'raw'
       }
 
       const result = parseDecodeResponse(response)
 
       expect(result.type).toBe('success')
       if (result.type === 'success') {
-        expect(result.value).toBe('arw')
+        expect(result.value).toBe('raw')
       }
     })
   })

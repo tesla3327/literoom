@@ -43,6 +43,7 @@ function createMockCache(): IThumbnailCache {
     clearMemory: vi.fn(() => {
       storage.clear()
     }),
+    clearAll: vi.fn(),
     has: vi.fn(async (assetId: string) => storage.has(assetId)),
   }
 }
@@ -66,6 +67,7 @@ function createMockPreviewCache(): IPreviewCache {
     clearMemory: vi.fn(() => {
       storage.clear()
     }),
+    clearAll: vi.fn(),
     has: vi.fn(async (assetId: string) => storage.has(assetId)),
   }
 }

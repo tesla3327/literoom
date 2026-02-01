@@ -198,7 +198,7 @@ function createMockDevice(): MockGPUDevice {
     const buffer: MockGPUBuffer = {
       destroy: vi.fn(),
       mapAsync: vi.fn().mockResolvedValue(undefined),
-      getMappedRange: vi.fn(() => mockStagingBufferData.buffer),
+      getMappedRange: vi.fn(() => mockStagingBufferData.buffer as ArrayBuffer),
       unmap: vi.fn(),
     }
     createdBuffers.push(buffer)

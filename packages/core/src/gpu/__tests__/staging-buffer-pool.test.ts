@@ -618,7 +618,7 @@ describe('edge cases', () => {
 
       // Now resolve first
       if (resolveFirst) {
-        resolveFirst()
+        ;(resolveFirst as () => void)()
       }
 
       // Wait for first to complete
@@ -899,7 +899,7 @@ describe('integration scenarios', () => {
     const skippedCount = { value: 0 }
 
     // Track which readbacks were skipped
-    const originalAcquire = pool.acquire.bind(pool)
+    const originalAcquire = pool.acquire.bind(pool) as () => ReturnType<typeof pool.acquire>
     pool.acquire = () => {
       const result = originalAcquire()
       if (result === null) {
