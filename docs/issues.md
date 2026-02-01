@@ -3,10 +3,12 @@
 ## Table of Contents
 
 ### Open Issues
+- [Rescanning a folder fails (Critical)](#rescanning-a-folder-fails)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
 - [Research: Edit operation caching (Low)](#research-edit-operation-caching)
 
 ### Recently Solved
+- [Load new folder doesn't work (Critical)](#load-new-folder-doesnt-work---solved)
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid---solved)
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option---solved)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste---solved)
@@ -64,6 +66,15 @@
 ---
 
 ## Open Issues
+
+### Rescanning a folder fails
+
+**Severity**: Critical | **Status**: Open | **Found**: 2026-02-01
+
+**Problem**:
+Rescanning a folder fails. Further investigation needed.
+
+---
 
 ### debouncedFullRender.cancel is not a function - CANNOT REPRODUCE
 
@@ -549,6 +560,39 @@ Added `:unmount-on-hide="false"` to the UAccordion component in EditControlsPane
 ---
 
 ## Recently Solved
+
+### Load new folder doesn't work - SOLVED
+
+**Severity**: Critical | **Status**: **SOLVED** | **Found**: 2026-02-01 | **Fixed**: 2026-02-01
+
+**Problem**:
+Loading a new folder does not work. Further investigation needed.
+
+**Root Cause**:
+Multiple state management issues when switching folders:
+1. Edit stores (editStore, editUIStore) were not cleared when switching folders
+2. CatalogService didn't cancel in-progress operations (PhotoProcessor, thumbnail/preview requests)
+3. `loadFromDatabase()` didn't clear `_assets` before loading new assets
+
+**Fix Applied**:
+1. Added `clear()` method to editUIStore to reset all UI state
+2. Added editStore.clear() and editUIStore.clear() to useCatalog.selectFolder()
+3. Added editStore.clear() and editUIStore.clear() to useRecentFolders.openRecentFolder()
+4. Added `resetForFolderChange()` method to CatalogService that:
+   - Cancels any in-progress scan
+   - Cancels all pending PhotoProcessor requests
+   - Cancels all pending thumbnail/preview requests
+   - Clears in-memory assets
+5. Updated loadFromDatabase() to clear _assets before loading
+6. Updated selectFolder() and loadFolderById() to call resetForFolderChange()
+
+**Files Modified**:
+- apps/web/app/stores/editUI.ts - Added clear() method
+- apps/web/app/composables/useCatalog.ts - Added edit store clearing
+- apps/web/app/composables/useRecentFolders.ts - Added edit store clearing
+- packages/core/src/catalog/catalog-service.ts - Added resetForFolderChange(), fixed loadFromDatabase()
+
+---
 
 ### previewUrl.value.startsWith is not a function - SOLVED
 

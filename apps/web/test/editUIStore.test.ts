@@ -1387,4 +1387,157 @@ describe('editUIStore', () => {
       })
     })
   })
+
+  // ============================================================================
+  // Clear
+  // ============================================================================
+
+  describe('clear', () => {
+    beforeEach(() => {
+      // Set up non-default state for all properties before each test
+      store.setImageDimensions(2000, 1500)
+      store.setViewportDimensions(1000, 800)
+      store.initializeZoom()
+    })
+
+    it('should reset camera to default', () => {
+      // Modify camera from default
+      store.setCamera({ scale: 2, panX: 100, panY: 50 })
+      expect(store.camera.scale).not.toBe(1)
+
+      store.clear()
+
+      expect(store.camera).toEqual({ scale: 1, panX: 0, panY: 0 })
+    })
+
+    it('should reset zoomPreset to "fit"', () => {
+      // Modify zoomPreset from default
+      store.setZoomPreset('100%')
+      expect(store.zoomPreset).toBe('100%')
+
+      store.clear()
+
+      expect(store.zoomPreset).toBe('fit')
+    })
+
+    it('should reset isZoomInteracting to false', () => {
+      // Modify isZoomInteracting from default
+      store.setZoomInteracting(true)
+      expect(store.isZoomInteracting).toBe(true)
+
+      store.clear()
+
+      expect(store.isZoomInteracting).toBe(false)
+    })
+
+    it('should clear the zoomCache', () => {
+      // Add items to zoom cache
+      store.setZoomPreset('100%')
+      store.cacheZoomForAsset('asset-1')
+      store.setZoomPreset('200%')
+      store.cacheZoomForAsset('asset-2')
+
+      store.clear()
+
+      // After clear, restoring should reset to fit (not cached value)
+      store.setImageDimensions(2000, 1500)
+      store.setViewportDimensions(1000, 800)
+      store.restoreZoomForAsset('asset-1')
+      expect(store.zoomPreset).toBe('fit')
+      expect(store.wasRestoredFromCache).toBe(false)
+    })
+
+    it('should reset wasRestoredFromCache to false', () => {
+      // Set wasRestoredFromCache to true
+      store.setZoomPreset('100%')
+      store.cacheZoomForAsset('asset-1')
+      store.restoreZoomForAsset('asset-1')
+      expect(store.wasRestoredFromCache).toBe(true)
+
+      store.clear()
+
+      expect(store.wasRestoredFromCache).toBe(false)
+    })
+
+    it('should reset imageDimensions and viewportDimensions', () => {
+      // Already set in beforeEach
+      expect(store.imageDimensions.width).toBe(2000)
+      expect(store.imageDimensions.height).toBe(1500)
+      expect(store.viewportDimensions.width).toBe(1000)
+      expect(store.viewportDimensions.height).toBe(800)
+
+      store.clear()
+
+      expect(store.imageDimensions).toEqual({ width: 0, height: 0 })
+      expect(store.viewportDimensions).toEqual({ width: 0, height: 0 })
+    })
+
+    it('should reset clipping overlays', () => {
+      // Enable clipping overlays
+      store.toggleClippingOverlays()
+      expect(store.showHighlightClipping).toBe(true)
+      expect(store.showShadowClipping).toBe(true)
+
+      store.clear()
+
+      expect(store.showHighlightClipping).toBe(false)
+      expect(store.showShadowClipping).toBe(false)
+    })
+
+    it('should reset crop tool state', () => {
+      // Activate crop tool and set pending crop
+      store.activateCropTool()
+      store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+      expect(store.isCropToolActive).toBe(true)
+      expect(store.pendingCrop).not.toBe(null)
+      expect(store.hasPendingCrop).toBe(true)
+
+      store.clear()
+
+      expect(store.isCropToolActive).toBe(false)
+      expect(store.pendingCrop).toBe(null)
+      expect(store.hasPendingCrop).toBe(false)
+    })
+
+    it('should reset mask tool state', () => {
+      // Activate mask tool with drawing mode
+      store.setMaskDrawingMode('linear')
+      expect(store.isMaskToolActive).toBe(true)
+      expect(store.maskDrawingMode).toBe('linear')
+
+      store.clear()
+
+      expect(store.isMaskToolActive).toBe(false)
+      expect(store.maskDrawingMode).toBe(null)
+    })
+
+    it('should reset all state when everything is modified', () => {
+      // Modify ALL state to non-default values
+      store.setCamera({ scale: 2, panX: 100, panY: 50 })
+      store.setZoomPreset('200%')
+      store.setZoomInteracting(true)
+      store.cacheZoomForAsset('asset-1')
+      store.restoreZoomForAsset('asset-1')
+      store.toggleClippingOverlays()
+      store.activateCropTool()
+      store.setPendingCrop({ left: 0.1, top: 0.2, width: 0.5, height: 0.6 })
+      store.setMaskDrawingMode('radial')
+
+      store.clear()
+
+      // Verify ALL state is reset
+      expect(store.camera).toEqual({ scale: 1, panX: 0, panY: 0 })
+      expect(store.zoomPreset).toBe('fit')
+      expect(store.isZoomInteracting).toBe(false)
+      expect(store.wasRestoredFromCache).toBe(false)
+      expect(store.imageDimensions).toEqual({ width: 0, height: 0 })
+      expect(store.viewportDimensions).toEqual({ width: 0, height: 0 })
+      expect(store.showHighlightClipping).toBe(false)
+      expect(store.showShadowClipping).toBe(false)
+      expect(store.isCropToolActive).toBe(false)
+      expect(store.pendingCrop).toBe(null)
+      expect(store.isMaskToolActive).toBe(false)
+      expect(store.maskDrawingMode).toBe(null)
+    })
+  })
 })

@@ -68,3 +68,90 @@ Increased preview memory cache from 20 to 50 items:
 
 ---
 
+## Iteration 173: Fix "Load new folder doesn't work" (Critical)
+
+**Time**: 2026-02-01 07:30 EST
+**Status**: Complete
+**Task**: Investigate and fix the critical issue where loading a new folder doesn't work
+
+### Problem
+The issues.md file reports that loading a new folder does not work. This is a critical bug that prevents users from using the app with their own photos after the initial folder selection.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+1. CatalogService folder loading implementation
+2. useCatalog composable folder switching logic
+3. Pinia store state management during folder changes
+4. UI components involved in folder selection
+5. ThumbnailService and cache clearing
+
+### Root Causes Identified
+
+1. **Edit stores NOT cleared on folder change** (CRITICAL)
+   - `editStore.clear()` and `editUIStore.clear()` never called when switching folders
+   - Edit cache persists across folder changes, causing cross-folder contamination
+
+2. **PhotoProcessor requests NOT cancelled** (CRITICAL)
+   - In-flight PhotoProcessor requests from old folder continue after switch
+   - Callbacks fire with stale data from wrong folder
+
+3. **Missing `_assets.clear()` in `loadFromDatabase()`** (HIGH)
+   - Assets accumulate from multiple folders when restoring session
+
+4. **Thumbnail/Preview caches NOT cleared** (HIGH)
+   - Memory caches retain old folder's data during switch
+
+### Solution Implemented
+
+1. **Added `clear()` method to editUIStore** (`apps/web/app/stores/editUI.ts`):
+   - Resets all zoom/pan state (camera, preset, cache, dimensions)
+   - Resets clipping overlays
+   - Resets crop tool state
+   - Resets mask tool state
+
+2. **Added edit store clearing to `useCatalog.selectFolder()`** (`apps/web/app/composables/useCatalog.ts`):
+   ```typescript
+   catalogStore.clear()
+   selectionStore.clear()
+   editStore.clear()      // NEW
+   editUIStore.clear()    // NEW
+   ```
+
+3. **Added edit store clearing to `useRecentFolders.openRecentFolder()`** (`apps/web/app/composables/useRecentFolders.ts`):
+   ```typescript
+   catalogStore.clear()
+   selectionStore.clear()
+   editStore.clear()      // NEW
+   editUIStore.clear()    // NEW
+   ```
+
+4. **Added `resetForFolderChange()` to CatalogService** (`packages/core/src/catalog/catalog-service.ts`):
+   - Cancels any in-progress scan
+   - Cancels all pending PhotoProcessor requests
+   - Cancels all pending thumbnail/preview requests
+   - Clears in-memory assets
+
+5. **Fixed `loadFromDatabase()`** to clear assets before loading
+
+6. **Updated `selectFolder()` and `loadFolderById()`** to call `resetForFolderChange()`
+
+### Files Modified (4)
+- `apps/web/app/stores/editUI.ts` - Added `clear()` method (25 lines)
+- `apps/web/app/composables/useCatalog.ts` - Added edit store clearing
+- `apps/web/app/composables/useRecentFolders.ts` - Added edit store clearing
+- `packages/core/src/catalog/catalog-service.ts` - Added `resetForFolderChange()`, fixed `loadFromDatabase()`
+
+### Tests Added
+- 10 new tests for `editUIStore.clear()` in `apps/web/test/editUIStore.test.ts`
+
+### Test Results
+- Core unit tests: 51 files, 2404 passing
+- Web unit tests: 39 files, 1419 passing (10 new tests)
+
+### Documentation Updated
+- `docs/research/2026-02-01-load-new-folder-bug-synthesis.md` - Research findings
+- `docs/plans/2026-02-01-load-new-folder-fix-plan.md` - Implementation plan
+- `docs/issues.md` - Marked issue as SOLVED
+
+---
+

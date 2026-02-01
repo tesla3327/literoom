@@ -134,6 +134,12 @@ export function useCatalog() {
     catalogStore.clear()
     selectionStore.clear()
 
+    // Clear edit state to prevent cross-folder contamination
+    const editStore = useEditStore()
+    const editUIStore = useEditUIStore()
+    editStore.clear()
+    editUIStore.clear()
+
     if (isDemoMode) {
       catalogStore.setFolderPath('Demo Photos')
     }

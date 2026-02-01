@@ -518,6 +518,37 @@ export const useEditUIStore = defineStore('editUI', () => {
     maskDrawingMode.value = null
   }
 
+  // ============================================================================
+  // Clear All State
+  // ============================================================================
+
+  /**
+   * Reset ALL UI state to defaults.
+   * Call this when leaving the edit view or switching catalogs.
+   */
+  function clear(): void {
+    // Zoom/Pan State
+    camera.value = { scale: 1, panX: 0, panY: 0 }
+    zoomPreset.value = 'fit'
+    isZoomInteracting.value = false
+    zoomCache.value = new Map()
+    wasRestoredFromCache.value = false
+    imageDimensions.value = { width: 0, height: 0 }
+    viewportDimensions.value = { width: 0, height: 0 }
+
+    // Clipping State
+    showHighlightClipping.value = false
+    showShadowClipping.value = false
+
+    // Crop Tool State
+    isCropToolActive.value = false
+    pendingCrop.value = null
+
+    // Mask Tool State
+    isMaskToolActive.value = false
+    maskDrawingMode.value = null
+  }
+
   return {
     // Zoom/Pan State
     camera,
@@ -574,5 +605,7 @@ export const useEditUIStore = defineStore('editUI', () => {
     deactivateMaskTool,
     setMaskDrawingMode,
     cancelMaskDrawing,
+    // Clear All State
+    clear,
   }
 })

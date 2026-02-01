@@ -206,6 +206,8 @@ export class CatalogService implements ICatalogService {
 
     try {
       const handle = await (window as any).showDirectoryPicker({ mode: 'read' })
+      // Reset state from any previous folder
+      this.resetForFolderChange()
       await this.setCurrentFolder(handle)
     } catch (error) {
       if (error instanceof DOMException) {
@@ -708,6 +710,25 @@ export class CatalogService implements ICatalogService {
     this._state = { status: 'initializing' }
   }
 
+  /**
+   * Reset internal state when switching to a different folder.
+   * Cancels in-progress operations and clears caches.
+   */
+  private resetForFolderChange(): void {
+    // Cancel any in-progress scan
+    this.cancelScan()
+
+    // Cancel all pending photo processing
+    this.photoProcessor.cancelAll()
+
+    // Cancel all pending thumbnail/preview requests
+    this.thumbnailService.cancelAll()
+    this.thumbnailService.cancelAllPreviews()
+
+    // Clear in-memory assets
+    this._assets.clear()
+  }
+
   // ==========================================================================
   // Internal Helpers
   // ==========================================================================
@@ -896,6 +917,9 @@ export class CatalogService implements ICatalogService {
     this._currentFolder = handle
     this._currentFolderId = folder.id!
 
+    // Clear existing assets before loading new ones
+    this._assets.clear()
+
     // Load assets from database
     const records = await db.assets.where('folderId').equals(folder.id!).toArray()
     for (const record of records) {
@@ -977,12 +1001,12 @@ export class CatalogService implements ICatalogService {
       }
     }
 
+    // Reset state from any previous folder
+    this.resetForFolderChange()
+
     // Set as current folder
     this._currentFolder = handle
     this._currentFolderId = folderId
-
-    // Clear existing assets
-    this._assets.clear()
 
     // Load assets from database
     const records = await db.assets.where('folderId').equals(folderId).toArray()

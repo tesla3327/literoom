@@ -94,6 +94,12 @@ export function useRecentFolders() {
       catalogStore.clear()
       selectionStore.clear()
 
+      // Clear edit state to prevent cross-folder contamination
+      const editStore = useEditStore()
+      const editUIStore = useEditUIStore()
+      editStore.clear()
+      editUIStore.clear()
+
       // Load the folder
       const success = await service.loadFolderById(folder.id)
       if (success) {
