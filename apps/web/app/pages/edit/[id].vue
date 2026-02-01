@@ -361,7 +361,7 @@ onUnmounted(() => {
       </aside>
 
       <!-- Center: preview canvas -->
-      <main class="flex-1 relative min-w-0">
+      <main class="flex-1 relative min-w-0" data-testid="edit-preview">
         <EditPreviewCanvas
           ref="previewCanvasRef"
           :asset-id="assetId"
@@ -369,7 +369,7 @@ onUnmounted(() => {
       </main>
 
       <!-- Right panel: edit controls -->
-      <aside class="w-80 border-l border-gray-800 overflow-y-auto flex-shrink-0">
+      <aside class="w-80 border-l border-gray-800 overflow-y-auto flex-shrink-0" data-testid="edit-panel">
         <EditControlsPanel :asset-id="assetId" />
       </aside>
     </div>

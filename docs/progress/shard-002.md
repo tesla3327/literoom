@@ -618,3 +618,62 @@ beginRenderPass: vi.fn(() => ({
 
 ---
 
+## Iteration 171: Fix E2E Test Environment Configuration
+
+**Time**: 2026-01-31 23:42 EST
+**Status**: Complete
+**Task**: Fix E2E tests failing due to demo mode not being enabled properly
+
+### Problem
+All E2E tests were failing because `[data-testid="catalog-grid"]` was not appearing within the 15 second timeout. The tests were waiting for the catalog grid to load, but demo mode wasn't being activated despite `LITEROOM_DEMO_MODE=true` being set in the Playwright config.
+
+### Root Cause
+The Nuxt config was using `import.meta.env.LITEROOM_DEMO_MODE === 'true'` to read the environment variable, but Vite only exposes environment variables with `VITE_` prefix to `import.meta.env`. The `LITEROOM_DEMO_MODE` variable was never being captured.
+
+### Solution Implemented
+Updated `apps/web/nuxt.config.ts` to use `process.env.LITEROOM_DEMO_MODE` instead of `import.meta.env.LITEROOM_DEMO_MODE`:
+
+```typescript
+runtimeConfig: {
+  public: {
+    // Demo mode is enabled via LITEROOM_DEMO_MODE=true environment variable
+    // This is evaluated at Nuxt startup time
+    demoMode: !!process.env.LITEROOM_DEMO_MODE && process.env.LITEROOM_DEMO_MODE === 'true',
+  },
+},
+```
+
+Also added a Vite define to expose the variable to client-side code if needed:
+```typescript
+vite: {
+  define: {
+    'import.meta.env.LITEROOM_DEMO_MODE': JSON.stringify(process.env.LITEROOM_DEMO_MODE || 'false'),
+  },
+}
+```
+
+### Additional Fixes
+Added missing `data-testid` attributes to the edit page for E2E test selectors:
+- Added `data-testid="edit-preview"` to the main preview area (`<main>` element)
+- Added `data-testid="edit-panel"` to the right controls panel (`<aside>` element)
+
+### Files Modified
+- `apps/web/nuxt.config.ts` - Fixed environment variable reading for demo mode
+- `apps/web/app/pages/edit/[id].vue` - Added data-testid attributes
+
+### Test Results
+- **E2E tests**: 109 passed, 57 failed, 1 skipped
+- **Previous state**: All E2E tests failing (grid not loading)
+- **After fix**: Grid loads properly, majority of tests pass
+
+### Remaining E2E Test Failures
+The remaining 57 failures are due to missing `data-testid` attributes on various UI elements:
+- Histogram components (`histogram-display`, `histogram-shadow-clipping`, etc.)
+- Zoom controls (`zoom-in-button`, `zoom-out-button`, `zoom-level`)
+- Export modal elements
+- Filmstrip thumbnails
+
+These are pre-existing gaps in data-testid coverage, not regressions from this fix.
+
+---
+

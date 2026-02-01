@@ -25,7 +25,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      demoMode: import.meta.env.LITEROOM_DEMO_MODE === 'true',
+      // Demo mode is enabled via LITEROOM_DEMO_MODE=true environment variable
+      // This is evaluated at Nuxt startup time
+      demoMode: !!process.env.LITEROOM_DEMO_MODE && process.env.LITEROOM_DEMO_MODE === 'true',
     },
   },
 
@@ -38,6 +40,10 @@ export default defineNuxtConfig({
     plugins: [wasm(), topLevelAwait()],
     worker: {
       plugins: () => [wasm(), topLevelAwait()],
+    },
+    // Expose LITEROOM_DEMO_MODE via Vite's define for client-side access
+    define: {
+      'import.meta.env.LITEROOM_DEMO_MODE': JSON.stringify(process.env.LITEROOM_DEMO_MODE || 'false'),
     },
   },
 
