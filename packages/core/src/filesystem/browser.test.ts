@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { BrowserFileSystemProvider, isFileSystemAccessSupported } from './browser'
+import type { FileHandle } from './types'
 import { FileSystemError } from './types'
 
 // Helper to create a mock native directory handle
@@ -43,14 +44,14 @@ function createMockValuesIterator(entries: FileSystemHandle[]) {
     return {
       async next() {
         if (index < entries.length) {
-          return { done: false, value: entries[index++] }
+          return { done: false as const, value: entries[index++] }
         }
-        return { done: true, value: undefined }
+        return { done: true as const, value: undefined }
       },
       [Symbol.asyncIterator]() {
         return this
       },
-    }
+    } as AsyncIterableIterator<FileSystemHandle>
   }
 }
 
@@ -65,19 +66,19 @@ function createMockValuesIteratorFromDescriptors(
         if (index < entries.length) {
           const entry = entries[index++]
           if (entry.handle) {
-            return { done: false, value: entry.handle }
+            return { done: false as const, value: entry.handle }
           }
           const handle = entry.kind === 'file'
             ? createMockNativeFileHandle({ name: entry.name })
             : createMockNativeDirectoryHandle({ name: entry.name })
-          return { done: false, value: handle }
+          return { done: false as const, value: handle as FileSystemHandle }
         }
-        return { done: true, value: undefined }
+        return { done: true as const, value: undefined }
       },
       [Symbol.asyncIterator]() {
         return this
       },
-    }
+    } as AsyncIterableIterator<FileSystemHandle>
   }
 }
 
@@ -117,7 +118,7 @@ describe('isFileSystemAccessSupported', () => {
     // Note: The 'in' operator checks if property exists, not if it has a truthy value
     // @ts-expect-error - mocking browser API
     globalThis.window = {
-      showDirectoryPicker: undefined,
+      showDirectoryPicker: undefined as unknown as typeof window.showDirectoryPicker,
     }
 
     // This returns true because the property exists in the object
@@ -125,12 +126,12 @@ describe('isFileSystemAccessSupported', () => {
   })
 
   it('returns true when showDirectoryPicker exists alongside other properties', () => {
-    // @ts-expect-error - mocking browser API
-    globalThis.window = {
+    // Use 'as any' since Window type declarations may vary
+    (globalThis as any).window = {
       showDirectoryPicker: vi.fn(),
       showOpenFilePicker: vi.fn(),
       showSaveFilePicker: vi.fn(),
-      location: { href: 'https://example.com' },
+      location: { href: 'https://example.com' } as unknown as Location,
     }
 
     expect(isFileSystemAccessSupported()).toBe(true)
@@ -725,7 +726,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       const result = await provider.queryPermission(fileHandle, 'read')
 
@@ -809,7 +810,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       const result = await provider.requestPermission(fileHandle, 'read')
 
@@ -843,7 +844,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       const result = await provider.readFile(fileHandle)
 
@@ -872,7 +873,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       await expect(provider.readFile(fileHandle)).rejects.toThrow(FileSystemError)
       await expect(provider.readFile(fileHandle)).rejects.toMatchObject({
@@ -894,7 +895,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       const result = await provider.readFileAsBlob(fileHandle)
 
@@ -922,7 +923,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       await expect(provider.readFileAsBlob(fileHandle)).rejects.toThrow(FileSystemError)
       await expect(provider.readFileAsBlob(fileHandle)).rejects.toMatchObject({
@@ -949,7 +950,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       const metadata = await provider.getFileMetadata(fileHandle)
 
@@ -978,7 +979,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       const metadata = await provider.getFileMetadata(fileHandle)
 
@@ -1005,7 +1006,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       await expect(provider.getFileMetadata(fileHandle)).rejects.toThrow(FileSystemError)
       await expect(provider.getFileMetadata(fileHandle)).rejects.toMatchObject({
@@ -1030,7 +1031,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
       const data = new ArrayBuffer(100)
 
       await provider.writeFile(fileHandle, data)
@@ -1055,7 +1056,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
       const data = new Blob(['test content'], { type: 'image/jpeg' })
 
       await provider.writeFile(fileHandle, data)
@@ -1079,7 +1080,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
       const data = 'Hello, World!'
 
       await provider.writeFile(fileHandle, data)
@@ -1100,7 +1101,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       await expect(provider.writeFile(fileHandle, new ArrayBuffer(10))).rejects.toThrow(FileSystemError)
       await expect(provider.writeFile(fileHandle, new ArrayBuffer(10))).rejects.toMatchObject({
@@ -1119,7 +1120,7 @@ describe('BrowserFileSystemProvider', () => {
 
       const dirHandle = await provider.selectDirectory()
       const entries = await provider.listDirectory(dirHandle)
-      const fileHandle = entries[0].handle
+      const fileHandle = entries[0].handle as FileHandle
 
       await expect(provider.writeFile(fileHandle, new ArrayBuffer(10))).rejects.toThrow(FileSystemError)
       await expect(provider.writeFile(fileHandle, new ArrayBuffer(10))).rejects.toMatchObject({

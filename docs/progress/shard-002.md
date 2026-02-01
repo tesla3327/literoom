@@ -459,3 +459,52 @@ Created a complete loupe view system for rapid photo culling:
 
 ---
 
+## Iteration 168: Fix TypeScript Errors in browser.test.ts
+
+**Time**: 2026-01-31 22:51 EST
+**Status**: Complete
+**Task**: Fix TypeScript errors blocking CI
+
+### Problem
+TypeScript errors in `packages/core/src/filesystem/browser.test.ts` were blocking CI:
+1. Unused `@ts-expect-error` directive at line 128
+2. `showOpenFilePicker` does not exist on type `Window` at line 131
+3. 17 instances of `DirectoryHandle | FileHandle` not assignable to `FileHandle` at various lines (848, 877, 878, etc.)
+
+### Root Cause
+The test file was accessing `entries[0].handle` which returns `FileHandle | DirectoryHandle` (the union type from `FileEntry.handle`), but then passing it to methods like `readFile()` which expect `FileHandle` only. TypeScript correctly flagged the type mismatch.
+
+### Solution Implemented
+
+#### 1. Added FileHandle import
+```typescript
+import type { FileHandle } from './types'
+```
+
+#### 2. Fixed Window mocking
+Changed from `@ts-expect-error` to explicit `as any` cast:
+```typescript
+(globalThis as any).window = {
+  showDirectoryPicker: vi.fn(),
+  showOpenFilePicker: vi.fn(),
+  ...
+}
+```
+
+#### 3. Added type assertions for file handles
+Applied `as FileHandle` assertion to all 17 occurrences:
+```typescript
+const fileHandle = entries[0].handle as FileHandle
+```
+
+### Files Modified
+- `packages/core/src/filesystem/browser.test.ts` - Added FileHandle import, fixed Window mock, added type assertions
+
+### Test Results
+- **Core unit tests**: 51 files, 2395 passing (9 pre-existing GPU mock failures)
+- **Web unit tests**: 39 files, 1409 passing
+- **Lint**: ✅ Passes
+- **TypeCheck**: ✅ Passes
+
+---
+
