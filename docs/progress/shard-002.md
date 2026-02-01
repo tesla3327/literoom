@@ -371,3 +371,91 @@ CI was blocked by:
 - **Tests**: ✅ 2395 core tests pass (9 pre-existing GPU mock failures)
 - **Tests**: ✅ Web tests pass when run individually
 
+---
+
+## Iteration 167: Loupe View Implementation
+
+**Time**: 2026-01-31 22:28 EST
+**Status**: In Progress
+**Task**: Implement Loupe View for catalog culling workflow
+
+### Problem
+The spec (section 3.4) requires two views for the culling workflow:
+- **Grid view** (default): thumbnails in responsive grid ✅ Implemented
+- **Loupe view**: single image large preview + filmstrip ❌ Not implemented
+
+Currently the catalogUI store tracks `viewMode` ('grid' | 'loupe') but there's no Loupe component. Users can only view photos at full size by entering edit mode, which is heavy-weight for pure culling.
+
+### Research Phase
+Used 5 parallel subagents to investigate:
+1. Existing catalogUI store viewMode implementation
+2. EditFilmstrip component reuse potential
+3. Preview generation and display patterns
+4. Keyboard navigation requirements
+5. Spec requirements and Lightroom-style UX patterns
+
+### Solution Implemented
+
+Created a complete loupe view system for rapid photo culling:
+
+#### New Files Created (5)
+1. **`apps/web/app/components/loupe/LoupeView.vue`** - Main container component
+   - Header with back button, filename, navigation arrows
+   - LoupePreviewCanvas for large image display
+   - FilterBar for filter/sort controls
+   - LoupeFilmstrip for thumbnail navigation
+
+2. **`apps/web/app/components/loupe/LoupePreviewCanvas.vue`** - Preview canvas
+   - Displays preview 1x (2560px) or thumbnail fallback
+   - Zoom/pan support via useZoomPan
+   - Clipping overlay toggle (J key)
+   - Loading state handling
+
+3. **`apps/web/app/components/loupe/LoupeFilmstrip.vue`** - Filmstrip navigation
+   - Horizontal scrolling thumbnails
+   - Uses selectionStore.currentId for current tracking
+   - Virtual windowing (30 items around current)
+   - Auto-scroll to current photo
+
+4. **`apps/web/app/composables/useLoupeKeyboard.ts`** - Keyboard handling
+   - Arrow keys: navigate prev/next
+   - P/X/U: flag as pick/reject/unflag
+   - G/Esc: return to grid
+   - E/Enter: enter edit view
+   - Z: toggle zoom, J: toggle clipping
+
+5. **`apps/web/test/loupeView.test.ts`** - Unit tests (12 tests)
+   - View mode switching
+   - Navigation with filtered lists
+   - Selection preservation
+
+#### Modified Files (4)
+1. **`apps/web/app/pages/index.vue`** - Added LoupeView conditional rendering
+2. **`apps/web/app/composables/useGridKeyboard.ts`** - Added Space key for loupe mode
+3. **`apps/web/app/components/catalog/CatalogGrid.vue`** - Added loupe mode handler
+4. **`apps/web/app/components/help/HelpModal.vue`** - Added Loupe View shortcuts section
+
+### Keyboard Shortcuts
+| Action | Key |
+|--------|-----|
+| Enter Loupe View | Space |
+| Navigate photos | ← / → |
+| Pick | P |
+| Reject | X |
+| Unflag | U |
+| Return to Grid | G / Esc |
+| Enter Edit View | E / Enter |
+| Toggle clipping | J |
+| Toggle zoom | Z |
+
+### Research Documents
+- `docs/research/2026-01-31-loupe-view-synthesis.md`
+- `docs/plans/2026-01-31-loupe-view-plan.md`
+
+### Test Results
+- **Web unit tests**: 39 files, 1409 tests passing (12 new)
+- **Lint**: ✅ Passes
+- **TypeCheck**: ✅ Passes
+
+---
+

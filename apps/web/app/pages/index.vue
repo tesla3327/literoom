@@ -16,11 +16,15 @@ import { formatRelativeTime } from '~/utils/formatRelativeTime'
 // ============================================================================
 
 const catalogStore = useCatalogStore()
+const catalogUIStore = useCatalogUIStore()
 const selectionStore = useSelectionStore()
 const exportStore = useExportStore()
 const deleteConfirmationStore = useDeleteConfirmationStore()
 const toast = useToast()
 const { selectFolder, restoreSession, isDemoMode, isLoading, loadingMessage, deleteAssets } = useCatalog()
+
+// Track if we're in loupe view mode
+const isLoupeMode = computed(() => catalogUIStore.viewMode === 'loupe')
 
 // Recent folders composable
 const {
@@ -197,6 +201,17 @@ async function handleDeleteConfirm(assetIds: string[]) {
     description: `${count} photo${count === 1 ? '' : 's'} removed`,
     color: 'success',
   })
+}
+
+// ============================================================================
+// Loupe View
+// ============================================================================
+
+/**
+ * Handle back from loupe view - return to grid.
+ */
+function handleLoupeBack() {
+  catalogUIStore.setViewMode('grid')
 }
 </script>
 
@@ -379,7 +394,13 @@ async function handleDeleteConfirm(assetIds: string[]) {
       </div>
     </div>
 
-    <!-- Main catalog view -->
+    <!-- Loupe view mode -->
+    <LoupeView
+      v-else-if="hasFolder && isLoupeMode && hasAssets"
+      @back="handleLoupeBack"
+    />
+
+    <!-- Main catalog view (grid mode) -->
     <div
       v-else-if="hasFolder"
       class="flex-1 flex flex-col min-h-0"

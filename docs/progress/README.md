@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 22:24 EST
+**Last Updated**: 2026-01-31 22:42 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 166 - Fix CI Blocking Issues (Lint + TypeScript) - Complete (see shard-002.md)
+**Current Iteration**: 167 - Loupe View Implementation - Complete (see shard-002.md)
 
 ## Project Structure
 
@@ -133,6 +133,14 @@ literoom/
 - useMaskOverlay composable (canvas interaction, drawing mode)
 - EditPreviewCanvas integration (mask overlay canvas layer)
 
+### Phase 17: Loupe View
+- LoupeView container component with header, preview, filmstrip
+- LoupePreviewCanvas with zoom/pan and clipping overlay
+- LoupeFilmstrip with virtual windowing and selection tracking
+- useLoupeKeyboard composable for navigation and flagging
+- Space key to enter loupe view from grid
+- Keyboard shortcuts: P/X/U flagging, arrow navigation, G/Esc to return
+
 ## Test Status
 
 | Package | Tests | Status | Coverage |
@@ -140,7 +148,7 @@ literoom/
 | literoom-core | 214 | Passing | 93.38% lines |
 | literoom-wasm | 44 | Passing | 72.48% lines |
 | packages/core | 1300+ | Passing | 76%+ lines |
-| apps/web (unit) | 450+ | Passing | 22%+ lines |
+| apps/web (unit) | 1409 | Passing | 22%+ lines |
 | apps/web (E2E) | 28 | Passing | N/A |
 
 ### GPU Acceleration Tests (Phase 9)

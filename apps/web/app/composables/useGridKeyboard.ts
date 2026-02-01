@@ -35,7 +35,7 @@ export interface UseGridKeyboardOptions {
   /**
    * Called when view mode should change.
    */
-  onViewChange?: (mode: 'edit' | 'grid') => void
+  onViewChange?: (mode: 'edit' | 'grid' | 'loupe') => void
   /**
    * Called when delete is pressed.
    */
@@ -311,6 +311,12 @@ export function useGridKeyboard(options: UseGridKeyboardOptions): UseGridKeyboar
           // D for "Develop" (Lightroom convention)
           event.preventDefault()
           onViewChange('edit')
+          return
+
+        case ' ':
+          // Space for loupe view (quick preview)
+          event.preventDefault()
+          onViewChange('loupe')
           return
       }
     }

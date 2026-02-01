@@ -243,12 +243,20 @@ const { handleKeydown } = useGridKeyboard({
   },
   onViewChange: (mode) => {
     if (mode === 'edit') {
-      catalogUIStore.setViewMode('loupe')
       const currentId = selectionStore.currentId
       if (currentId) {
         // Start preview generation early (before navigation) so it's ready when edit view loads
         requestPreview(currentId, ThumbnailPriority.VISIBLE)
         navigateTo(`/edit/${currentId}`)
+      }
+    }
+    else if (mode === 'loupe') {
+      // Enter loupe view mode (stay on same page, show LoupeView)
+      const currentId = selectionStore.currentId
+      if (currentId) {
+        // Start preview generation early so it's ready when loupe view appears
+        requestPreview(currentId, ThumbnailPriority.VISIBLE)
+        catalogUIStore.setViewMode('loupe')
       }
     }
     else {

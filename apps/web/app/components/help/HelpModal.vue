@@ -65,6 +65,7 @@ const columns = computed<Column[]>(() => [
       {
         title: 'Views',
         shortcuts: [
+          { label: 'Loupe view', keys: ['Space'] },
           { label: 'Enter Edit view', keys: ['E', 'Enter', 'D'] },
           { label: 'Grid view', keys: ['G'] },
         ],
@@ -81,6 +82,39 @@ const columns = computed<Column[]>(() => [
         shortcuts: [
           { label: 'Delete photo', keys: ['Delete'] },
           { label: 'Export', keys: [modKey.value, 'E'] },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Loupe View',
+    sections: [
+      {
+        title: 'Navigation',
+        shortcuts: [
+          { label: 'Previous/Next photo', keys: ['Left/Right'] },
+          { label: 'Return to grid', keys: ['Esc', 'G'] },
+        ],
+      },
+      {
+        title: 'Flagging',
+        shortcuts: [
+          { label: 'Pick (flag)', keys: ['P'] },
+          { label: 'Reject', keys: ['X'] },
+          { label: 'Unflag', keys: ['U'] },
+        ],
+      },
+      {
+        title: 'Views',
+        shortcuts: [
+          { label: 'Enter Edit view', keys: ['E', 'Enter'] },
+        ],
+      },
+      {
+        title: 'Display',
+        shortcuts: [
+          { label: 'Toggle clipping overlay', keys: ['J'] },
+          { label: 'Toggle fit/100%', keys: ['Z'] },
         ],
       },
     ],
@@ -164,7 +198,7 @@ function handleClose() {
     </template>
 
     <template #body>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
         <div
           v-for="column in columns"
           :key="column.title"
