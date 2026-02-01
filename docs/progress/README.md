@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Updated**: 2026-01-31 22:59 EST
+**Last Updated**: 2026-01-31 23:05 EST
 **Current Phase**: V1.1 - Post-GPU Acceleration (UX Enhancements)
-**Current Iteration**: 169 - CI Verification and V1 Status Assessment - Complete (see shard-002.md)
+**Current Iteration**: 170 - Fix GPU Mock Test Failures - Complete (see shard-002.md)
 
 ## Project Structure
 
@@ -147,7 +147,7 @@ literoom/
 |---------|-------|--------|----------|
 | literoom-core | 214 | Passing | 93.38% lines |
 | literoom-wasm | 44 | Passing | 72.48% lines |
-| packages/core | 1300+ | Passing | 76%+ lines |
+| packages/core | 2404 | Passing | 76%+ lines |
 | apps/web (unit) | 1409 | Passing | 22%+ lines |
 | apps/web (E2E) | 28 | Passing | N/A |
 

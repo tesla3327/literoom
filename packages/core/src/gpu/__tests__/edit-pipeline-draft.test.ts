@@ -175,6 +175,8 @@ interface MockGPUDevice {
   createBindGroupLayout: ReturnType<typeof vi.fn>
   createPipelineLayout: ReturnType<typeof vi.fn>
   createComputePipeline: ReturnType<typeof vi.fn>
+  createRenderPipeline: ReturnType<typeof vi.fn>
+  createSampler: ReturnType<typeof vi.fn>
   createTexture: ReturnType<typeof vi.fn>
   createBuffer: ReturnType<typeof vi.fn>
   createBindGroup: ReturnType<typeof vi.fn>
@@ -194,9 +196,12 @@ function createMockDevice(): MockGPUDevice {
     createBindGroupLayout: vi.fn(() => ({})),
     createPipelineLayout: vi.fn(() => ({})),
     createComputePipeline: vi.fn(() => ({})),
+    createRenderPipeline: vi.fn(() => ({})),
+    createSampler: vi.fn(() => ({})),
     createTexture: vi.fn(() => ({
       createView: vi.fn(() => ({})),
       destroy: vi.fn(),
+      format: 'rgba8unorm',
     })),
     createBuffer: vi.fn(() => ({
       destroy: vi.fn(),
@@ -210,6 +215,12 @@ function createMockDevice(): MockGPUDevice {
         setPipeline: vi.fn(),
         setBindGroup: vi.fn(),
         dispatchWorkgroups: vi.fn(),
+        end: vi.fn(),
+      })),
+      beginRenderPass: vi.fn(() => ({
+        setPipeline: vi.fn(),
+        setBindGroup: vi.fn(),
+        draw: vi.fn(),
         end: vi.fn(),
       })),
       copyTextureToBuffer: vi.fn(),

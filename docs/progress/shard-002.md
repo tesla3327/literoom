@@ -557,9 +557,64 @@ Per spec section 12, all V1 acceptance criteria are now met:
 
 ### Remaining Enhancement Opportunities
 
-1. **Fix GPU mock for draft mode tests** - Add `createSampler` mock (Low priority - test infra)
+1. ~~**Fix GPU mock for draft mode tests**~~ - ✅ Fixed in Iteration 170
 2. **Preview generation performance** - Further optimizations possible (Medium priority)
 3. **Edit operation caching** - Research investigation (Low priority - premature optimization)
+
+---
+
+## Iteration 170: Fix GPU Mock Test Failures
+
+**Time**: 2026-01-31 23:05 EST
+**Status**: Complete
+**Task**: Fix 9 failing GPU tests in edit-pipeline-draft.test.ts
+
+### Problem
+9 tests in `src/gpu/__tests__/edit-pipeline-draft.test.ts` were failing because the mock GPU device was missing `createSampler` and `createRenderPipeline` methods. The `BlitPipeline` class (used by the edit pipeline) requires these WebGPU methods for blit operations.
+
+### Root Cause
+The `createMockDevice()` function in the test file did not include:
+- `createSampler()` - Required by BlitPipeline constructor for texture sampling
+- `createRenderPipeline()` - Required for render pipeline creation
+- `beginRenderPass()` - Required by command encoder for render passes
+- `texture.format` property - Required for pipeline format matching
+
+### Solution Implemented
+Updated `createMockDevice()` in `edit-pipeline-draft.test.ts` to include all required WebGPU mock methods:
+
+```typescript
+// Added to MockGPUDevice interface
+createRenderPipeline: ReturnType<typeof vi.fn>
+createSampler: ReturnType<typeof vi.fn>
+
+// Added to createMockDevice() function
+createRenderPipeline: vi.fn(() => ({})),
+createSampler: vi.fn(() => ({})),
+
+// Added to createTexture() mock
+format: 'rgba8unorm',
+
+// Added to createCommandEncoder() mock
+beginRenderPass: vi.fn(() => ({
+  setPipeline: vi.fn(),
+  setBindGroup: vi.fn(),
+  draw: vi.fn(),
+  end: vi.fn(),
+})),
+```
+
+### Files Modified
+- `packages/core/src/gpu/__tests__/edit-pipeline-draft.test.ts` - Added missing WebGPU mock methods
+
+### Test Results
+- **Core unit tests**: 51 files, 2404 passing (all tests now pass!)
+- **Web unit tests**: 39 files, 1409 passing
+- **Previously failing tests**: All 9 tests now pass
+
+### Impact
+- All unit tests now pass completely
+- CI should now show green for all test checks
+- No more test infrastructure gaps blocking a clean CI run
 
 ---
 
