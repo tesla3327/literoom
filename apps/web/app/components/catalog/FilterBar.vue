@@ -3,13 +3,14 @@
  * FilterBar Component
  *
  * Provides filter mode buttons (All, Picks, Rejects, Unflagged),
- * export button, and sort dropdown for the catalog grid.
+ * export button, help icon, and sort dropdown for the catalog grid.
  */
 import type { FilterMode, SortField, SortDirection } from '@literoom/core/catalog'
 
 const catalogStore = useCatalogStore()
 const catalogUIStore = useCatalogUIStore()
 const exportStore = useExportStore()
+const helpStore = useHelpStore()
 const { rescanFolder } = useCatalog()
 
 // Filter mode configuration
@@ -239,6 +240,16 @@ function setSort(field: SortField, direction: SortDirection): void {
           {{ sortLabel }}
         </UButton>
       </UDropdownMenu>
+
+      <!-- Help button -->
+      <UButton
+        variant="ghost"
+        size="sm"
+        icon="i-heroicons-question-mark-circle"
+        title="Keyboard shortcuts (?)"
+        data-testid="help-button"
+        @click="helpStore.openModal"
+      />
     </div>
   </div>
 </template>

@@ -569,3 +569,46 @@ Created new test file `apps/web/test/multiSelectFlagging.test.ts` with 17 tests:
 ### Test Results
 - All 1268 web unit tests pass (17 new tests)
 - New tests verify both store-level batch operations and selection+flagging integration
+
+---
+
+## Iteration 157: Implement Help Modal
+
+**Time**: 2026-01-31 15:43 EST → 20:45 EST
+**Status**: Complete
+**Task**: Create a help modal showing all keyboard shortcuts
+
+### Problem
+The spec requires keyboard shortcuts to be documented in-app (help modal). Currently pressing ? or Cmd/Ctrl+/ has no effect, and there's no way for users to discover available keyboard shortcuts.
+
+### Expected Behavior
+1. Create a HelpModal.vue component listing all shortcuts organized by context
+2. Show platform-specific modifier keys (Cmd on Mac, Ctrl on Windows)
+3. Add keyboard handler for ? and Cmd/Ctrl+/ to open the modal
+4. Add a help icon button in the header as alternative access
+
+### Implementation
+
+**Files Created (4):**
+1. `apps/web/app/stores/help.ts` - Pinia store for modal state (isModalOpen, openModal, closeModal, toggleModal)
+2. `apps/web/app/composables/useHelpModal.ts` - Composable for keyboard listeners (? and Cmd/Ctrl+/) with shouldIgnoreShortcuts for input detection
+3. `apps/web/app/components/help/HelpModal.vue` - Modal component with two-column layout (Grid View | Edit View), organized sections, and platform-aware modifier keys
+4. `apps/web/test/useHelpModal.test.ts` - 19 tests for modal patterns, keyboard detection, and input field handling
+
+**Files Modified (3):**
+1. `apps/web/app/pages/index.vue` - Added `useHelpModal()` composable and `<HelpModal />` component
+2. `apps/web/app/pages/edit/[id].vue` - Added `useHelpModal()` composable, `<HelpModal />` component, and help icon button in header
+3. `apps/web/app/components/catalog/FilterBar.vue` - Added help icon button for discoverability
+
+### Features
+- **Two-column layout**: Grid View shortcuts on left, Edit View shortcuts on right
+- **Grouped sections**: Navigation, Flagging, Views, Selection, Actions (Grid); Navigation, Editing, Display, Zoom, Mask Editing, Help (Edit)
+- **Platform-aware modifiers**: Shows "Cmd" on Mac, "Ctrl" on Windows/Linux
+- **Keyboard triggers**: `?` key and `Cmd/Ctrl+/`
+- **Input field detection**: Ignores shortcuts when focused on text input, textarea, or contenteditable elements
+- **Help icon buttons**: Added to both FilterBar (grid view) and edit page header for discoverability
+
+### Test Results
+- All 1268 web unit tests pass (including 19 new help modal tests)
+- Pre-existing 9 GPU mock failures in core package (unrelated)
+

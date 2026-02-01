@@ -7,7 +7,6 @@
 - [Zoom state not persisted per-image (Medium)](#zoom-state-not-persisted-per-image)
 - [Crop re-edit should show full uncropped image (Medium)](#crop-re-edit-should-show-full-uncropped-image)
 - [Delete key doesn't delete photos from grid (Low)](#delete-key-doesnt-delete-photos-from-grid)
-- [No help modal exists (Low)](#no-help-modal-exists)
 - [No clipboard summary shown for copy/paste (Low)](#no-clipboard-summary-shown-for-copypaste)
 - [Export missing "Include rejected" option (Low)](#export-missing-include-rejected-option)
 - [Preview generation is slow (HIGH)](#preview-generation-is-slow)
@@ -15,6 +14,7 @@
 - [Masks panel collapses unexpectedly when scrolling page (Medium)](#masks-panel-collapses-unexpectedly-when-scrolling-page)
 
 ### Recently Solved
+- [No help modal exists (Low)](#no-help-modal-exists---solved)
 - [Keyboard flagging only affects current photo, not all selected (Medium)](#keyboard-flagging-only-affects-current-photo-not-all-selected---solved)
 - [debouncedFullRender.cancel is not a function (Medium)](#debouncedFullRendercancle-is-not-a-function---cannot-reproduce)
 - [Escape key navigates away during mask drawing mode (Medium)](#escape-key-navigates-away-during-mask-drawing-mode---solved)
@@ -417,37 +417,46 @@ Tested in Demo Mode. The Delete key works correctly in the Edit view for deletin
 
 ---
 
-### No help modal exists
+### No help modal exists - SOLVED
 
-**Severity**: Low | **Type**: Missing Feature | **Found**: 2026-01-25
+**Severity**: Low | **Fixed**: 2026-01-31
 
 **Problem**:
-The QA plan specifies that pressing the ? key (or Cmd/Ctrl+/) should open a help modal showing all keyboard shortcuts. This feature does not exist.
+The QA plan specifies that pressing the ? key (or Cmd/Ctrl+/) should open a help modal showing all keyboard shortcuts. This feature did not exist.
 
-**Steps to Reproduce**:
-1. Open the app (grid or edit view)
-2. Press the ? key (Shift+/)
-3. Observe: Nothing happens
+**Fix Applied**:
+Created a complete help modal system with keyboard shortcuts documentation.
 
-**Expected Behavior**:
-A help modal should appear listing all keyboard shortcuts with platform-specific modifiers (Cmd on Mac, Ctrl on Windows).
+**Implementation**:
 
-**Actual Behavior**:
-Pressing ? has no effect. There is no help modal or shortcut reference in the app.
+1. **Pinia Store** (`apps/web/app/stores/help.ts`):
+   - `isModalOpen` state
+   - `openModal()`, `closeModal()`, `toggleModal()` methods
 
-**Suggested Implementation**:
-1. Create a `HelpModal.vue` component listing all shortcuts
-2. Organize shortcuts by context (Grid, Edit, Crop, Masks)
-3. Show platform-specific modifier keys
-4. Add keyboard handler for ? and Cmd/Ctrl+/ to open the modal
-5. Add a help icon button in the header as alternative access
+2. **Composable** (`apps/web/app/composables/useHelpModal.ts`):
+   - Global keydown listener for `?` and `Cmd/Ctrl+/`
+   - `shouldIgnoreShortcuts()` to skip when typing in inputs
 
-**Files to Create**:
-- `apps/web/app/components/HelpModal.vue`
+3. **HelpModal Component** (`apps/web/app/components/help/HelpModal.vue`):
+   - Two-column layout (Grid View | Edit View)
+   - Grouped sections: Navigation, Flagging, Views, Selection, Actions (Grid); Navigation, Editing, Display, Zoom, Mask Editing, Help (Edit)
+   - Platform-aware modifier keys (Cmd on Mac, Ctrl on Windows)
+   - Styled keyboard key indicators
 
-**Files to Modify**:
-- `apps/web/app/pages/index.vue` - Add keyboard handler
-- `apps/web/app/pages/edit/[id].vue` - Add keyboard handler
+4. **Help Icon Buttons**:
+   - Added to FilterBar (grid view header)
+   - Added to edit page header
+
+**Files Created**:
+- `apps/web/app/stores/help.ts`
+- `apps/web/app/composables/useHelpModal.ts`
+- `apps/web/app/components/help/HelpModal.vue`
+- `apps/web/test/useHelpModal.test.ts` (19 tests)
+
+**Files Modified**:
+- `apps/web/app/pages/index.vue` - Added useHelpModal() and HelpModal
+- `apps/web/app/pages/edit/[id].vue` - Added useHelpModal(), HelpModal, and help icon button
+- `apps/web/app/components/catalog/FilterBar.vue` - Added help icon button
 
 ---
 

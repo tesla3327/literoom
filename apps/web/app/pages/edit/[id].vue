@@ -29,6 +29,7 @@ const editStore = useEditStore()
 const editUIStore = useEditUIStore()
 const { openCopyModal, pasteSettings, canPaste } = useCopyPasteSettings()
 const { regenerateThumbnail } = useCatalog()
+const helpStore = useHelpStore()
 
 // Help modal keyboard shortcuts
 useHelpModal()
@@ -290,6 +291,16 @@ onUnmounted(() => {
           :disabled="!hasNext"
           data-testid="next-button"
           @click="navigateNext"
+        />
+
+        <!-- Help button -->
+        <UButton
+          variant="ghost"
+          icon="i-heroicons-question-mark-circle"
+          size="sm"
+          title="Keyboard shortcuts (?)"
+          data-testid="help-button"
+          @click="helpStore.openModal"
         />
       </div>
     </header>
