@@ -5,7 +5,7 @@
  * used by the crop overlay.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   CROP_CROP_HANDLE_HIT_RADIUS,
   CROP_CROP_HANDLE_SIZE,
@@ -308,7 +308,7 @@ describe('edge cases', () => {
  * Mock CanvasRenderingContext2D for testing rendering functions.
  */
 function createMockContext() {
-  const calls: Array<{ method: string; args: unknown[] }> = []
+  const calls: Array<{ method: string, args: unknown[] }> = []
 
   const mockCtx = {
     fillStyle: '',
@@ -335,7 +335,7 @@ function createMockContext() {
     },
   }
 
-  return mockCtx as unknown as CanvasRenderingContext2D & { _calls: typeof calls; _reset: () => void }
+  return mockCtx as unknown as CanvasRenderingContext2D & { _calls: typeof calls, _reset: () => void }
 }
 
 describe('drawOverlay', () => {
@@ -555,7 +555,7 @@ describe('drawHandles', () => {
     // The nw handle is drawn first with active color
     // After all draws, fillStyle will be the last handle's color
     // We need to check that active color was used at some point
-    expect(ctx._calls.some((call) =>
+    expect(ctx._calls.some(call =>
       call.method === 'fillRect' && ctx.fillStyle === COLORS.handleActive,
     ) || ctx.fillStyle === COLORS.handleActive || true).toBe(true)
   })

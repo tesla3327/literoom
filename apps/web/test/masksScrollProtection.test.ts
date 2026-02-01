@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 import { useEditStore } from '../app/stores/edit'
 import { useEditUIStore } from '../app/stores/editUI'

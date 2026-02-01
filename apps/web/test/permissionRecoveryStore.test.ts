@@ -9,9 +9,9 @@
  * - Issue clearing and removal
  */
 
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { usePermissionRecoveryStore, type FolderIssue } from '~/stores/permissionRecovery'
+import { usePermissionRecoveryStore } from '~/stores/permissionRecovery'
 
 // ============================================================================
 // Mocks
@@ -33,19 +33,6 @@ vi.mock('@literoom/core/filesystem', () => ({
 // ============================================================================
 // Test Helpers
 // ============================================================================
-
-/**
- * Create a mock folder issue.
- */
-function createFolderIssue(overrides: Partial<FolderIssue> = {}): FolderIssue {
-  return {
-    folderId: 'test-folder-1',
-    folderName: 'Photos',
-    folderPath: '/Users/test/Photos',
-    permissionState: 'prompt',
-    ...overrides,
-  }
-}
 
 /**
  * Create a mock directory handle.

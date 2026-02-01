@@ -27,10 +27,10 @@ export function isLinearCurve(
   if (points.length !== 2) return false
   const [p0, p1] = points
   return (
-    Math.abs(p0.x) < CURVE_POINT_TOLERANCE &&
-    Math.abs(p0.y) < CURVE_POINT_TOLERANCE &&
-    Math.abs(p1.x - 1) < CURVE_POINT_TOLERANCE &&
-    Math.abs(p1.y - 1) < CURVE_POINT_TOLERANCE
+    Math.abs(p0!.x) < CURVE_POINT_TOLERANCE &&
+    Math.abs(p0!.y) < CURVE_POINT_TOLERANCE &&
+    Math.abs(p1!.x - 1) < CURVE_POINT_TOLERANCE &&
+    Math.abs(p1!.y - 1) < CURVE_POINT_TOLERANCE
   )
 }
 

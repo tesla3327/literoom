@@ -87,7 +87,10 @@ function formatAngle(value: number): string {
 </script>
 
 <template>
-  <div class="space-y-4" data-testid="rotation-controls">
+  <div
+    class="space-y-4"
+    data-testid="rotation-controls"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between">
       <h4 class="text-xs font-medium text-gray-400">
@@ -129,7 +132,10 @@ function formatAngle(value: number): string {
     <div class="space-y-1">
       <div class="flex justify-between text-xs">
         <span class="text-gray-500">Angle</span>
-        <span class="text-gray-300" data-testid="rotation-value">{{ formatAngle(rotation) }}</span>
+        <span
+          class="text-gray-300"
+          data-testid="rotation-value"
+        >{{ formatAngle(rotation) }}</span>
       </div>
       <input
         v-model.number="rotation"
@@ -139,14 +145,17 @@ function formatAngle(value: number): string {
         step="0.1"
         class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
         data-testid="rotation-slider"
-      />
+      >
     </div>
 
     <!-- Straighten slider -->
     <div class="space-y-1">
       <div class="flex justify-between text-xs">
         <span class="text-gray-500">Straighten</span>
-        <span class="text-gray-300" data-testid="straighten-value">{{ formatAngle(straighten) }}</span>
+        <span
+          class="text-gray-300"
+          data-testid="straighten-value"
+        >{{ formatAngle(straighten) }}</span>
       </div>
       <input
         v-model.number="straighten"
@@ -156,7 +165,7 @@ function formatAngle(value: number): string {
         step="0.1"
         class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
         data-testid="straighten-slider"
-      />
+      >
     </div>
 
     <!-- Total rotation display -->

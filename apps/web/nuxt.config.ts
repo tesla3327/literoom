@@ -3,7 +3,6 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 
 export default defineNuxtConfig({
   // Disable SSR - this app requires browser APIs (IndexedDB, FileSystem Access, Canvas, etc.)
-  ssr: false,
 
   modules: [
     '@nuxt/ui',
@@ -11,6 +10,7 @@ export default defineNuxtConfig({
     '@nuxt/test-utils/module',
     '@pinia/nuxt',
   ],
+  ssr: false,
 
   components: [
     {
@@ -25,7 +25,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      demoMode: process.env.LITEROOM_DEMO_MODE === 'true',
+      demoMode: import.meta.env.LITEROOM_DEMO_MODE === 'true',
     },
   },
 

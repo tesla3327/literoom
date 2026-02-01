@@ -421,9 +421,9 @@ export const useEditUIStore = defineStore('editUI', () => {
       // Check if it's effectively full image (no crop needed)
       const isFullImage
         = Math.abs(crop.left) < 0.001
-        && Math.abs(crop.top) < 0.001
-        && Math.abs(crop.width - 1) < 0.001
-        && Math.abs(crop.height - 1) < 0.001
+          && Math.abs(crop.top) < 0.001
+          && Math.abs(crop.width - 1) < 0.001
+          && Math.abs(crop.height - 1) < 0.001
 
       if (isFullImage) {
         editStore.setCrop(null)

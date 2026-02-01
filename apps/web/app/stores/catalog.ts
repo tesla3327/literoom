@@ -261,7 +261,7 @@ export const useCatalogStore = defineStore('catalog', () => {
   function markPhotoReady(
     assetId: string,
     thumbnailUrl: string,
-    previewUrl: string
+    previewUrl: string,
   ): void {
     updateAsset(assetId, {
       thumbnailStatus: 'ready',

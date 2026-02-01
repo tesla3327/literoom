@@ -281,9 +281,9 @@ export class MockDecodeService implements IDecodeService {
 
     for (let i = 0; i < pixels.length; i += 3) {
       const [r, g, b] = this.applyAllAdjustmentsToPixel(
-        pixels[i],
-        pixels[i + 1],
-        pixels[i + 2],
+        pixels[i]!,
+        pixels[i + 1]!,
+        pixels[i + 2]!,
         adjustments
       )
       outputPixels[i] = r
@@ -313,18 +313,18 @@ export class MockDecodeService implements IDecodeService {
 
     // Process pixels in RGB triplets
     for (let i = 0; i < pixels.length; i += 3) {
-      const r = pixels[i] ?? 0
-      const g = pixels[i + 1] ?? 0
-      const b = pixels[i + 2] ?? 0
+      const r = pixels[i]!
+      const g = pixels[i + 1]!
+      const b = pixels[i + 2]!
 
       // Bin each channel
-      red[r]++
-      green[g]++
-      blue[b]++
+      red[r]!++
+      green[g]!++
+      blue[b]!++
 
       // Compute luminance (BT.709)
       const lum = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b)
-      luminance[Math.min(255, Math.max(0, lum))]++
+      luminance[Math.min(255, Math.max(0, lum))]!++
     }
 
     // Find max value across RGB channels
@@ -566,9 +566,9 @@ export class MockDecodeService implements IDecodeService {
         const y = (py + 0.5) / height
 
         // Start with original pixel values
-        let r = pixels[idx]
-        let g = pixels[idx + 1]
-        let b = pixels[idx + 2]
+        let r = pixels[idx]!
+        let g = pixels[idx + 1]!
+        let b = pixels[idx + 2]!
 
         // Apply each linear mask
         for (const mask of linearMasks) {

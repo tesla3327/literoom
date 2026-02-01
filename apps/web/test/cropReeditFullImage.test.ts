@@ -5,7 +5,7 @@
  * should display the full uncropped image so users can see and adjust
  * areas that were previously excluded.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useEditUIStore } from '../app/stores/editUI'
 import { useEditStore } from '../app/stores/edit'

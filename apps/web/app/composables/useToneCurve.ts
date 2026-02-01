@@ -37,7 +37,7 @@ const COLORS = {
 // ============================================================================
 
 export interface UseToneCurveOptions {
-  histogram?: Ref<HistogramData | null>
+  histogram?: Ref<HistogramData | null | undefined>
 }
 
 export interface UseToneCurveReturn {
@@ -134,7 +134,7 @@ export function useToneCurve(options: UseToneCurveOptions = {}): UseToneCurveRet
   /**
    * Convert normalized curve point to canvas coordinates.
    */
-  function toCanvas(point: CurvePoint): { x: number; y: number } {
+  function toCanvas(point: CurvePoint): { x: number, y: number } {
     return {
       x: point.x * CANVAS_SIZE,
       y: (1 - point.y) * CANVAS_SIZE,
@@ -342,7 +342,7 @@ export function useToneCurve(options: UseToneCurveOptions = {}): UseToneCurveRet
   /**
    * Get canvas coordinates from mouse event.
    */
-  function getCanvasCoords(e: MouseEvent): { x: number; y: number } | null {
+  function getCanvasCoords(e: MouseEvent): { x: number, y: number } | null {
     const canvas = canvasRef.value
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()

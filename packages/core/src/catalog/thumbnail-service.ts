@@ -604,9 +604,9 @@ export class ThumbnailService implements IThumbnailService {
 
     // Convert RGB to RGBA (add alpha channel)
     for (let i = 0, j = 0; i < src.length; i += 3, j += 4) {
-      dst[j] = src[i] // R
-      dst[j + 1] = src[i + 1] // G
-      dst[j + 2] = src[i + 2] // B
+      dst[j] = src[i]! // R
+      dst[j + 1] = src[i + 1]! // G
+      dst[j + 2] = src[i + 2]! // B
       dst[j + 3] = 255 // A
     }
 

@@ -71,11 +71,11 @@ function createMockDirectoryHandle(
  * Collect all files from an async generator.
  */
 async function collectAllFiles(
-  generator: AsyncGenerator<ScannedFile[], void, unknown>
+  generator: AsyncGenerator<ScannedFile, void, unknown>
 ): Promise<ScannedFile[]> {
   const allFiles: ScannedFile[] = []
-  for await (const batch of generator) {
-    allFiles.push(...batch)
+  for await (const file of generator) {
+    allFiles.push(file)
   }
   return allFiles
 }
@@ -214,25 +214,23 @@ describe('ScanService', () => {
       expect(files).toHaveLength(0)
     })
 
-    it('should yield files in batches', async () => {
-      // Create 120 files (more than one batch of 50)
-      const fileHandles = Array.from({ length: 120 }, (_, i) =>
+    it('should yield individual files', async () => {
+      // Create multiple files
+      const fileHandles = Array.from({ length: 10 }, (_, i) =>
         createMockFileHandle(`photo${i.toString().padStart(3, '0')}.jpg`)
       )
       const directory = createMockDirectoryHandle('photos', fileHandles)
 
-      const batches: ScannedFile[][] = []
-      for await (const batch of scanService.scan(directory)) {
-        batches.push(batch)
+      const files: ScannedFile[] = []
+      for await (const file of scanService.scan(directory)) {
+        files.push(file)
       }
 
-      // Should have multiple batches
-      expect(batches.length).toBeGreaterThan(1)
-      // First batch should be 50 files
-      expect(batches[0]).toHaveLength(50)
-      // Total should be 120 files
-      const totalFiles = batches.reduce((sum, batch) => sum + batch.length, 0)
-      expect(totalFiles).toBe(120)
+      // Should yield individual files
+      expect(files).toHaveLength(10)
+      // Each file should be a ScannedFile object
+      expect(files[0].filename).toBe('photo000')
+      expect(files[9].filename).toBe('photo009')
     })
 
     it('should support AbortController cancellation', async () => {
@@ -245,13 +243,13 @@ describe('ScanService', () => {
       const controller = new AbortController()
       const files: ScannedFile[] = []
 
-      // Abort after first batch
-      let batchCount = 0
+      // Abort after a few files
+      let fileCount = 0
       try {
-        for await (const batch of scanService.scan(directory, { signal: controller.signal })) {
-          files.push(...batch)
-          batchCount++
-          if (batchCount >= 1) {
+        for await (const file of scanService.scan(directory, { signal: controller.signal })) {
+          files.push(file)
+          fileCount++
+          if (fileCount >= 5) {
             controller.abort()
           }
         }
@@ -260,7 +258,7 @@ describe('ScanService', () => {
         expect((error as CatalogError).code).toBe('SCAN_CANCELLED')
       }
 
-      // Should have gotten at least one batch before cancellation
+      // Should have gotten at least some files before cancellation
       expect(files.length).toBeGreaterThan(0)
       // Should not have gotten all files
       expect(files.length).toBeLessThan(100)

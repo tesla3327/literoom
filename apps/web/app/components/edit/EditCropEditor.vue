@@ -54,7 +54,10 @@ function formatPercent(value: number): string {
 </script>
 
 <template>
-  <div class="space-y-3" data-testid="crop-editor">
+  <div
+    class="space-y-3"
+    data-testid="crop-editor"
+  >
     <!-- Aspect Ratio Presets -->
     <div class="space-y-2">
       <label class="text-xs text-gray-500">Aspect Ratio</label>
@@ -98,19 +101,31 @@ function formatPercent(value: number): string {
     <div class="grid grid-cols-4 gap-2 text-xs">
       <div class="text-center">
         <span class="text-gray-500 block">X</span>
-        <span class="text-gray-300" data-testid="crop-x">{{ formatPercent(localCrop.left) }}</span>
+        <span
+          class="text-gray-300"
+          data-testid="crop-x"
+        >{{ formatPercent(localCrop.left) }}</span>
       </div>
       <div class="text-center">
         <span class="text-gray-500 block">Y</span>
-        <span class="text-gray-300" data-testid="crop-y">{{ formatPercent(localCrop.top) }}</span>
+        <span
+          class="text-gray-300"
+          data-testid="crop-y"
+        >{{ formatPercent(localCrop.top) }}</span>
       </div>
       <div class="text-center">
         <span class="text-gray-500 block">W</span>
-        <span class="text-gray-300" data-testid="crop-w">{{ formatPercent(localCrop.width) }}</span>
+        <span
+          class="text-gray-300"
+          data-testid="crop-w"
+        >{{ formatPercent(localCrop.width) }}</span>
       </div>
       <div class="text-center">
         <span class="text-gray-500 block">H</span>
-        <span class="text-gray-300" data-testid="crop-h">{{ formatPercent(localCrop.height) }}</span>
+        <span
+          class="text-gray-300"
+          data-testid="crop-h"
+        >{{ formatPercent(localCrop.height) }}</span>
       </div>
     </div>
 

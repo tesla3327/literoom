@@ -734,8 +734,8 @@ export function isModifiedToneCurve(curve: ToneCurve): boolean {
 
   for (let i = 0; i < curve.points.length; i++) {
     if (
-      Math.abs(curve.points[i].x - defaultPoints[i].x) > 0.001
-      || Math.abs(curve.points[i].y - defaultPoints[i].y) > 0.001
+      Math.abs(curve.points[i]!.x - defaultPoints[i]!.x) > 0.001
+      || Math.abs(curve.points[i]!.y - defaultPoints[i]!.y) > 0.001
     ) {
       return true
     }

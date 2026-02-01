@@ -129,7 +129,7 @@ describe('useGridLayout', () => {
       const { getItem } = useGridLayout({
         totalItems: computed(() => items.length),
         columnsCount: computed(() => 3),
-        getItemAtIndex: (index) => items[index],
+        getItemAtIndex: index => items[index],
       })
       expect(getItem(0, 0)).toBe('a')
       expect(getItem(0, 2)).toBe('c')
@@ -142,7 +142,7 @@ describe('useGridLayout', () => {
       const { getItem } = useGridLayout({
         totalItems: computed(() => items.length),
         columnsCount: computed(() => 3),
-        getItemAtIndex: (index) => items[index],
+        getItemAtIndex: index => items[index],
       })
       expect(getItem(1, 0)).toBeUndefined()
     })

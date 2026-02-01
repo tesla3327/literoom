@@ -31,6 +31,7 @@ import { getUberPipeline } from './uber-pipeline'
 import { getMaskPipeline, type MaskStackInput } from './mask-pipeline'
 import { getRotationPipeline, RotationPipeline } from './rotation-pipeline'
 import { getDownsamplePipeline, type DownsampleParams } from './downsample-pipeline'
+import { BlitPipeline } from './blit-pipeline'
 import type { CurvePoint } from '../../decode/types'
 import { generateLutFromCurvePoints } from '../gpu-tone-curve-service'
 
@@ -151,6 +152,7 @@ export class GPUEditPipeline {
   private _initialized = false
   private texturePool: TexturePool | null = null
   private timingHelper: TimingHelper | null = null
+  private blitPipeline: BlitPipeline | null = null
 
   /**
    * Whether the pipeline is ready to process images.
@@ -190,6 +192,9 @@ export class GPUEditPipeline {
     } else {
       this.timingHelper = null
     }
+
+    // Initialize blit pipeline for canvas copy (handles RGBA8 -> BGRA8 format conversion)
+    this.blitPipeline = new BlitPipeline(this.device)
 
     this._initialized = true
     return true
@@ -1024,18 +1029,19 @@ export class GPUEditPipeline {
     encoder = ctx.encoder
 
     // ========== KEY DIFFERENCE FROM process() ==========
-    // Instead of reading back pixels, copy the final texture directly to the target (canvas) texture.
+    // Instead of reading back pixels, blit the final texture directly to the target (canvas) texture.
     // This eliminates the 15-30ms readback bottleneck!
+    // We use a render pass (blit) instead of copyTextureToTexture because:
+    // - Internal textures use RGBA8Unorm format
+    // - Canvas textures on macOS use BGRA8Unorm format (preferred canvas format)
+    // - copyTextureToTexture requires matching formats
+    // - Render passes handle the format conversion automatically
     const copyStart = performance.now()
 
-    // Copy the processed texture to the target canvas texture
-    encoder.copyTextureToTexture(
-      { texture: inputTexture },
-      { texture: targetTexture },
-      { width: currentWidth, height: currentHeight }
-    )
+    // Blit the processed texture to the target canvas texture with format conversion
+    encoder = this.blitPipeline!.blit(inputTexture, targetTexture, encoder)
 
-    console.log(`[edit-pipeline] processToTexture: texture copy scheduled in ${(performance.now() - copyStart).toFixed(2)}ms`)
+    console.log(`[edit-pipeline] processToTexture: texture blit scheduled in ${(performance.now() - copyStart).toFixed(2)}ms`)
 
     // Resolve GPU timestamps after all stages
     this.timingHelper?.resolveTimestamps(encoder)
@@ -1120,6 +1126,7 @@ export class GPUEditPipeline {
     this.timingHelper = null
     this.texturePool?.clear()
     this.texturePool = null
+    this.blitPipeline = null
     this.device = null
     this._initialized = false
   }
@@ -1248,7 +1255,9 @@ function shouldApplyToneCurve(
   if (points.length !== 2) return true
 
   // Check for identity: (0,0) to (1,1)
-  const [p0, p1] = points
+  // We know points.length === 2 from the check above
+  const p0 = points[0]!
+  const p1 = points[1]!
   return !(
     Math.abs(p0.x) < 0.001 &&
     Math.abs(p0.y) < 0.001 &&

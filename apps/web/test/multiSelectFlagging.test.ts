@@ -5,7 +5,7 @@
  * not just the current/focused photo.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useCatalogStore } from '~/stores/catalog'
 import { useSelectionStore } from '~/stores/selection'
@@ -310,7 +310,7 @@ describe('multi-select flagging', () => {
       // Select and pick
       selectionStore.selectSingle('asset-1')
       selectionStore.toggleSelection('asset-2')
-      let selectedIds = [...selectionStore.selectedIds]
+      const selectedIds = [...selectionStore.selectedIds]
       catalogStore.setFlagBatch(selectedIds, 'pick')
 
       expect(catalogStore.pickCount).toBe(2)

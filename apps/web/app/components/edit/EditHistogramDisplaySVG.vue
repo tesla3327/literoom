@@ -16,7 +16,7 @@ import type { ChannelClipping } from '@literoom/core/decode'
 const props = defineProps<{
   assetId: string
   adjustedPixels?: Uint8Array | null
-  adjustedDimensions?: { width: number; height: number } | null
+  adjustedDimensions?: { width: number, height: number } | null
   renderQuality?: 'draft' | 'full'
 }>()
 
@@ -113,7 +113,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-3" data-testid="histogram-display-svg">
+  <div
+    class="space-y-3"
+    data-testid="histogram-display-svg"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between">
       <h3 class="text-sm font-medium text-gray-400">

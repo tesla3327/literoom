@@ -11,9 +11,7 @@
 import type { Ref, ComputedRef } from 'vue'
 import type { CropRectangle } from '@literoom/core/catalog'
 import {
-  HANDLES,
   type HandlePosition,
-  getHandlePositions,
   findHandleAt,
   isInsideCrop,
   drawOverlay,
@@ -90,7 +88,7 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
   const isMoving = ref(false)
 
   /** Last mouse position for move calculations */
-  const lastMousePos = ref<{ x: number; y: number } | null>(null)
+  const lastMousePos = ref<{ x: number, y: number } | null>(null)
 
   /** Handle currently under cursor (for hover effect) */
   const hoveredHandle = ref<HandlePosition | null>(null)
@@ -191,7 +189,7 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
    */
   function resizeCrop(
     handle: HandlePosition,
-    coords: { x: number; y: number },
+    coords: { x: number, y: number },
     canvasWidth: number,
     canvasHeight: number,
   ): void {
@@ -293,7 +291,7 @@ export function useCropOverlay(options: UseCropOverlayOptions): UseCropOverlayRe
    * Move crop region.
    */
   function moveCrop(
-    coords: { x: number; y: number },
+    coords: { x: number, y: number },
     canvasWidth: number,
     canvasHeight: number,
   ): void {

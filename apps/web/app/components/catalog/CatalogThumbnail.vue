@@ -6,7 +6,7 @@
  * Handles loading states, selection, and flag badges.
  * Double-click navigates to edit view.
  */
-import type { Asset, ThumbnailStatus } from '@literoom/core/catalog'
+import type { Asset } from '@literoom/core/catalog'
 import { ThumbnailPriority } from '@literoom/core/catalog'
 
 interface Props {
@@ -195,7 +195,7 @@ const containerClasses = computed(() => {
       :class="[
         'absolute inset-0 w-full h-full object-cover transition-opacity duration-200',
         // Reduce opacity during regeneration (status=loading but has existing thumbnail)
-        asset.thumbnailStatus === 'loading' && 'opacity-70'
+        asset.thumbnailStatus === 'loading' && 'opacity-70',
       ]"
       loading="lazy"
       decoding="async"

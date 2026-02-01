@@ -53,7 +53,6 @@ const {
   isWebGPURenderingActive,
 } = useEditPreview(toRef(props, 'assetId'))
 
-
 // ============================================================================
 // Template Refs
 // ============================================================================
@@ -114,7 +113,8 @@ async function configureWebGPUCanvas(): Promise<boolean> {
         console.log('[EditPreviewCanvas] GPU pipeline initialization failed')
         return false
       }
-    } catch (e) {
+    }
+    catch (e) {
       console.log('[EditPreviewCanvas] GPU pipeline initialization error:', e)
       return false
     }
@@ -150,7 +150,8 @@ async function configureWebGPUCanvas(): Promise<boolean> {
 
     console.log(`[EditPreviewCanvas] WebGPU canvas configured with format: ${format}`)
     return true
-  } catch (e) {
+  }
+  catch (e) {
     console.log('[EditPreviewCanvas] WebGPU canvas configuration failed:', e)
     return false
   }
@@ -265,7 +266,7 @@ const isInitialLoading = computed(() => {
  * Actual rendered dimensions of the preview image.
  * Used to size the clipping overlay canvas.
  */
-const renderedDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 })
+const renderedDimensions = ref<{ width: number, height: number }>({ width: 0, height: 0 })
 
 // ============================================================================
 // Clipping Overlay
@@ -312,15 +313,39 @@ onUnmounted(() => {
 
 /**
  * Update canvas dimensions and rendered dimensions when WebGPU rendering completes.
- * Called from useEditPreview after processToTexture completes.
+ * Called from useEditPreview BEFORE processToTexture to ensure the canvas texture
+ * has the correct dimensions for the copy operation.
  */
 function updateWebGPUCanvasDimensions(width: number, height: number): void {
   const canvas = previewCanvasRef.value
   if (!canvas) return
 
+  // Only update if dimensions actually changed
+  if (canvas.width === width && canvas.height === height) {
+    console.log(`[EditPreviewCanvas] Canvas dimensions unchanged: ${width}x${height}`)
+    return
+  }
+
+  console.log(`[EditPreviewCanvas] Updating canvas dimensions: ${canvas.width}x${canvas.height} -> ${width}x${height}`)
+
   // Update canvas element dimensions
   canvas.width = width
   canvas.height = height
+
+  // Reconfigure WebGPU context after resize to ensure the texture has correct dimensions
+  // Some browsers require this after canvas dimension changes
+  if (webgpuContext.value && webgpuFormat.value) {
+    const pipeline = getGPUEditPipeline()
+    const device = pipeline.getDevice()
+    if (device) {
+      webgpuContext.value.configure({
+        device,
+        format: webgpuFormat.value,
+        alphaMode: 'premultiplied',
+      })
+      console.log(`[EditPreviewCanvas] Reconfigured WebGPU context for new dimensions: ${width}x${height}`)
+    }
+  }
 
   // Update rendered dimensions for overlays
   renderedDimensions.value = {

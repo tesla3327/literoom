@@ -13,5 +13,5 @@
     "declarationMap": true,
     "noEmit": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "src/types/**/*.d.ts"]
 }

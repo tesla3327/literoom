@@ -264,9 +264,13 @@ export class DecodeService implements IDecodeService {
   /**
    * Create a request with the given fields and send it.
    * DRYs up the common pattern: generateId() + sendRequest().
+   *
+   * Uses a generic parameter R to accept any specific request type (minus id),
+   * since Omit<DecodeRequest, 'id'> would lose the discriminated union's
+   * per-variant fields like 'bytes' and 'pixels'.
    */
-  private routeRequest<T extends ResponseValue>(requestFields: Omit<DecodeRequest, 'id'>): Promise<T> {
-    const request = { ...requestFields, id: this.generateId() } as DecodeRequest
+  private routeRequest<T extends ResponseValue, R extends Omit<DecodeRequest, 'id'>>(requestFields: R): Promise<T> {
+    const request = { ...requestFields, id: this.generateId() } as unknown as DecodeRequest
     return this.sendRequest(request)
   }
 

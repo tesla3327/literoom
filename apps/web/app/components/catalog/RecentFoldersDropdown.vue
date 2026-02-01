@@ -7,6 +7,17 @@
  */
 import { formatRelativeTime } from '~/utils/formatRelativeTime'
 
+interface DropdownItem {
+  label: string
+  icon: string
+  disabled?: boolean
+  suffix?: string
+  suffixClass?: string
+  click?: () => void
+  iconClass?: string
+  class?: string
+}
+
 const catalogStore = useCatalogStore()
 const {
   recentFolders,
@@ -60,10 +71,9 @@ async function handleSelectNew() {
   }
 }
 
-
 // Build dropdown items from recent folders
 const dropdownItems = computed(() => {
-  const items: any[][] = []
+  const items: DropdownItem[][] = []
 
   // Recent folders section
   if (hasRecentFolders.value) {

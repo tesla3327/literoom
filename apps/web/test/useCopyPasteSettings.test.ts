@@ -137,10 +137,10 @@ describe('useCopyPasteSettings patterns', () => {
       })
 
       const hasSelectedGroups = computed(() =>
-        selectedGroups.basicAdjustments ||
-        selectedGroups.toneCurve ||
-        selectedGroups.crop ||
-        selectedGroups.rotation,
+        selectedGroups.basicAdjustments
+        || selectedGroups.toneCurve
+        || selectedGroups.crop
+        || selectedGroups.rotation,
       )
 
       expect(hasSelectedGroups.value).toBe(false)

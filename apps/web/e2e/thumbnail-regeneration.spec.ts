@@ -40,7 +40,7 @@ test.describe('Thumbnail Regeneration', () => {
       if (sliderBounds) {
         await page.mouse.click(
           sliderBounds.x + sliderBounds.width * 0.7,
-          sliderBounds.y + sliderBounds.height / 2
+          sliderBounds.y + sliderBounds.height / 2,
         )
         await page.waitForTimeout(500)
       }
@@ -69,7 +69,7 @@ test.describe('Thumbnail Regeneration', () => {
         // Increase exposure significantly
         await page.mouse.click(
           sliderBounds.x + sliderBounds.width * 0.8,
-          sliderBounds.y + sliderBounds.height / 2
+          sliderBounds.y + sliderBounds.height / 2,
         )
         // Wait for processing
         await page.waitForTimeout(1000)
@@ -94,7 +94,7 @@ test.describe('Thumbnail Regeneration', () => {
       if (sliderBounds) {
         await page.mouse.click(
           sliderBounds.x + sliderBounds.width * 0.6,
-          sliderBounds.y + sliderBounds.height / 2
+          sliderBounds.y + sliderBounds.height / 2,
         )
         await page.waitForTimeout(200)
       }
@@ -106,7 +106,7 @@ test.describe('Thumbnail Regeneration', () => {
       if (sliderBounds) {
         await page.mouse.click(
           sliderBounds.x + sliderBounds.width * 0.6,
-          sliderBounds.y + sliderBounds.height / 2
+          sliderBounds.y + sliderBounds.height / 2,
         )
         await page.waitForTimeout(200)
       }
@@ -137,7 +137,7 @@ test.describe('Thumbnail Regeneration', () => {
       if (sliderBounds) {
         await page.mouse.click(
           sliderBounds.x + sliderBounds.width * 0.7,
-          sliderBounds.y + sliderBounds.height / 2
+          sliderBounds.y + sliderBounds.height / 2,
         )
       }
     }
@@ -192,7 +192,7 @@ test.describe('Thumbnail Regeneration', () => {
         if (sliderBounds) {
           await page.mouse.click(
             sliderBounds.x + sliderBounds.width * 0.5,
-            sliderBounds.y + sliderBounds.height / 2
+            sliderBounds.y + sliderBounds.height / 2,
           )
         }
       }

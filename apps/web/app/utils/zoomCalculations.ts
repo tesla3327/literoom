@@ -68,7 +68,7 @@ export function hasValidDimensions(d: Dimensions): boolean {
 }
 
 /** Calculate X and Y scale factors */
-function calculateScaleFactors(d: Dimensions): { scaleX: number; scaleY: number } {
+function calculateScaleFactors(d: Dimensions): { scaleX: number, scaleY: number } {
   return {
     scaleX: d.viewportWidth / d.imageWidth,
     scaleY: d.viewportHeight / d.imageHeight,
@@ -76,7 +76,7 @@ function calculateScaleFactors(d: Dimensions): { scaleX: number; scaleY: number 
 }
 
 /** Calculate centered pan position for scaled image */
-function calculateCenteredPosition(scaledWidth: number, scaledHeight: number, viewportWidth: number, viewportHeight: number): { centerX: number; centerY: number } {
+function calculateCenteredPosition(scaledWidth: number, scaledHeight: number, viewportWidth: number, viewportHeight: number): { centerX: number, centerY: number } {
   return {
     centerX: (viewportWidth - scaledWidth) / 2,
     centerY: (viewportHeight - scaledHeight) / 2,
@@ -201,7 +201,7 @@ export function calculateCenteredPan(
   imageHeight: number,
   viewportWidth: number,
   viewportHeight: number,
-): { panX: number; panY: number } {
+): { panX: number, panY: number } {
   const { centerX, centerY } = calculateCenteredPosition(imageWidth * scale, imageHeight * scale, viewportWidth, viewportHeight)
   return { panX: centerX, panY: centerY }
 }

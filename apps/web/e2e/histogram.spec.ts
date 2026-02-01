@@ -176,7 +176,6 @@ test.describe('Clipping Overlay', () => {
     await page.waitForTimeout(500)
 
     // The clipping overlay canvas should exist
-    const clippingCanvas = page.locator('[data-testid="clipping-overlay"]')
     // May or may not be visible depending on if there's clipping
     // Just check it doesn't crash
   })
@@ -200,7 +199,6 @@ test.describe('Clipping Overlay', () => {
 
         // With high exposure, there should be highlight clipping shown
         // The clipping overlay should be visible/rendered
-        const clippingCanvas = page.locator('[data-testid="clipping-overlay"]')
         // Clipping visualization should be active (verify no errors)
       }
     }

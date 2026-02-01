@@ -9,10 +9,10 @@
  * - Tooltip text display
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import { defineComponent, h, computed, ref } from 'vue'
+import { defineComponent, h } from 'vue'
 import GPUStatusIndicator from '~/components/gpu/GPUStatusIndicator.vue'
 import { useGpuStatusStore } from '~/stores/gpuStatus'
 
@@ -26,7 +26,7 @@ const UTooltipStub = defineComponent({
     text: String,
   },
   setup(props, { slots }) {
-    return () => h('div', { class: 'u-tooltip', 'data-tooltip-text': props.text }, slots.default?.())
+    return () => h('div', { 'class': 'u-tooltip', 'data-tooltip-text': props.text }, slots.default?.())
   },
 })
 
@@ -42,7 +42,7 @@ const UButtonStub = defineComponent({
   setup(props) {
     return () =>
       h('button', {
-        class: 'u-button',
+        'class': 'u-button',
         'data-icon': props.icon,
         'data-color': props.color,
         'data-variant': props.variant,
@@ -370,7 +370,13 @@ describe('GPUStatusIndicator', () => {
         { setup: () => {}, expected: 'Initializing...' },
         { setup: () => store.setAvailable(true), expected: 'GPU Accelerated' },
         { setup: () => store.setAvailable(false), expected: 'GPU Unavailable' },
-        { setup: () => { store.setAvailable(true); store.setError('Error') }, expected: 'GPU Error' },
+        {
+          setup: () => {
+            store.setAvailable(true)
+            store.setError('Error')
+          },
+          expected: 'GPU Error',
+        },
       ]
 
       for (const testCase of testCases) {

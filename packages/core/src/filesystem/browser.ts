@@ -142,7 +142,7 @@ export class BrowserFileSystemProvider implements FileSystemProvider {
     }
 
     try {
-      const handle = await window.showDirectoryPicker({
+      const handle = await (window as any).showDirectoryPicker({
         mode: 'read',
       })
       return wrapDirectoryHandle(handle)
@@ -165,7 +165,7 @@ export class BrowserFileSystemProvider implements FileSystemProvider {
     const entries: FileEntry[] = []
 
     try {
-      for await (const entry of native.values()) {
+      for await (const entry of (native as any).values()) {
         if (entry.kind === 'file') {
           entries.push({
             name: entry.name,
@@ -290,7 +290,7 @@ export class BrowserFileSystemProvider implements FileSystemProvider {
         : unwrapFileHandle(handle as FileHandle)
 
     try {
-      const result = await native.queryPermission({ mode })
+      const result = await (native as any).queryPermission({ mode })
       return result as PermissionState
     }
     catch {
@@ -308,7 +308,7 @@ export class BrowserFileSystemProvider implements FileSystemProvider {
         : unwrapFileHandle(handle as FileHandle)
 
     try {
-      const result = await native.requestPermission({ mode })
+      const result = await (native as any).requestPermission({ mode })
       return result as PermissionState
     }
     catch (error) {

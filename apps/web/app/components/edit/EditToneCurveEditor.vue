@@ -48,8 +48,8 @@ const hasModifications = computed(() => {
     const def = defaultPoints[i]
     if (!current || !def) return true
     if (
-      Math.abs(current.x - def.x) > 0.001 ||
-      Math.abs(current.y - def.y) > 0.001
+      Math.abs(current.x - def.x) > 0.001
+      || Math.abs(current.y - def.y) > 0.001
     ) {
       return true
     }
@@ -60,7 +60,10 @@ const hasModifications = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-3" data-testid="tone-curve-editor">
+  <div
+    class="space-y-3"
+    data-testid="tone-curve-editor"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between">
       <h3 class="text-sm font-medium text-gray-400">

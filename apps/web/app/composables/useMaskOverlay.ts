@@ -12,11 +12,8 @@ import type { Ref, ComputedRef } from 'vue'
 import type { LinearGradientMask, RadialGradientMask } from '@literoom/core/catalog'
 import { createLinearMask, createRadialMask } from '@literoom/core/catalog'
 import {
-  MASK_HANDLE_HIT_RADIUS,
   type LinearHandle,
   type RadialHandle,
-  getLinearHandlePositions,
-  getRadialHandlePositions,
   findLinearHandleAt,
   findRadialHandleAt,
   isNearLinearGradient,
@@ -105,16 +102,16 @@ export function useMaskOverlay(options: UseMaskOverlayOptions): UseMaskOverlayRe
   const isDrawingMask = ref(false)
 
   /** Start position for drawing a new mask (canvas coords) */
-  const drawStart = ref<{ x: number; y: number } | null>(null)
+  const drawStart = ref<{ x: number, y: number } | null>(null)
 
   /** Current position for drawing a new mask (canvas coords) */
-  const drawCurrent = ref<{ x: number; y: number } | null>(null)
+  const drawCurrent = ref<{ x: number, y: number } | null>(null)
 
   /** Whether dragging a radial center for move operation */
   const isMovingRadial = ref(false)
 
   /** Last mouse position for move calculations */
-  const lastMousePos = ref<{ x: number; y: number } | null>(null)
+  const lastMousePos = ref<{ x: number, y: number } | null>(null)
 
   // ============================================================================
   // Computed
@@ -276,11 +273,11 @@ export function useMaskOverlay(options: UseMaskOverlayOptions): UseMaskOverlayRe
     canvasWidth: number,
     canvasHeight: number,
   ): {
-      maskId: string | null
-      maskType: 'linear' | 'radial' | null
-      linearHandle: LinearHandle | null
-      radialHandle: RadialHandle | null
-    } {
+    maskId: string | null
+    maskType: 'linear' | 'radial' | null
+    linearHandle: LinearHandle | null
+    radialHandle: RadialHandle | null
+  } {
     const result = {
       maskId: null as string | null,
       maskType: null as 'linear' | 'radial' | null,
@@ -551,7 +548,7 @@ export function useMaskOverlay(options: UseMaskOverlayOptions): UseMaskOverlayRe
   /**
    * Handle mouse up - finish drawing or dragging.
    */
-  function handleMouseUp(e: MouseEvent): void {
+  function handleMouseUp(_e: MouseEvent): void {
     const canvas = canvasRef.value
     if (!canvas) return
 

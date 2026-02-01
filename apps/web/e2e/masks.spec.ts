@@ -33,17 +33,17 @@ test.describe('Masks', () => {
   test.describe('Mask Panel', () => {
     test('masks section is visible in edit panel', async ({ page }) => {
       // Look for the masks section header or container
-      const masksSection = page.locator('[data-testid="masks-section"]')
+      page.locator('[data-testid="masks-section"]')
       await page.waitForTimeout(500)
     })
 
     test('add linear gradient mask button exists', async ({ page }) => {
-      const addLinearButton = page.locator('[data-testid="add-linear-mask-button"]')
+      page.locator('[data-testid="add-linear-mask-button"]')
       await page.waitForTimeout(500)
     })
 
     test('add radial gradient mask button exists', async ({ page }) => {
-      const addRadialButton = page.locator('[data-testid="add-radial-mask-button"]')
+      page.locator('[data-testid="add-radial-mask-button"]')
       await page.waitForTimeout(500)
     })
   })
@@ -57,7 +57,7 @@ test.describe('Masks', () => {
 
         // Should enter drawing mode (cursor should change, or there should be an indicator)
         // Check that a drawing mode indicator is present
-        const drawingIndicator = page.locator('[data-testid="mask-drawing-indicator"]')
+        page.locator('[data-testid="mask-drawing-indicator"]')
         await page.waitForTimeout(200)
       }
     })
@@ -85,7 +85,7 @@ test.describe('Masks', () => {
             await page.waitForTimeout(500)
 
             // A mask should be created and appear in the masks list
-            const maskItem = page.locator('[data-testid="mask-list-item"]').first()
+            page.locator('[data-testid="mask-list-item"]').first()
             // Just verify no crash
           }
         }
@@ -110,7 +110,7 @@ test.describe('Masks', () => {
 
             // Check for mask in the list
             const maskListItems = page.locator('[data-testid="mask-list-item"]')
-            const count = await maskListItems.count()
+            await maskListItems.count()
             // Should have at least one mask
           }
         }
@@ -205,7 +205,7 @@ test.describe('Masks', () => {
             await page.waitForTimeout(500)
 
             // Look for mask adjustment sliders
-            const maskExposureSlider = page.locator('[data-testid="mask-adjustment-exposure"]')
+            page.locator('[data-testid="mask-adjustment-exposure"]')
             await page.waitForTimeout(200)
           }
         }
@@ -267,7 +267,7 @@ test.describe('Masks', () => {
             await page.waitForTimeout(500)
 
             // Look for visibility toggle
-            const visibilityToggle = page.locator('[data-testid="mask-visibility-toggle"]').first()
+            page.locator('[data-testid="mask-visibility-toggle"]').first()
             await page.waitForTimeout(200)
           }
         }
@@ -319,7 +319,7 @@ test.describe('Masks', () => {
             await page.mouse.up()
             await page.waitForTimeout(500)
 
-            const deleteButton = page.locator('[data-testid="delete-mask-button"]').first()
+            page.locator('[data-testid="delete-mask-button"]').first()
             await page.waitForTimeout(200)
           }
         }
@@ -386,7 +386,7 @@ test.describe('Masks', () => {
             await page.waitForTimeout(300)
 
             // The mask overlay should be visible
-            const maskOverlay = page.locator('[data-testid="mask-overlay"]')
+            page.locator('[data-testid="mask-overlay"]')
             await page.waitForTimeout(200)
 
             // Press O again to hide
@@ -439,7 +439,7 @@ test.describe('Mask Persistence', () => {
             await page.waitForTimeout(500)
 
             // The mask should still exist
-            const maskListItems = page.locator('[data-testid="mask-list-item"]')
+            page.locator('[data-testid="mask-list-item"]')
             // Verify no crash and masks are persisted
           }
         }

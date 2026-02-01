@@ -256,7 +256,7 @@ describe('combined clipping scenarios', () => {
   it('handles full tonal range clipping (very high contrast)', () => {
     // All shadows and all highlights clipped (extreme case)
     const clipBits = CLIP_SHADOW_R | CLIP_SHADOW_G | CLIP_SHADOW_B
-                   | CLIP_HIGHLIGHT_R | CLIP_HIGHLIGHT_G | CLIP_HIGHLIGHT_B
+      | CLIP_HIGHLIGHT_R | CLIP_HIGHLIGHT_G | CLIP_HIGHLIGHT_B
 
     const shadowColor = getShadowColor(clipBits)
     const highlightColor = getHighlightColor(clipBits)

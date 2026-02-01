@@ -826,7 +826,6 @@ describe('editUIStore', () => {
         // Setup: Cache asset at specific zoom with pan
         store.setZoomPreset('100%')
         store.pan(100, 100) // Pan to a specific position
-        const originalPan = { panX: store.camera.panX, panY: store.camera.panY }
         store.cacheZoomForAsset('asset-1')
 
         // Navigate away

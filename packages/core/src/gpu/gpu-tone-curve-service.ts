@@ -38,9 +38,9 @@ function computeMonotonicTangents(points: readonly CurvePoint[]): number[] {
   const delta: number[] = []
 
   for (let i = 0; i < n - 1; i++) {
-    const hVal = points[i + 1].x - points[i].x
+    const hVal = points[i + 1]!.x - points[i]!.x
     h.push(hVal)
-    delta.push(Math.abs(hVal) < 1e-7 ? 0 : (points[i + 1].y - points[i].y) / hVal)
+    delta.push(Math.abs(hVal) < 1e-7 ? 0 : (points[i + 1]!.y - points[i]!.y) / hVal)
   }
 
   // Initialize tangents
@@ -49,42 +49,42 @@ function computeMonotonicTangents(points: readonly CurvePoint[]): number[] {
   // Interior points: weighted harmonic mean
   for (let i = 1; i < n - 1; i++) {
     if (
-      Math.sign(delta[i - 1]) !== Math.sign(delta[i]) ||
-      Math.abs(delta[i - 1]) < 1e-7 ||
-      Math.abs(delta[i]) < 1e-7
+      Math.sign(delta[i - 1]!) !== Math.sign(delta[i]!) ||
+      Math.abs(delta[i - 1]!) < 1e-7 ||
+      Math.abs(delta[i]!) < 1e-7
     ) {
       m[i] = 0
     } else {
-      const w1 = 2 * h[i] + h[i - 1]
-      const w2 = h[i] + 2 * h[i - 1]
-      m[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i])
+      const w1 = 2 * h[i]! + h[i - 1]!
+      const w2 = h[i]! + 2 * h[i - 1]!
+      m[i] = (w1 + w2) / (w1 / delta[i - 1]! + w2 / delta[i]!)
     }
   }
 
   // Endpoint tangents
-  m[0] = delta[0]
-  m[n - 1] = delta[n - 2]
+  m[0] = delta[0]!
+  m[n - 1] = delta[n - 2]!
 
   // Enforce monotonicity constraints
   for (let i = 0; i < n - 1; i++) {
-    if (Math.abs(delta[i]) < 1e-7) {
+    if (Math.abs(delta[i]!) < 1e-7) {
       m[i] = 0
       m[i + 1] = 0
     } else {
-      const alpha = m[i] / delta[i]
-      const beta = m[i + 1] / delta[i]
+      const alpha = m[i]! / delta[i]!
+      const beta = m[i + 1]! / delta[i]!
 
       if (alpha > 3) {
-        m[i] = 3 * delta[i]
+        m[i] = 3 * delta[i]!
       }
       if (beta > 3) {
-        m[i + 1] = 3 * delta[i]
+        m[i + 1] = 3 * delta[i]!
       }
       if (alpha < -3) {
-        m[i] = -3 * Math.abs(delta[i])
+        m[i] = -3 * Math.abs(delta[i]!)
       }
       if (beta < -3) {
-        m[i + 1] = -3 * Math.abs(delta[i])
+        m[i + 1] = -3 * Math.abs(delta[i]!)
       }
     }
   }
@@ -106,7 +106,7 @@ function findInterval(points: readonly CurvePoint[], x: number): number {
 
   while (low < high) {
     const mid = Math.ceil((low + high) / 2)
-    if (points[mid].x <= x) {
+    if (points[mid]!.x <= x) {
       low = mid
     } else {
       high = mid - 1
@@ -130,17 +130,17 @@ function evaluateWithTangents(
     return x
   }
   if (n === 1) {
-    return points[0].y
+    return points[0]!.y
   }
 
   // Clamp to valid range
-  const clampedX = Math.max(points[0].x, Math.min(points[n - 1].x, x))
+  const clampedX = Math.max(points[0]!.x, Math.min(points[n - 1]!.x, x))
 
   // Find interval
   const i = findInterval(points, clampedX)
 
-  const p0 = points[i]
-  const p1 = points[i + 1]
+  const p0 = points[i]!
+  const p1 = points[i + 1]!
 
   const h = p1.x - p0.x
   if (Math.abs(h) < 1e-7) {
@@ -157,7 +157,7 @@ function evaluateWithTangents(
   const h01 = -2 * t3 + 3 * t2
   const h11 = t3 - t2
 
-  const y = h00 * p0.y + h10 * h * tangents[i] + h01 * p1.y + h11 * h * tangents[i + 1]
+  const y = h00 * p0.y + h10 * h * tangents[i]! + h01 * p1.y + h11 * h * tangents[i + 1]!
 
   return Math.max(0, Math.min(1, y))
 }
@@ -352,7 +352,7 @@ export async function applyToneCurveAdaptive(
       return service.applyToneCurve(pixels, width, height, lut)
     },
     // WASM fallback
-    () => {
+    async () => {
       // The WASM function modifies pixels in place, so we need to copy
       const pixelsCopy = pixels.slice()
       return wasmFallback(pixelsCopy, lut.lut)

@@ -152,7 +152,7 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   const isMoving = ref(false)
 
   /** Last mouse position for move calculations */
-  const lastMousePos = ref<{ x: number; y: number } | null>(null)
+  const lastMousePos = ref<{ x: number, y: number } | null>(null)
 
   // ============================================================================
   // Computed
@@ -180,10 +180,10 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   const hasModifications = computed(() => {
     const crop = localCrop.value
     return (
-      Math.abs(crop.left) > 0.001 ||
-      Math.abs(crop.top) > 0.001 ||
-      Math.abs(crop.width - 1) > 0.001 ||
-      Math.abs(crop.height - 1) > 0.001
+      Math.abs(crop.left) > 0.001
+      || Math.abs(crop.top) > 0.001
+      || Math.abs(crop.width - 1) > 0.001
+      || Math.abs(crop.height - 1) > 0.001
     )
   })
 
@@ -194,7 +194,7 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   /**
    * Convert canvas coordinates to normalized (0-1) coordinates.
    */
-  function toNormalized(canvasX: number, canvasY: number, canvas: HTMLCanvasElement): { x: number; y: number } {
+  function toNormalized(canvasX: number, canvasY: number, canvas: HTMLCanvasElement): { x: number, y: number } {
     return {
       x: Math.max(0, Math.min(1, canvasX / canvas.width)),
       y: Math.max(0, Math.min(1, canvasY / canvas.height)),
@@ -202,19 +202,9 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   }
 
   /**
-   * Convert normalized coordinates to canvas coordinates.
-   */
-  function toCanvas(normX: number, normY: number, canvas: HTMLCanvasElement): { x: number; y: number } {
-    return {
-      x: normX * canvas.width,
-      y: normY * canvas.height,
-    }
-  }
-
-  /**
    * Get handle positions in canvas coordinates.
    */
-  function getHandlePositions(canvas: HTMLCanvasElement): Record<HandlePosition, { x: number; y: number }> {
+  function getHandlePositions(canvas: HTMLCanvasElement): Record<HandlePosition, { x: number, y: number }> {
     const crop = localCrop.value
     const left = crop.left * canvas.width
     const top = crop.top * canvas.height
@@ -256,10 +246,10 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
     const normX = canvasX / canvas.width
     const normY = canvasY / canvas.height
     return (
-      normX >= crop.left &&
-      normX <= crop.left + crop.width &&
-      normY >= crop.top &&
-      normY <= crop.top + crop.height
+      normX >= crop.left
+      && normX <= crop.left + crop.width
+      && normY >= crop.top
+      && normY <= crop.top + crop.height
     )
   }
 
@@ -398,10 +388,10 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
     const crop = localCrop.value
     // If crop is full image, set to null
     if (
-      Math.abs(crop.left) < 0.001 &&
-      Math.abs(crop.top) < 0.001 &&
-      Math.abs(crop.width - 1) < 0.001 &&
-      Math.abs(crop.height - 1) < 0.001
+      Math.abs(crop.left) < 0.001
+      && Math.abs(crop.top) < 0.001
+      && Math.abs(crop.width - 1) < 0.001
+      && Math.abs(crop.height - 1) < 0.001
     ) {
       editStore.setCrop(null)
     }
@@ -496,7 +486,7 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   /**
    * Get canvas coordinates from mouse event.
    */
-  function getCanvasCoords(e: MouseEvent): { x: number; y: number } | null {
+  function getCanvasCoords(e: MouseEvent): { x: number, y: number } | null {
     const canvas = canvasRef.value
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
@@ -572,7 +562,7 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   /**
    * Resize crop based on handle drag.
    */
-  function resizeCrop(handle: HandlePosition, coords: { x: number; y: number }, canvas: HTMLCanvasElement): void {
+  function resizeCrop(handle: HandlePosition, coords: { x: number, y: number }, canvas: HTMLCanvasElement): void {
     const norm = toNormalized(coords.x, coords.y, canvas)
     const crop = { ...localCrop.value }
     const ratio = effectiveAspectRatio.value
@@ -667,7 +657,7 @@ export function useCropEditor(options: UseCropEditorOptions): UseCropEditorRetur
   /**
    * Move crop region.
    */
-  function moveCrop(coords: { x: number; y: number }, canvas: HTMLCanvasElement): void {
+  function moveCrop(coords: { x: number, y: number }, canvas: HTMLCanvasElement): void {
     if (!lastMousePos.value) return
 
     const deltaX = (coords.x - lastMousePos.value.x) / canvas.width

@@ -89,7 +89,6 @@ describe('useIntersectionObserver', () => {
   ) {
     const { threshold = 0.1, rootMargin = '100px', root = null } = options
 
-    let elementRef: HTMLElement | null = null
     let isVisible = false
     let observer: IntersectionObserver | null = null
 
@@ -113,7 +112,6 @@ describe('useIntersectionObserver', () => {
 
     const setElement = (element: HTMLElement | null) => {
       stop()
-      elementRef = element
 
       if (!element) return
 
@@ -215,7 +213,7 @@ describe('useIntersectionObserver', () => {
 
   it('calls callback when visibility changes to false', () => {
     const callback = vi.fn()
-    const { setElement, getIsVisible } = useIntersectionObserver(callback)
+    const { setElement } = useIntersectionObserver(callback)
     const element = document.createElement('div')
 
     setElement(element)
@@ -742,7 +740,7 @@ describe('useIntersectionObserverBatch', () => {
   })
 
   it('handles observing many elements', () => {
-    const { observe, getVisibleIds } = useIntersectionObserverBatch()
+    const { observe } = useIntersectionObserverBatch()
     const elements: HTMLElement[] = []
 
     for (let i = 0; i < 100; i++) {
@@ -778,7 +776,6 @@ describe('useIntersectionObserverBatch', () => {
 
 describe('edge cases', () => {
   it('handles rapid observe/unobserve cycles', () => {
-    const onVisibilityChange = vi.fn()
     const { observe, unobserve, isVisible } = (() => {
       const elementToId = new Map<Element, string>()
       const visibilityState = new Map<string, boolean>()
@@ -825,9 +822,6 @@ describe('edge cases', () => {
       }
     })()
 
-    const el1 = document.createElement('div')
-    const el2 = document.createElement('div')
-
     observe('same-id')
     observe('same-id') // Re-observe with different element
 
@@ -836,8 +830,6 @@ describe('edge cases', () => {
   })
 
   it('handles threshold of 0 (any visibility)', () => {
-    const callback = vi.fn()
-
     // With threshold 0, even 1 pixel visible triggers
     const options = { threshold: 0 }
 

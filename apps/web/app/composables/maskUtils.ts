@@ -8,12 +8,9 @@
  * This file provides mask-specific wrappers that return Point2D types.
  */
 
-import type { LinearGradientMask, RadialGradientMask, Point2D } from '@literoom/core/catalog'
+import type { LinearGradientMask, RadialGradientMask } from '@literoom/core/catalog'
 import {
   toCanvas as toCanvasBase,
-  toNormalized as toNormalizedBase,
-  getCanvasCoords as getCanvasCoordsBase,
-  debounce as debounceBase,
   distance,
   clamp01,
 } from '~/utils/canvasCoords'
@@ -80,23 +77,13 @@ export type MaskHandle = LinearHandle | RadialHandle
 // These are used internally and by useMaskOverlay
 // Using the base implementations from canvasCoords
 
-/** Convert canvas coordinates to normalized Point2D */
-function toNormalizedPoint2D(
-  canvasX: number,
-  canvasY: number,
-  canvasWidth: number,
-  canvasHeight: number,
-): Point2D {
-  return toNormalizedBase(canvasX, canvasY, canvasWidth, canvasHeight)
-}
-
 /** Convert normalized to canvas coordinates */
 function toCanvasCoords(
   normX: number,
   normY: number,
   canvasWidth: number,
   canvasHeight: number,
-): { x: number; y: number } {
+): { x: number, y: number } {
   return toCanvasBase(normX, normY, canvasWidth, canvasHeight)
 }
 
@@ -111,7 +98,7 @@ export function getLinearHandlePositions(
   mask: LinearGradientMask,
   canvasWidth: number,
   canvasHeight: number,
-): Record<LinearHandle, { x: number; y: number }> {
+): Record<LinearHandle, { x: number, y: number }> {
   return {
     start: toCanvasCoords(mask.start.x, mask.start.y, canvasWidth, canvasHeight),
     end: toCanvasCoords(mask.end.x, mask.end.y, canvasWidth, canvasHeight),
@@ -183,7 +170,7 @@ export function getRadialHandlePositions(
   mask: RadialGradientMask,
   canvasWidth: number,
   canvasHeight: number,
-): Record<RadialHandle, { x: number; y: number }> {
+): Record<RadialHandle, { x: number, y: number }> {
   const center = toCanvasCoords(mask.center.x, mask.center.y, canvasWidth, canvasHeight)
   const rx = mask.radiusX * canvasWidth
   const ry = mask.radiusY * canvasHeight
@@ -301,8 +288,8 @@ export function drawLinearMask(
  */
 function drawLinearGradientVisualization(
   ctx: CanvasRenderingContext2D,
-  start: { x: number; y: number },
-  end: { x: number; y: number },
+  start: { x: number, y: number },
+  end: { x: number, y: number },
   feather: number,
   canvasWidth: number,
   canvasHeight: number,
@@ -453,8 +440,8 @@ function drawCenterHandle(
  */
 export function drawTempLinearMask(
   ctx: CanvasRenderingContext2D,
-  start: { x: number; y: number },
-  end: { x: number; y: number },
+  start: { x: number, y: number },
+  end: { x: number, y: number },
 ): void {
   // Draw line with dashed pattern
   ctx.beginPath()
@@ -476,7 +463,7 @@ export function drawTempLinearMask(
  */
 export function drawTempRadialMask(
   ctx: CanvasRenderingContext2D,
-  center: { x: number; y: number },
+  center: { x: number, y: number },
   radiusX: number,
   radiusY: number,
 ): void {
@@ -517,7 +504,7 @@ export function getCursorForRadialHandle(handle: RadialHandle | null, isDragging
 
   // Radius handles get resize cursors
   const cursors: Record<RadialHandle, string> = {
-    center: 'move',
+    'center': 'move',
     'radiusX+': 'ew-resize',
     'radiusX-': 'ew-resize',
     'radiusY+': 'ns-resize',

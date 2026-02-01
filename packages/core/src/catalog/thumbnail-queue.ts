@@ -118,7 +118,7 @@ export class ThumbnailQueue {
       return undefined
     }
 
-    const top = this.heap[0]
+    const top = this.heap[0]!
     this.indexMap.delete(top.assetId)
 
     if (this.heap.length === 1) {
@@ -152,8 +152,8 @@ export class ThumbnailQueue {
       return
     }
 
-    const oldPriority = this.heap[index].priority
-    this.heap[index].priority = priority
+    const oldPriority = this.heap[index]!.priority
+    this.heap[index]!.priority = priority
 
     // Re-heapify based on priority change
     if (priority < oldPriority) {
@@ -187,7 +187,7 @@ export class ThumbnailQueue {
 
     // Re-heapify
     const parent = Math.floor((index - 1) / 2)
-    if (index > 0 && this.compare(this.heap[index], this.heap[parent]) < 0) {
+    if (index > 0 && this.compare(this.heap[index]!, this.heap[parent]!) < 0) {
       this.bubbleUp(index)
     } else {
       this.bubbleDown(index)
@@ -210,7 +210,7 @@ export class ThumbnailQueue {
     if (index === undefined) {
       return undefined
     }
-    return this.heap[index].priority
+    return this.heap[index]!.priority
   }
 
   /**
@@ -266,7 +266,7 @@ export class ThumbnailQueue {
   private bubbleUp(index: number): void {
     while (index > 0) {
       const parentIndex = Math.floor((index - 1) / 2)
-      if (this.compare(this.heap[index], this.heap[parentIndex]) >= 0) {
+      if (this.compare(this.heap[index]!, this.heap[parentIndex]!) >= 0) {
         break
       }
       this.swap(index, parentIndex)
@@ -283,11 +283,11 @@ export class ThumbnailQueue {
       const rightChild = 2 * index + 2
       let smallest = index
 
-      if (leftChild < this.heap.length && this.compare(this.heap[leftChild], this.heap[smallest]) < 0) {
+      if (leftChild < this.heap.length && this.compare(this.heap[leftChild]!, this.heap[smallest]!) < 0) {
         smallest = leftChild
       }
 
-      if (rightChild < this.heap.length && this.compare(this.heap[rightChild], this.heap[smallest]) < 0) {
+      if (rightChild < this.heap.length && this.compare(this.heap[rightChild]!, this.heap[smallest]!) < 0) {
         smallest = rightChild
       }
 
@@ -304,11 +304,11 @@ export class ThumbnailQueue {
    * Swap two items in the heap and update the index map.
    */
   private swap(i: number, j: number): void {
-    const temp = this.heap[i]
-    this.heap[i] = this.heap[j]
+    const temp = this.heap[i]!
+    this.heap[i] = this.heap[j]!
     this.heap[j] = temp
-    this.indexMap.set(this.heap[i].assetId, i)
-    this.indexMap.set(this.heap[j].assetId, j)
+    this.indexMap.set(this.heap[i]!.assetId, i)
+    this.indexMap.set(this.heap[j]!.assetId, j)
   }
 
   /**
@@ -324,11 +324,11 @@ export class ThumbnailQueue {
     // In a min-heap, lowest priority items are in the leaves
     const startIdx = Math.floor(this.heap.length / 2)
     let lowestIdx = startIdx
-    let lowest = this.heap[startIdx]
+    let lowest = this.heap[startIdx]!
 
     for (let i = startIdx + 1; i < this.heap.length; i++) {
-      if (this.compare(this.heap[i], lowest) > 0) {
-        lowest = this.heap[i]
+      if (this.compare(this.heap[i]!, lowest) > 0) {
+        lowest = this.heap[i]!
         lowestIdx = i
       }
     }

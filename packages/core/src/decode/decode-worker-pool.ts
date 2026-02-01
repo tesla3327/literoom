@@ -167,8 +167,8 @@ export class DecodeWorkerPool implements IDecodeService {
     let minIndex = 0
 
     for (let i = 0; i < this.workerLoad.length; i++) {
-      if (this.workerLoad[i] < minLoad) {
-        minLoad = this.workerLoad[i]
+      if (this.workerLoad[i]! < minLoad) {
+        minLoad = this.workerLoad[i]!
         minIndex = i
       }
     }
@@ -185,7 +185,7 @@ export class DecodeWorkerPool implements IDecodeService {
 
     clearTimeout(pending.timeoutId)
     this.pending.delete(response.id)
-    this.workerLoad[workerId]--
+    this.workerLoad[workerId]!--
 
     const parsed = parseDecodeResponse(response)
     if (parsed.type === 'error') {
@@ -206,15 +206,15 @@ export class DecodeWorkerPool implements IDecodeService {
         return
       }
 
-      const worker = this.workers[workerId]
+      const worker = this.workers[workerId]!
 
       const timeoutId = setTimeout(() => {
         this.pending.delete(request.id)
-        this.workerLoad[workerId]--
+        this.workerLoad[workerId]!--
         reject(new DecodeError('Decode operation timed out', 'TIMEOUT'))
       }, DEFAULT_TIMEOUT)
 
-      this.workerLoad[workerId]++
+      this.workerLoad[workerId]!++
       this.pending.set(request.id, {
         workerId,
         resolve: resolve as (value: ResponseValue) => void,
@@ -230,9 +230,9 @@ export class DecodeWorkerPool implements IDecodeService {
    * Create a request with the given fields and route it to the least busy worker.
    * DRYs up the common pattern: getLeastBusyWorker() + generateId() + sendRequest().
    */
-  private routeRequest<T extends ResponseValue>(requestFields: Omit<DecodeRequest, 'id'>): Promise<T> {
+  private routeRequest<T extends ResponseValue, R extends Omit<DecodeRequest, 'id'>>(requestFields: R): Promise<T> {
     const workerId = this.getLeastBusyWorker()
-    const request = { ...requestFields, id: this.generateId(workerId) } as DecodeRequest
+    const request = { ...requestFields, id: this.generateId(workerId) } as unknown as DecodeRequest
     return this.sendRequest(request, workerId)
   }
 

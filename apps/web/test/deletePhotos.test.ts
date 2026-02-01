@@ -25,7 +25,7 @@ function createMockAsset(
     flag?: FlagStatus
     thumbnailStatus?: ThumbnailStatus
     preview1xStatus?: ThumbnailStatus
-  } = {}
+  } = {},
 ): Asset {
   return {
     id,
@@ -49,7 +49,7 @@ function createMockAsset(
  */
 function populateCatalog(
   catalogStore: ReturnType<typeof useCatalogStore>,
-  count: number
+  count: number,
 ): Asset[] {
   const assets: Asset[] = []
   for (let i = 1; i <= count; i++) {

@@ -30,10 +30,6 @@ export interface UseHistogramDisplayReturn {
 // Constants
 // ============================================================================
 
-/** Canvas dimensions for histogram */
-const HISTOGRAM_WIDTH = 256
-const HISTOGRAM_HEIGHT = 192
-
 /** Debounce delay for histogram computation (longer than preview) */
 const HISTOGRAM_DEBOUNCE_MS = 500
 
@@ -161,7 +157,7 @@ function debounce<T extends (...args: unknown[]) => void>(
  */
 async function loadImagePixels(
   url: string,
-): Promise<{ pixels: Uint8Array; width: number; height: number }> {
+): Promise<{ pixels: Uint8Array, width: number, height: number }> {
   // Load image
   const img = new Image()
   img.crossOrigin = 'anonymous'
@@ -209,7 +205,7 @@ async function loadImagePixels(
 export function useHistogramDisplay(
   assetId: Ref<string>,
   adjustedPixelsRef?: Ref<Uint8Array | null | undefined>,
-  adjustedDimensionsRef?: Ref<{ width: number; height: number } | null | undefined>,
+  adjustedDimensionsRef?: Ref<{ width: number, height: number } | null | undefined>,
   renderQualityRef?: Ref<'draft' | 'full'>,
 ): UseHistogramDisplayReturn {
   const editStore = useEditStore()
@@ -280,7 +276,7 @@ export function useHistogramDisplay(
 
     // Draw each channel as a filled path with proper colors
     // Order: Blue first (back), then Green, then Red (front) - matches Lightroom
-    const channels: Array<{ data: number[]; color: string; fillColor: string }> = [
+    const channels: Array<{ data: number[], color: string, fillColor: string }> = [
       { data: smoothedBlue, color: COLORS.blue, fillColor: 'rgba(0, 100, 255, 0.4)' },
       { data: smoothedGreen, color: COLORS.green, fillColor: 'rgba(0, 200, 0, 0.4)' },
       { data: smoothedRed, color: COLORS.red, fillColor: 'rgba(255, 50, 50, 0.4)' },
@@ -519,7 +515,7 @@ export function useHistogramDisplay(
    * Uses longer delay (500ms) to prioritize preview updates.
    * Stores the pending pixels to avoid closure issues with typed parameters.
    */
-  let pendingAdjustedPixels: { pixels: Uint8Array; width: number; height: number } | null = null
+  let pendingAdjustedPixels: { pixels: Uint8Array, width: number, height: number } | null = null
 
   const debouncedComputeFromPixels = debounce(() => {
     if (pendingAdjustedPixels) {

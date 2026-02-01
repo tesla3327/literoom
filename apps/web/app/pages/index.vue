@@ -17,7 +17,6 @@ import { formatRelativeTime } from '~/utils/formatRelativeTime'
 
 const catalogStore = useCatalogStore()
 const selectionStore = useSelectionStore()
-const permissionStore = usePermissionRecoveryStore()
 const exportStore = useExportStore()
 const deleteConfirmationStore = useDeleteConfirmationStore()
 const toast = useToast()
@@ -31,7 +30,6 @@ const {
   hasRecentFolders,
   loadRecentFolders,
   openRecentFolder,
-  openNewFolder,
 } = useRecentFolders()
 
 // Help modal keyboard shortcuts
@@ -49,11 +47,6 @@ const scanError = ref<string | null>(null)
 
 const hasFolder = computed(() => catalogStore.folderPath !== null)
 const hasAssets = computed(() => catalogStore.assetIds.length > 0)
-const folderName = computed(() => {
-  const path = catalogStore.folderPath
-  if (!path) return null
-  return path.split('/').pop() || path
-})
 
 // ============================================================================
 // Folder Selection

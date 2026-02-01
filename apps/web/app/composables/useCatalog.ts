@@ -378,13 +378,13 @@ export function useCatalog() {
       // Previous assets
       const prevIndex = currentIndex - offset
       if (prevIndex >= 0) {
-        idsToPreload.push(sortedIds[prevIndex])
+        idsToPreload.push(sortedIds[prevIndex]!)
       }
 
       // Next assets
       const nextIndex = currentIndex + offset
       if (nextIndex < sortedIds.length) {
-        idsToPreload.push(sortedIds[nextIndex])
+        idsToPreload.push(sortedIds[nextIndex]!)
       }
     }
 

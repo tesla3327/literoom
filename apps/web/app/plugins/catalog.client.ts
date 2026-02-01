@@ -121,6 +121,11 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     catalogStore.updatePreview(assetId, 'ready', url)
   }
 
+  // Photo ready callback - when both thumbnail and preview are done
+  catalogService.onPhotoReady = (photo) => {
+    catalogStore.markPhotoReady(photo.asset.id, photo.thumbnailUrl, photo.previewUrl)
+  }
+
   // Cleanup on page unload
   if (import.meta.client) {
     window.addEventListener('beforeunload', () => {

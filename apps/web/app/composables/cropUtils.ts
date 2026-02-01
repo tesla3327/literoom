@@ -10,6 +10,9 @@
 
 import type { CropRectangle } from '@literoom/core/catalog'
 
+// Import coordinate utilities
+import { distance } from '~/utils/canvasCoords'
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -33,9 +36,6 @@ export const COLORS = {
 export const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 export type HandlePosition = (typeof HANDLES)[number]
 
-// Import coordinate utilities
-import { toCanvas as toCanvasInternal, distance } from '~/utils/canvasCoords'
-
 /**
  * Get handle positions in canvas coordinates.
  */
@@ -43,7 +43,7 @@ export function getHandlePositions(
   crop: CropRectangle,
   canvasWidth: number,
   canvasHeight: number,
-): Record<HandlePosition, { x: number; y: number }> {
+): Record<HandlePosition, { x: number, y: number }> {
   const left = crop.left * canvasWidth
   const top = crop.top * canvasHeight
   const right = (crop.left + crop.width) * canvasWidth
@@ -234,4 +234,3 @@ export function getCursorForHandle(handle: HandlePosition | null): string {
 
   return cursors[handle]
 }
-

@@ -58,7 +58,7 @@ export function useZoomPan(options: UseZoomPanOptions): UseZoomPanReturn {
   const isPanning = ref(false)
 
   /** Last mouse position during pan */
-  const lastPanPos = ref<{ x: number; y: number } | null>(null)
+  const lastPanPos = ref<{ x: number, y: number } | null>(null)
 
   /** Whether spacebar is held (for temporary pan mode) */
   const isSpacebarHeld = ref(false)

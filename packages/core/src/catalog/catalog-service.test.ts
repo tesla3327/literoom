@@ -16,6 +16,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { CatalogService, createCatalogService } from './catalog-service'
+import { PhotoProcessor } from './photo-processor'
 import { ThumbnailPriority, CatalogError } from './types'
 import type { Asset, IScanService, IThumbnailService, ScannedFile, ScanOptions } from './types'
 import type { IDecodeService } from '../decode/decode-service'
@@ -71,9 +72,8 @@ function createMockScanService(): IScanService {
     scan: vi.fn(async function* (
       _directory: FileSystemDirectoryHandle,
       _options?: ScanOptions
-    ): AsyncGenerator<ScannedFile[], void, unknown> {
-      // Yield empty batches by default
-      yield []
+    ): AsyncGenerator<ScannedFile, void, unknown> {
+      // Yields nothing by default
     }),
   }
 }
@@ -1145,6 +1145,21 @@ describe('internal callback handlers', () => {
   }
 
   /**
+   * Create a mock PhotoProcessor for tests.
+   */
+  function createMockPhotoProcessor(): PhotoProcessor {
+    return {
+      enqueue: vi.fn().mockReturnValue(true),
+      cancelAll: vi.fn(),
+      queueSize: 0,
+      activeProcessing: 0,
+      has: vi.fn().mockReturnValue(false),
+      onPhotoProcessed: null as any,
+      onPhotoError: null as any,
+    } as unknown as PhotoProcessor
+  }
+
+  /**
    * Helper to create a CatalogService with injected mock services.
    * We use Object.create to bypass the private constructor.
    */
@@ -1154,11 +1169,13 @@ describe('internal callback handlers', () => {
   ): CatalogService {
     // Use Object.create to bypass the private constructor
     const service = Object.create(CatalogService.prototype) as CatalogService
+    const mockPhotoProcessor = createMockPhotoProcessor()
 
     // Set up internal state via type casting to access private fields
     const privateService = service as unknown as {
       scanService: IScanService
       thumbnailService: IThumbnailService
+      photoProcessor: PhotoProcessor
       _state: { status: string }
       _currentFolder: null
       _currentFolderId: null
@@ -1172,6 +1189,7 @@ describe('internal callback handlers', () => {
 
     privateService.scanService = mockScanService
     privateService.thumbnailService = mockThumbnailService
+    privateService.photoProcessor = mockPhotoProcessor
     privateService._state = { status: 'ready' }
     privateService._currentFolder = null
     privateService._currentFolderId = null
@@ -2254,29 +2272,42 @@ describe('scanFolder state management', () => {
 
   /**
    * Create a controllable mock scan service.
-   * Returns an object with the service and controls for yielding batches or throwing errors.
+   * Returns an object with the service and controls for yielding files or throwing errors.
    */
   function createControllableScanService(): {
     service: IScanService
-    yieldBatch: (batch: ScannedFile[]) => void
+    yieldFile: (file: ScannedFile) => void
+    yieldFiles: (files: ScannedFile[]) => void
     complete: () => void
     throwError: (error: Error) => void
     getSignal: () => AbortSignal | undefined
   } {
-    let resolveNext: ((value: IteratorResult<ScannedFile[], void>) => void) | null = null
+    let resolveNext: ((value: IteratorResult<ScannedFile, void>) => void) | null = null
     let rejectNext: ((error: Error) => void) | null = null
     let capturedSignal: AbortSignal | undefined
+    const pendingFiles: ScannedFile[] = []
+    let isComplete = false
 
     const service: IScanService = {
       scan: vi.fn(async function* (
         _directory: FileSystemDirectoryHandle,
         options?: ScanOptions
-      ): AsyncGenerator<ScannedFile[], void, unknown> {
+      ): AsyncGenerator<ScannedFile, void, unknown> {
         capturedSignal = options?.signal
 
-        // Yield batches as they are provided via yieldBatch()
+        // Yield files as they are provided via yieldFile()
         while (true) {
-          const result = await new Promise<IteratorResult<ScannedFile[], void>>(
+          // First check for any pending files
+          if (pendingFiles.length > 0) {
+            yield pendingFiles.shift()!
+            continue
+          }
+
+          if (isComplete) {
+            return
+          }
+
+          const result = await new Promise<IteratorResult<ScannedFile, void>>(
             (resolve, reject) => {
               resolveNext = resolve
               rejectNext = reject
@@ -2294,15 +2325,30 @@ describe('scanFolder state management', () => {
 
     return {
       service,
-      yieldBatch: (batch: ScannedFile[]) => {
+      yieldFile: (file: ScannedFile) => {
         if (resolveNext) {
           const resolve = resolveNext
           resolveNext = null
           rejectNext = null
-          resolve({ value: batch, done: false })
+          resolve({ value: file, done: false })
+        } else {
+          pendingFiles.push(file)
+        }
+      },
+      yieldFiles: (files: ScannedFile[]) => {
+        for (const file of files) {
+          if (resolveNext) {
+            const resolve = resolveNext
+            resolveNext = null
+            rejectNext = null
+            resolve({ value: file, done: false })
+          } else {
+            pendingFiles.push(file)
+          }
         }
       },
       complete: () => {
+        isComplete = true
         if (resolveNext) {
           const resolve = resolveNext
           resolveNext = null

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { test } from '@playwright/test'
 
 /**
  * Crop and Rotate E2E Tests
@@ -32,7 +32,6 @@ test.describe('Crop and Rotate', () => {
   test.describe('Rotation Controls', () => {
     test('rotation controls section is present', async ({ page }) => {
       // Look for the rotation/transform section in the edit panel
-      const rotationSection = page.locator('[data-testid="rotation-controls"]')
       // May be collapsed - just check it exists
       await page.waitForTimeout(500)
     })
@@ -56,7 +55,6 @@ test.describe('Crop and Rotate', () => {
     })
 
     test('straighten slider is present', async ({ page }) => {
-      const straightenSlider = page.locator('[data-testid="straighten-slider"]')
       // May be inside collapsed section
       await page.waitForTimeout(500)
     })
@@ -80,7 +78,6 @@ test.describe('Crop and Rotate', () => {
 
   test.describe('Crop Controls', () => {
     test('crop aspect ratio selector exists', async ({ page }) => {
-      const aspectSelector = page.locator('[data-testid="crop-aspect-selector"]')
       // May need to expand transform section
       await page.waitForTimeout(500)
     })
@@ -162,7 +159,6 @@ test.describe('Crop and Rotate', () => {
     test('crop overlay canvas exists in edit view', async ({ page }) => {
       // The crop overlay might not always be visible
       // but the canvas element should exist
-      const cropOverlay = page.locator('[data-testid="crop-overlay-canvas"]')
       await page.waitForTimeout(500)
     })
   })

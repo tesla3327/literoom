@@ -5,7 +5,7 @@
  * Since the actual plugin requires Nuxt context, we test the underlying logic patterns.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ============================================================================
 // Mock Types
@@ -59,7 +59,7 @@ interface MockGPUProcessor {
     activeBackend: 'webgpu' | 'wasm'
     capabilities: {
       available: boolean
-      adapterInfo?: { vendor: string; device: string }
+      adapterInfo?: { vendor: string, device: string }
     }
   }
 }
@@ -276,7 +276,8 @@ describe('initializeCatalog logic', () => {
             await catalogService.scanFolder()
             await editStore.initializeFromDb()
             return catalogStore.assetIds.length > 0
-          } finally {
+          }
+          finally {
             catalogStore.setScanning(false)
           }
         }
@@ -301,7 +302,8 @@ describe('initializeCatalog logic', () => {
             await catalogService.selectFolder()
             await catalogService.scanFolder()
             return true
-          } finally {
+          }
+          finally {
             catalogStore.setScanning(false)
           }
         }
@@ -327,7 +329,8 @@ describe('initializeCatalog logic', () => {
             await catalogService.selectFolder()
             await catalogService.scanFolder()
             return true
-          } finally {
+          }
+          finally {
             catalogStore.setScanning(false)
           }
         }
@@ -354,7 +357,8 @@ describe('initializeCatalog logic', () => {
             await catalogService.scanFolder()
             await editStore.initializeFromDb()
             return catalogStore.assetIds.length > 0
-          } finally {
+          }
+          finally {
             catalogStore.setScanning(false)
           }
         }
@@ -460,7 +464,8 @@ describe('initializeCatalog logic', () => {
             return true
           }
           return false
-        } catch (e) {
+        }
+        catch (e) {
           console.warn('Failed to initialize catalog:', e)
           return false
         }
@@ -500,7 +505,8 @@ describe('GPU initialization', () => {
     try {
       await gpuProcessor.initialize()
       gpuCapabilities = gpuProcessor.state.capabilities
-    } catch (error) {
+    }
+    catch {
       // GPU init failed, use WASM fallback
       gpuCapabilities = { available: false }
     }
@@ -572,13 +578,14 @@ describe('concurrent initialization prevention', () => {
 
       initializationPromise = (async () => {
         callCount++
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await new Promise(resolve => setTimeout(resolve, 10))
         return true
       })()
 
       try {
         return await initializationPromise
-      } finally {
+      }
+      finally {
         initializationPromise = null
       }
     }
@@ -606,13 +613,14 @@ describe('concurrent initialization prevention', () => {
 
       initializationPromise = (async () => {
         callCount++
-        await new Promise((resolve) => setTimeout(resolve, 5))
+        await new Promise(resolve => setTimeout(resolve, 5))
         return true
       })()
 
       try {
         return await initializationPromise
-      } finally {
+      }
+      finally {
         initializationPromise = null
       }
     }
@@ -640,7 +648,7 @@ describe('catalogReady promise', () => {
     // Simulate service initialization
     const initializeServices = async () => {
       // Services created...
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      await new Promise(resolve => setTimeout(resolve, 5))
       // Mark as ready
       resolveReady!()
     }

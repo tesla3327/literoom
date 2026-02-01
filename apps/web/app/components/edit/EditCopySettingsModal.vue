@@ -12,7 +12,7 @@
  * - Copy button to confirm selection
  */
 
-const { showCopyModal, selectedGroups, hasSelectedGroups, copySettings, closeCopyModal, toggleGroup, selectAllGroups, selectNoGroups } = useCopyPasteSettings()
+const { selectedGroups, hasSelectedGroups, copySettings, closeCopyModal, toggleGroup, selectAllGroups, selectNoGroups } = useCopyPasteSettings()
 
 const clipboardStore = useEditClipboardStore()
 

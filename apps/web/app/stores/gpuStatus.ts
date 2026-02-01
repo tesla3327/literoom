@@ -135,9 +135,9 @@ export const useGpuStatusStore = defineStore('gpuStatus', () => {
    */
   const rollingAverageFps = computed(() => {
     if (recentRenderTimes.value.length === 0) return null
-    const avgTime =
-      recentRenderTimes.value.reduce((sum, t) => sum + t, 0) /
-      recentRenderTimes.value.length
+    const avgTime
+      = recentRenderTimes.value.reduce((sum, t) => sum + t, 0)
+        / recentRenderTimes.value.length
     if (avgTime === 0) return null
     return 1000 / avgTime
   })

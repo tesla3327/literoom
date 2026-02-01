@@ -205,7 +205,7 @@ export class CatalogService implements ICatalogService {
     }
 
     try {
-      const handle = await window.showDirectoryPicker({ mode: 'read' })
+      const handle = await (window as any).showDirectoryPicker({ mode: 'read' })
       await this.setCurrentFolder(handle)
     } catch (error) {
       if (error instanceof DOMException) {
@@ -634,7 +634,7 @@ export class CatalogService implements ICatalogService {
         } else {
           // Navigate to subdirectory
           currentHandle = await (currentHandle as FileSystemDirectoryHandle).getDirectoryHandle(
-            part
+            part!
           )
         }
       }
@@ -877,7 +877,7 @@ export class CatalogService implements ICatalogService {
     }
 
     // For now, just load the first folder
-    const folder = folders[0]
+    const folder = folders[0]!
 
     // Try to restore the handle
     const handle = await this.loadHandle(folder.handleKey)
@@ -886,7 +886,7 @@ export class CatalogService implements ICatalogService {
     }
 
     // Check permission
-    const permission = await handle.queryPermission({ mode: 'read' })
+    const permission = await (handle as any).queryPermission({ mode: 'read' })
     if (permission !== 'granted') {
       // Would need to request permission via UI
       return false
@@ -930,7 +930,7 @@ export class CatalogService implements ICatalogService {
       try {
         const handle = await this.loadHandle(folder.handleKey)
         if (handle) {
-          const permission = await handle.queryPermission({ mode: 'read' })
+          const permission = await (handle as any).queryPermission({ mode: 'read' })
           isAccessible = permission === 'granted'
         }
       } catch {
@@ -968,10 +968,10 @@ export class CatalogService implements ICatalogService {
     }
 
     // Check permission
-    const permission = await handle.queryPermission({ mode: 'read' })
+    const permission = await (handle as any).queryPermission({ mode: 'read' })
     if (permission !== 'granted') {
       // Try to request permission
-      const requestResult = await handle.requestPermission({ mode: 'read' })
+      const requestResult = await (handle as any).requestPermission({ mode: 'read' })
       if (requestResult !== 'granted') {
         return false
       }

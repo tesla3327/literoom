@@ -154,9 +154,6 @@ test.describe('Zoom and Pan', () => {
     const preview = page.locator('[data-testid="edit-preview"]')
     const zoomLevel = page.locator('[data-testid="zoom-level"]')
 
-    // Get initial zoom
-    const initialZoom = await zoomLevel.textContent()
-
     // Scroll up on preview (zoom in)
     await preview.hover()
     await page.mouse.wheel(0, -100)
@@ -220,9 +217,6 @@ test.describe('Zoom and Pan', () => {
   test('double-click toggles 100% zoom', async ({ page }) => {
     const preview = page.locator('[data-testid="edit-preview"]')
     const zoomLevel = page.locator('[data-testid="zoom-level"]')
-
-    // Get initial zoom
-    const initialZoom = await zoomLevel.textContent()
 
     // Double-click to zoom to 100%
     await preview.dblclick()

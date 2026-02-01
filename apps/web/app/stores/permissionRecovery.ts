@@ -31,6 +31,24 @@ export interface FolderIssue {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Update a specific folder issue in the issues array by folderId.
+ * Returns a new array with the updated issue.
+ */
+function updateIssueById(
+  issues: FolderIssue[],
+  folderId: string,
+  update: Partial<FolderIssue>,
+): FolderIssue[] {
+  return issues.map(issue =>
+    issue.folderId === folderId ? { ...issue, ...update } : issue,
+  )
+}
+
+// ============================================================================
 // Store
 // ============================================================================
 
@@ -130,32 +148,18 @@ export const usePermissionRecoveryStore = defineStore('permissionRecovery', () =
     permissionState: 'prompt' | 'denied',
     issueError?: string,
   ): void {
-    const newIssues = [...folderIssues.value]
+    const issue: FolderIssue = { folderId, folderName, folderPath, permissionState, error: issueError }
+    const existingIndex = folderIssues.value.findIndex(i => i.folderId === folderId)
 
-    // Check if this folder is already in the list
-    const existingIndex = newIssues.findIndex(issue => issue.folderId === folderId)
     if (existingIndex >= 0) {
       // Update existing issue
-      newIssues[existingIndex] = {
-        folderId,
-        folderName,
-        folderPath,
-        permissionState,
-        error: issueError,
-      }
+      folderIssues.value = updateIssueById(folderIssues.value, folderId, issue)
     }
     else {
       // Add new issue
-      newIssues.push({
-        folderId,
-        folderName,
-        folderPath,
-        permissionState,
-        error: issueError,
-      })
+      folderIssues.value = [...folderIssues.value, issue]
     }
 
-    folderIssues.value = newIssues
     showModal.value = true
   }
 
@@ -193,12 +197,7 @@ export const usePermissionRecoveryStore = defineStore('permissionRecovery', () =
       }
       else {
         // Update the issue state to denied
-        const newIssues = folderIssues.value.map(issue =>
-          issue.folderId === folderId
-            ? { ...issue, permissionState: 'denied' as const }
-            : issue,
-        )
-        folderIssues.value = newIssues
+        folderIssues.value = updateIssueById(folderIssues.value, folderId, { permissionState: 'denied' })
         return null
       }
     }
@@ -207,12 +206,7 @@ export const usePermissionRecoveryStore = defineStore('permissionRecovery', () =
       error.value = message
 
       // Update issue with error
-      const newIssues = folderIssues.value.map(issue =>
-        issue.folderId === folderId
-          ? { ...issue, error: message }
-          : issue,
-      )
-      folderIssues.value = newIssues
+      folderIssues.value = updateIssueById(folderIssues.value, folderId, { error: message })
 
       return null
     }

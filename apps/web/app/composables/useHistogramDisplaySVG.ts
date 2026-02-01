@@ -209,7 +209,7 @@ function throttle<T extends (...args: unknown[]) => void>(
 
 async function loadImagePixels(
   url: string,
-): Promise<{ pixels: Uint8Array; width: number; height: number }> {
+): Promise<{ pixels: Uint8Array, width: number, height: number }> {
   const img = new Image()
   img.crossOrigin = 'anonymous'
 
@@ -245,7 +245,7 @@ async function loadImagePixels(
 export function useHistogramDisplaySVG(
   assetId: Ref<string>,
   adjustedPixelsRef?: Ref<Uint8Array | null | undefined>,
-  adjustedDimensionsRef?: Ref<{ width: number; height: number } | null | undefined>,
+  adjustedDimensionsRef?: Ref<{ width: number, height: number } | null | undefined>,
   renderQualityRef?: Ref<'draft' | 'full'>,
 ): UseHistogramDisplaySVGReturn {
   const editStore = useEditStore()
@@ -366,7 +366,7 @@ export function useHistogramDisplaySVG(
         pixels,
         width,
         height,
-        () => $decodeService.computeHistogram(pixels, width, height)
+        () => $decodeService.computeHistogram(pixels, width, height),
       )
       console.log(`[useHistogramDisplaySVG] Histogram computed via ${backend} in ${timing.toFixed(1)}ms`)
 
@@ -410,7 +410,7 @@ export function useHistogramDisplaySVG(
         pixels,
         width,
         height,
-        () => $decodeService.computeHistogram(pixels, width, height)
+        () => $decodeService.computeHistogram(pixels, width, height),
       )
       console.log(`[useHistogramDisplaySVG] Adjusted-pixels histogram computed via ${backend} in ${timing.toFixed(1)}ms`)
 
@@ -436,7 +436,7 @@ export function useHistogramDisplaySVG(
    * Throttled histogram computation for adjusted pixels.
    * Stores the pending pixels to avoid closure issues with typed parameters.
    */
-  let pendingAdjustedPixels: { pixels: Uint8Array; width: number; height: number } | null = null
+  let pendingAdjustedPixels: { pixels: Uint8Array, width: number, height: number } | null = null
 
   const throttledComputeFromPixels = throttle(() => {
     if (pendingAdjustedPixels) {

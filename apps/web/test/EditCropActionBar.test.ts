@@ -4,7 +4,7 @@
  * Tests for the crop action bar that provides Apply, Cancel, and Reset buttons
  * for the crop confirmation workflow.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import EditCropActionBar from '~/components/edit/EditCropActionBar.vue'

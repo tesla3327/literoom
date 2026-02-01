@@ -71,7 +71,7 @@ export function parseDecodeResponse(response: DecodeResponse): ParsedResponse {
       // Exhaustive check - should never reach here
       return {
         type: 'error',
-        error: new DecodeError(`Unknown response type`, 'DECODE_ERROR')
+        error: new DecodeError(`Unknown response type`, 'UNKNOWN')
       }
   }
 }

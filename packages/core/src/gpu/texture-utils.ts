@@ -400,14 +400,23 @@ export class DoubleBufferedTextures {
    * Get the current input texture (source).
    */
   getCurrent(): GPUTexture {
-    return this.textures[this.currentIndex]
+    const texture = this.textures[this.currentIndex]
+    if (!texture) {
+      throw new Error(`Invalid texture index: ${this.currentIndex}`)
+    }
+    return texture
   }
 
   /**
    * Get the other texture (destination).
    */
   getNext(): GPUTexture {
-    return this.textures[1 - this.currentIndex]
+    const nextIndex = 1 - this.currentIndex
+    const texture = this.textures[nextIndex as 0 | 1]
+    if (!texture) {
+      throw new Error(`Invalid texture index: ${nextIndex}`)
+    }
+    return texture
   }
 
   /**

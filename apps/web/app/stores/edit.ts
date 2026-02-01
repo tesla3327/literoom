@@ -30,7 +30,6 @@ import {
   cloneLinearMask,
   cloneMaskStack,
   cloneRadialMask,
-  createDefaultEditState,
   createDefaultMaskStack,
   hasModifiedAdjustments,
   isModifiedCropTransform,
@@ -157,9 +156,9 @@ export const useEditStore = defineStore('edit', () => {
    * Whether any edits have been modified from defaults.
    */
   const hasModifications = computed(
-    () => hasModifiedAdjustments(adjustments.value) ||
-          isModifiedCropTransform(cropTransform.value) ||
-          isModifiedMaskStack(masks.value ?? undefined),
+    () => hasModifiedAdjustments(adjustments.value)
+      || isModifiedCropTransform(cropTransform.value)
+      || isModifiedMaskStack(masks.value ?? undefined),
   )
 
   /**
@@ -590,15 +589,17 @@ export const useEditStore = defineStore('edit', () => {
     const index = masks.value.linearMasks.findIndex(m => m.id === id)
     if (index !== -1) {
       const current = masks.value.linearMasks[index]
-      masks.value.linearMasks[index] = {
-        id: current.id,
-        start: updates.start ?? current.start,
-        end: updates.end ?? current.end,
-        feather: updates.feather ?? current.feather,
-        enabled: updates.enabled ?? current.enabled,
-        adjustments: updates.adjustments ?? current.adjustments,
+      if (current) {
+        masks.value.linearMasks[index] = {
+          id: current.id,
+          start: updates.start ?? current.start,
+          end: updates.end ?? current.end,
+          feather: updates.feather ?? current.feather,
+          enabled: updates.enabled ?? current.enabled,
+          adjustments: updates.adjustments ?? current.adjustments,
+        }
+        markDirty()
       }
-      markDirty()
     }
   }
 
@@ -611,18 +612,20 @@ export const useEditStore = defineStore('edit', () => {
     const index = masks.value.radialMasks.findIndex(m => m.id === id)
     if (index !== -1) {
       const current = masks.value.radialMasks[index]
-      masks.value.radialMasks[index] = {
-        id: current.id,
-        center: updates.center ?? current.center,
-        radiusX: updates.radiusX ?? current.radiusX,
-        radiusY: updates.radiusY ?? current.radiusY,
-        rotation: updates.rotation ?? current.rotation,
-        feather: updates.feather ?? current.feather,
-        invert: updates.invert ?? current.invert,
-        enabled: updates.enabled ?? current.enabled,
-        adjustments: updates.adjustments ?? current.adjustments,
+      if (current) {
+        masks.value.radialMasks[index] = {
+          id: current.id,
+          center: updates.center ?? current.center,
+          radiusX: updates.radiusX ?? current.radiusX,
+          radiusY: updates.radiusY ?? current.radiusY,
+          rotation: updates.rotation ?? current.rotation,
+          feather: updates.feather ?? current.feather,
+          invert: updates.invert ?? current.invert,
+          enabled: updates.enabled ?? current.enabled,
+          adjustments: updates.adjustments ?? current.adjustments,
+        }
+        markDirty()
       }
-      markDirty()
     }
   }
 

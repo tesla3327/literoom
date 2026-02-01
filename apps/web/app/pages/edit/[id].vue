@@ -9,6 +9,9 @@
  * - Bottom: filmstrip navigation
  */
 
+// Import component for type reference
+import EditPreviewCanvas from '~/components/edit/EditPreviewCanvas.vue'
+
 // Apply middleware to ensure catalog service is ready before page loads
 // Also disable SSR since this page requires client-only services (catalog, decode)
 definePageMeta({
@@ -24,7 +27,6 @@ const route = useRoute()
 const router = useRouter()
 const catalogStore = useCatalogStore()
 const uiStore = useCatalogUIStore()
-const selectionStore = useSelectionStore()
 const editStore = useEditStore()
 const editUIStore = useEditUIStore()
 const { openCopyModal, pasteSettings, canPaste } = useCopyPasteSettings()
@@ -360,7 +362,10 @@ onUnmounted(() => {
 
       <!-- Center: preview canvas -->
       <main class="flex-1 relative min-w-0">
-        <EditPreviewCanvas ref="previewCanvasRef" :asset-id="assetId" />
+        <EditPreviewCanvas
+          ref="previewCanvasRef"
+          :asset-id="assetId"
+        />
       </main>
 
       <!-- Right panel: edit controls -->

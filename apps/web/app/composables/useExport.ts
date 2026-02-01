@@ -170,7 +170,7 @@ export function useExport() {
           )
         }
         break
-      case 3: // Radial gradient overlay
+      case 3: { // Radial gradient overlay
         const radialGradient = ctx.createRadialGradient(
           size / 2, size / 2, 0,
           size / 2, size / 2, size / 2,
@@ -180,6 +180,7 @@ export function useExport() {
         ctx.fillStyle = radialGradient
         ctx.fillRect(0, 0, size, size)
         break
+      }
       case 4: // Triangles
         ctx.fillStyle = `hsl(${(hueBase + 90) % 360}, 70%, 65%)`
         ctx.beginPath()

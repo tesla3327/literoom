@@ -52,9 +52,6 @@ test.describe('GPU Processing', () => {
       const previewImage = page.locator('[data-testid="preview-image"]')
       await expect(previewImage).toBeVisible({ timeout: 10000 })
 
-      // Get initial image src
-      const initialSrc = await previewImage.getAttribute('src')
-
       // Adjust exposure
       const exposureSlider = page.locator('[data-testid="adjustment-slider-exposure"]')
       if (await exposureSlider.isVisible()) {
@@ -70,7 +67,6 @@ test.describe('GPU Processing', () => {
           await page.waitForTimeout(1500)
 
           // The image src should change (or data-version if using canvas)
-          const newSrc = await previewImage.getAttribute('src')
           // Either src changed or it's a canvas update
           // In either case, the preview should be different
         }
@@ -377,12 +373,8 @@ test.describe('Clipping Visualization', () => {
     await page.waitForTimeout(500)
 
     // Check if clipping buttons are active
-    const shadowButton = page.locator('[data-testid="clipping-shadows-button"]')
-    const highlightButton = page.locator('[data-testid="clipping-highlights-button"]')
-
-    // At least one should be toggled
-    const shadowActive = await shadowButton.getAttribute('data-active')
-    const highlightActive = await highlightButton.getAttribute('data-active')
+    page.locator('[data-testid="clipping-shadows-button"]')
+    page.locator('[data-testid="clipping-highlights-button"]')
 
     // Toggle off with J again
     await page.keyboard.press('j')

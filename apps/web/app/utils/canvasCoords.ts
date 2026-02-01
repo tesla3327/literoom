@@ -41,7 +41,7 @@ export function toNormalized(
   canvasY: number,
   canvasWidth: number,
   canvasHeight: number,
-): { x: number; y: number } {
+): { x: number, y: number } {
   return {
     x: clamp01(canvasX / canvasWidth),
     y: clamp01(canvasY / canvasHeight),
@@ -62,7 +62,7 @@ export function toCanvas(
   normY: number,
   canvasWidth: number,
   canvasHeight: number,
-): { x: number; y: number } {
+): { x: number, y: number } {
   return {
     x: normX * canvasWidth,
     y: normY * canvasHeight,
@@ -85,7 +85,7 @@ export function toCanvas(
 export function getCanvasCoords(
   e: MouseEvent,
   canvas: HTMLCanvasElement,
-): { x: number; y: number } {
+): { x: number, y: number } {
   const rect = canvas.getBoundingClientRect()
   const scaleX = canvas.width / rect.width
   const scaleY = canvas.height / rect.height

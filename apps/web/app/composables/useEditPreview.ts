@@ -30,7 +30,6 @@ import {
   RotationPipeline,
   type EditPipelineParams,
   type EditPipelineTiming,
-  type EditPipelineTextureResult,
   type MaskStackInput,
   type BasicAdjustments,
 } from '@literoom/core/gpu'
@@ -235,101 +234,6 @@ function debounce<T extends (...args: unknown[]) => void>(
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/**
- * Convert RGB pixel data (3 bytes per pixel) to RGBA (4 bytes per pixel).
- */
-function rgbToRgba(rgb: Uint8Array): Uint8ClampedArray {
-  const pixelCount = rgb.length / 3
-  const rgba = new Uint8ClampedArray(pixelCount * 4)
-
-  for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
-    rgba[j] = rgb[i]! // R
-    rgba[j + 1] = rgb[i + 1]! // G
-    rgba[j + 2] = rgb[i + 2]! // B
-    rgba[j + 3] = 255 // A (fully opaque)
-  }
-
-  return rgba
-}
-
-/**
- * Timing information for pixelsToUrl operation.
- */
-interface PixelsToUrlTiming {
-  rgbToRgba: number
-  putImageData: number
-  jpegEncode: number
-  total: number
-}
-
-/**
- * Result of pixelsToUrl including URL and timing breakdown.
- */
-interface PixelsToUrlResult {
-  url: string
-  timing: PixelsToUrlTiming
-}
-
-/**
- * Convert pixels to a blob URL for display in an <img> tag.
- * Returns both the URL and detailed timing information for benchmarking.
- */
-async function pixelsToUrl(
-  pixels: Uint8Array,
-  width: number,
-  height: number,
-): Promise<PixelsToUrlResult> {
-  const totalStart = performance.now()
-
-  // Create canvas
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')!
-
-  // Step 1: RGB to RGBA conversion
-  const rgbToRgbaStart = performance.now()
-  const rgbaPixels = rgbToRgba(pixels)
-  const rgbToRgbaTime = performance.now() - rgbToRgbaStart
-
-  // Step 2: createImageData + putImageData
-  const putImageDataStart = performance.now()
-  const imageData = ctx.createImageData(width, height)
-  imageData.data.set(rgbaPixels)
-  ctx.putImageData(imageData, 0, 0)
-  const putImageDataTime = performance.now() - putImageDataStart
-
-  // Step 3: JPEG encoding via canvas.toBlob
-  const jpegEncodeStart = performance.now()
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => {
-        if (b) resolve(b)
-        else reject(new Error('Failed to create blob'))
-      },
-      'image/jpeg',
-      0.9,
-    )
-  })
-  const jpegEncodeTime = performance.now() - jpegEncodeStart
-
-  const url = URL.createObjectURL(blob)
-  const totalTime = performance.now() - totalStart
-
-  const timing: PixelsToUrlTiming = {
-    rgbToRgba: rgbToRgbaTime,
-    putImageData: putImageDataTime,
-    jpegEncode: jpegEncodeTime,
-    total: totalTime,
-  }
-
-  console.log(
-    `[useEditPreview] pixelsToUrl: rgbToRgba=${timing.rgbToRgba.toFixed(1)}ms putImageData=${timing.putImageData.toFixed(1)}ms jpegEncode=${timing.jpegEncode.toFixed(1)}ms total=${timing.total.toFixed(1)}ms`,
-  )
-
-  return { url, timing }
-}
 
 interface PixelsToImageBitmapResult {
   bitmap: ImageBitmap
@@ -854,11 +758,9 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         ? (editStore.masks.linearMasks.length > 0 || editStore.masks.radialMasks.length > 0)
         : false
 
-      let resultUrl: string
-
       if (!hasAdjustments && !hasTransforms && !hasMasks) {
         // No adjustments or transforms, use source directly (borrowed URL)
-        resultUrl = sourceUrl.value!
+        previewUrl.value = sourceUrl.value!
         isPreviewUrlOwned.value = false
 
         // Still compute clipping from source pixels
@@ -1039,7 +941,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
 
                 // Continue to finally block
                 return
-              } else {
+              }
+              else {
                 console.log('[useEditPreview] WebGPU canvas texture not available, falling back to bitmap path')
               }
             }
@@ -1092,7 +995,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
               currentPixels = rotationResult.pixels
               currentWidth = rotationResult.width
               currentHeight = rotationResult.height
-            } else {
+            }
+            else {
               // No rotation - need to convert RGBA to RGB for crop (WASM expects RGB)
               const rgbPixels = new Uint8Array(currentWidth * currentHeight * 3)
               for (let i = 0, j = 0; i < currentPixels.length; i += 4, j += 3) {
@@ -1727,7 +1631,8 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
         if (sourceCache.value) {
           renderPreview('full')
         }
-      } else {
+      }
+      else {
         console.log('[useEditPreview] WebGPU canvas configuration failed, using fallback')
         isWebGPURenderingActive.value = false
       }
@@ -1759,7 +1664,7 @@ export function useEditPreview(assetId: Ref<string>): UseEditPreviewReturn {
       if (newState === 'interacting' && catalog) {
         catalog.cancelBackgroundPreloads()
       }
-    }
+    },
   )
 
   // ============================================================================

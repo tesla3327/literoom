@@ -46,7 +46,7 @@ function isValidSortDirection(value: string): value is SortDirection {
 // Session Storage Helpers
 // ============================================================================
 
-function getStorageValue<T>(key: string, validator: (v: string) => v is T, defaultValue: T): T {
+function getStorageValue<T extends string>(key: string, validator: (v: string) => v is T, defaultValue: T): T {
   if (import.meta.server) return defaultValue
   try {
     const stored = sessionStorage.getItem(key)

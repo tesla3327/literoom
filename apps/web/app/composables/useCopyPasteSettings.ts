@@ -6,6 +6,7 @@
  * - Paste clipboard settings to current or selected assets
  * - Integration with selection store for batch operations
  */
+import type { DeepReadonly } from '@vue/reactivity'
 import type { CopiedSettings, CopyGroups } from '~/stores/editClipboard'
 import { useClipboard } from '@vueuse/core'
 
@@ -165,10 +166,11 @@ export function useCopyPasteSettings() {
   /**
    * Apply copied settings to a single asset.
    * Returns true if successful.
+   * Note: settings may be deeply readonly when coming from the clipboard store.
    */
   async function applySettingsToAsset(
     assetId: string,
-    settings: CopiedSettings | Readonly<CopiedSettings>,
+    settings: CopiedSettings | DeepReadonly<CopiedSettings>,
   ): Promise<boolean> {
     try {
       // If this is the currently selected asset, apply via edit store
@@ -195,7 +197,7 @@ export function useCopyPasteSettings() {
    * Apply settings directly to the edit store (current asset).
    * Takes a readonly settings object and creates mutable copies for the store.
    */
-  function applyToEditStore(settings: CopiedSettings | Readonly<CopiedSettings>): void {
+  function applyToEditStore(settings: CopiedSettings | DeepReadonly<CopiedSettings>): void {
     // Apply basic adjustments
     if (settings.data.adjustments) {
       editStore.setAdjustments({ ...settings.data.adjustments })

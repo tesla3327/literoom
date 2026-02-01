@@ -239,7 +239,7 @@ describe('useHelpModal patterns', () => {
       // Note: happy-dom may not fully support isContentEditable property
       // In a real browser, this would return true
       // We check for the expected behavior or skip if happy-dom doesn't support it
-      const result = shouldIgnoreShortcuts()
+      shouldIgnoreShortcuts()
       // If happy-dom supports isContentEditable, it should return true
       // If not, we verify the element was at least focused
       expect(document.activeElement).toBe(div)

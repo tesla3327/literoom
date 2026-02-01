@@ -5,6 +5,9 @@
  * that work in both browser and Tauri environments.
  */
 
+// Note: File System Access API types are declared in ./types/file-system-access.d.ts
+// They are automatically included by TypeScript via the tsconfig include pattern
+
 export * from './filesystem'
 
 // Re-export decode module, excluding Adjustments (which is superseded by catalog/types Adjustments)

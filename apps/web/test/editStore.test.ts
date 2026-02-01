@@ -805,13 +805,6 @@ describe('editStore', () => {
       await store.loadForAsset('test-asset-123')
       store.setAdjustment('exposure', 1.0) // Make dirty
 
-      // Create a promise that we can control to observe isSaving during execution
-      let isSavingDuringSave = false
-
-      // Since the current implementation doesn't actually call the DB,
-      // we need to check that isSaving transitions correctly
-      const originalSave = store.save.bind(store)
-
       // We'll verify by checking the state transitions
       expect(store.isSaving).toBe(false)
 

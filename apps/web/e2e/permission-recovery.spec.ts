@@ -32,8 +32,8 @@ test.describe('Permission Recovery', () => {
 
       // These elements may or may not be visible depending on state
       // Just verify no crash when looking for them
-      const buttonVisible = await permissionButton.isVisible().catch(() => false)
-      const indicatorVisible = await permissionIndicator.isVisible().catch(() => false)
+      await permissionButton.isVisible().catch(() => false)
+      await permissionIndicator.isVisible().catch(() => false)
 
       // At least verify the page loaded correctly
       await expect(page.locator('[data-testid="catalog-grid"]')).toBeVisible()
@@ -114,10 +114,6 @@ test.describe('Permission Recovery', () => {
       // This test verifies error UI exists
       // In normal demo mode, there won't be errors
 
-      // Look for error-related UI elements
-      const errorMessage = page.locator('[data-testid="error-message"]')
-      const errorToast = page.locator('[data-testid="error-toast"]')
-
       // Just verify app is functional
       await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
 
@@ -126,10 +122,6 @@ test.describe('Permission Recovery', () => {
     })
 
     test('retry functionality is available', async ({ page }) => {
-      // Check for retry buttons/links in the UI
-      const retryButton = page.locator('[data-testid="retry-permission-button"]')
-      const retryAllButton = page.locator('[data-testid="retry-all-permissions-button"]')
-
       // These may not be visible in demo mode, just verify no crash
       await page.waitForSelector('[data-testid="catalog-grid"]', { timeout: 15000 })
 
@@ -187,7 +179,7 @@ test.describe('Permission Recovery Integration', () => {
       if (sliderBounds) {
         await page.mouse.click(
           sliderBounds.x + sliderBounds.width * 0.6,
-          sliderBounds.y + sliderBounds.height / 2
+          sliderBounds.y + sliderBounds.height / 2,
         )
         await page.waitForTimeout(200)
       }

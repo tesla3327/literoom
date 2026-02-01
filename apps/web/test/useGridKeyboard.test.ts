@@ -9,8 +9,7 @@
  * - scrollIntoViewIfNeeded helper
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref, computed } from 'vue'
+import { describe, it, expect, vi } from 'vitest'
 
 // Re-implement the composable logic for testing since Vue composables
 // can be tricky to test in isolation without full Vue context
@@ -710,8 +709,8 @@ describe('scrollIntoViewIfNeeded', () => {
   it('calls scrollIntoViewIfNeeded if available', () => {
     const element = document.createElement('div')
     const mockScrollIntoViewIfNeeded = vi.fn()
-    ;(element as HTMLElement & { scrollIntoViewIfNeeded: () => void }).scrollIntoViewIfNeeded =
-      mockScrollIntoViewIfNeeded
+    ;(element as HTMLElement & { scrollIntoViewIfNeeded: () => void }).scrollIntoViewIfNeeded
+      = mockScrollIntoViewIfNeeded
 
     scrollIntoViewIfNeeded(element)
 
@@ -739,28 +738,17 @@ describe('scrollIntoViewIfNeeded', () => {
 
 describe('edge cases', () => {
   it('handles single item grid', () => {
-    const ctx = {
-      currentIndex: 0,
-      orderedIds: ['single-id'],
-      columnsCount: 4,
-      onNavigate: vi.fn(),
-      onFlag: vi.fn(),
-      onViewChange: vi.fn(),
-      onDelete: vi.fn(),
-    }
-
     // Cannot navigate anywhere
     const state = { currentIndex: 0, columnsCount: 4, totalItems: 1 }
     expect(
       (() => {
-        const { currentIndex, columnsCount, totalItems } = state
+        const { currentIndex, totalItems } = state
         return currentIndex < totalItems - 1 ? currentIndex + 1 : currentIndex
       })(),
     ).toBe(0)
   })
 
   it('handles large grid', () => {
-    const orderedIds = Array.from({ length: 1000 }, (_, i) => `id-${i}`)
     const state = { currentIndex: 500, columnsCount: 5, totalItems: 1000 }
 
     // Down navigation

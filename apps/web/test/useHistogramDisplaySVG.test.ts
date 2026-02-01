@@ -154,7 +154,7 @@ describe('histogramToPath algorithm', () => {
   ): string {
     if (maxValue === 0) return ''
 
-    const points: { x: number; y: number }[] = []
+    const points: { x: number, y: number }[] = []
 
     for (let i = 0; i < 256; i += SAMPLE_RATE) {
       let sum = 0
@@ -385,13 +385,12 @@ describe('SVG constants', () => {
 describe('edge cases', () => {
   describe('histogram path generation', () => {
     it('handles all-zero histogram', () => {
-      const data = new Uint32Array(256).fill(0)
       // With maxValue > 0 but all data is 0, should still generate valid path
       const SVG_WIDTH = 256
       const SVG_HEIGHT = 192
 
       // Basic validation that algorithm handles this case
-      const points: { x: number; y: number }[] = []
+      const points: { x: number, y: number }[] = []
       for (let i = 0; i < 256; i += 4) {
         const x = (i / 255) * SVG_WIDTH
         const y = SVG_HEIGHT - (0 / 100) * SVG_HEIGHT
@@ -432,7 +431,7 @@ describe('edge cases', () => {
       const maxValue = 0xFFFFFFFF
 
       // Should not overflow or error
-      const points: { x: number; y: number }[] = []
+      const points: { x: number, y: number }[] = []
       const SVG_HEIGHT = 192
 
       const value = data[0]!
@@ -484,7 +483,6 @@ describe('performance characteristics', () => {
     }
 
     // With averaging, the noise should be reduced
-    const SAMPLE_RATE = 4
     const sum = (data[0]! + data[1]! + data[2]! + data[3]!) / 4
     expect(sum).toBeCloseTo(50, 0) // Average should be around 50
   })

@@ -8,9 +8,7 @@
  * - Edge cases with different step sizes
  */
 
-import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { h, computed } from 'vue'
+import { describe, it, expect } from 'vitest'
 
 // ============================================================================
 // Test Helpers

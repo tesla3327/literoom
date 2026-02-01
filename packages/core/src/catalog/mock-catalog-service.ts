@@ -21,6 +21,7 @@ import {
   type AssetUpdatedCallback,
   type ThumbnailReadyCallback,
   type PreviewReadyCallback,
+  type PhotoReadyCallback,
   type FolderInfo,
   ThumbnailPriority,
   CatalogError,
@@ -176,6 +177,7 @@ export class MockCatalogService implements ICatalogService {
   private _onAssetUpdated: AssetUpdatedCallback | null = null
   private _onThumbnailReady: ThumbnailReadyCallback | null = null
   private _onPreviewReady: PreviewReadyCallback | null = null
+  private _onPhotoReady: PhotoReadyCallback | null = null
 
   /**
    * Private constructor - use MockCatalogService.create() instead.
@@ -679,6 +681,14 @@ export class MockCatalogService implements ICatalogService {
 
   get onPreviewReady(): PreviewReadyCallback | null {
     return this._onPreviewReady
+  }
+
+  set onPhotoReady(callback: PhotoReadyCallback | null) {
+    this._onPhotoReady = callback
+  }
+
+  get onPhotoReady(): PhotoReadyCallback | null {
+    return this._onPhotoReady
   }
 
   // ==========================================================================

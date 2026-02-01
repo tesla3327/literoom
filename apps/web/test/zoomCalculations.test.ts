@@ -25,7 +25,6 @@ import {
   MAX_ZOOM,
   ZOOM_STEP,
   type Camera,
-  type ZoomPreset,
   type Dimensions,
 } from '~/utils/zoomCalculations'
 

@@ -382,7 +382,7 @@ function handleReset() {
           <EditRotationControls />
 
           <!-- Divider -->
-          <hr class="border-gray-700" />
+          <hr class="border-gray-700">
 
           <!-- Crop Editor -->
           <EditCropEditor
@@ -397,7 +397,7 @@ function handleReset() {
       <template #masks-body>
         <div class="pt-2 space-y-4">
           <EditMaskPanel />
-          <hr class="border-gray-700" />
+          <hr class="border-gray-700">
           <EditMaskAdjustments />
         </div>
       </template>

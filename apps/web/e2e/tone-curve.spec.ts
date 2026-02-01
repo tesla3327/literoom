@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { test } from '@playwright/test'
 
 /**
  * Tone Curve E2E Tests
@@ -32,14 +32,14 @@ test.describe('Tone Curve', () => {
   test.describe('Tone Curve Panel', () => {
     test('tone curve section is visible in edit panel', async ({ page }) => {
       // Look for the tone curve section header or container
-      const toneCurveSection = page.locator('[data-testid="tone-curve-section"]')
+      page.locator('[data-testid="tone-curve-section"]')
       // May need to scroll to see it
       await page.waitForTimeout(500)
     })
 
     test('tone curve canvas exists', async ({ page }) => {
       // The tone curve editor should have a canvas or SVG element
-      const curveCanvas = page.locator('[data-testid="tone-curve-canvas"]')
+      page.locator('[data-testid="tone-curve-canvas"]')
       await page.waitForTimeout(500)
     })
 
@@ -51,7 +51,7 @@ test.describe('Tone Curve', () => {
         await page.waitForTimeout(300)
 
         // Curve canvas should now be visible
-        const curveCanvas = page.locator('[data-testid="tone-curve-canvas"]')
+        page.locator('[data-testid="tone-curve-canvas"]')
         // Check it doesn't crash
       }
     })
@@ -141,7 +141,7 @@ test.describe('Tone Curve', () => {
 
   test.describe('Channel Selection', () => {
     test('RGB channel button exists', async ({ page }) => {
-      const rgbButton = page.locator('[data-testid="curve-channel-rgb"]')
+      page.locator('[data-testid="curve-channel-rgb"]')
       await page.waitForTimeout(500)
     })
 
@@ -175,7 +175,7 @@ test.describe('Tone Curve', () => {
 
   test.describe('Curve Reset', () => {
     test('reset curve button exists', async ({ page }) => {
-      const resetButton = page.locator('[data-testid="reset-tone-curve-button"]')
+      page.locator('[data-testid="reset-tone-curve-button"]')
       await page.waitForTimeout(500)
     })
 
@@ -212,7 +212,7 @@ test.describe('Tone Curve', () => {
 
   test.describe('Curve Presets', () => {
     test('curve presets dropdown exists', async ({ page }) => {
-      const presetsDropdown = page.locator('[data-testid="curve-presets-dropdown"]')
+      page.locator('[data-testid="curve-presets-dropdown"]')
       await page.waitForTimeout(500)
     })
 

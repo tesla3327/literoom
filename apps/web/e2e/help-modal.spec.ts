@@ -122,7 +122,7 @@ test.describe('Help Modal', () => {
     await expect(modal.getByText(/J.*Clipping/i)).toBeVisible()
   })
 
-  test('shortcuts are ignored when typing in input', async ({ page }) => {
+  test('shortcuts are ignored when typing in input', async ({ page: _page }) => {
     // Find an input field if available or create test scenario
     // For now, just verify the modal doesn't open when an input is focused
 
