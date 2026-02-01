@@ -309,6 +309,8 @@ export class CatalogService implements ICatalogService {
           .first()
 
         let asset: Asset
+        let isNew = false
+        let isModified = false
 
         if (existingAsset) {
           // Asset already exists - check if modified
@@ -317,10 +319,21 @@ export class CatalogService implements ICatalogService {
               fileSize: scannedFile.fileSize,
               modifiedDate: scannedFile.modifiedDate,
             })
+            isModified = true
           }
-          asset = this.assetRecordToAsset(existingAsset)
+
+          // Preserve existing in-memory asset if available (keeps thumbnail state)
+          const existingInMemory = this._assets.get(existingAsset.uuid)
+          if (existingInMemory && !isModified) {
+            // Unmodified existing asset - keep current state
+            asset = existingInMemory
+          } else {
+            // Modified or not in memory - create fresh
+            asset = this.assetRecordToAsset(existingAsset)
+          }
         } else {
           // New asset - create record
+          isNew = true
           const uuid = crypto.randomUUID()
           const assetRecord: AssetRecord = {
             uuid,
@@ -342,15 +355,19 @@ export class CatalogService implements ICatalogService {
         // Add to in-memory collection
         this._assets.set(asset.id, asset)
 
-        // Notify listeners of new asset
-        this._onAssetsAdded?.([asset])
+        // Only notify listeners for genuinely new assets
+        if (isNew) {
+          this._onAssetsAdded?.([asset])
+        }
 
-        // Queue for photo processing immediately
-        const getBytes = this.createGetBytesFunction(asset)
-        this.photoProcessor.enqueue({
-          assetId: asset.id,
-          getBytes,
-        })
+        // Only queue new or modified assets for processing
+        if (isNew || isModified) {
+          const getBytes = this.createGetBytesFunction(asset)
+          this.photoProcessor.enqueue({
+            assetId: asset.id,
+            getBytes,
+          })
+        }
 
         // Update progress
         const progress: ScanProgress = {
